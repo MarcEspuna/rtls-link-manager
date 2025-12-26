@@ -14,6 +14,8 @@ interface BulkResult {
   error?: string;
 }
 
+const COMMAND_TIMEOUT_MS = 5000;
+
 export function BulkActions({ devices }: BulkActionsProps) {
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [results, setResults] = useState<BulkResult[]>([]);
@@ -37,11 +39,30 @@ export function BulkActions({ devices }: BulkActionsProps) {
           try {
             const ws = new WebSocket(`ws://${device.ip}/ws`);
             await new Promise<void>((resolve, reject) => {
-              ws.onopen = () => { ws.send(command); resolve(); };
-              ws.onerror = reject;
-              setTimeout(() => reject(new Error('Timeout')), 5000);
+              const timeout = setTimeout(() => {
+                ws.close();
+                reject(new Error('Timeout'));
+              }, COMMAND_TIMEOUT_MS);
+
+              ws.onopen = () => ws.send(command);
+
+              ws.onmessage = (event) => {
+                clearTimeout(timeout);
+                const response = event.data.toString().toLowerCase();
+                if (response.includes('error') || response.includes('fail')) {
+                  reject(new Error(event.data.toString()));
+                } else {
+                  resolve();
+                }
+                ws.close();
+              };
+
+              ws.onerror = () => {
+                clearTimeout(timeout);
+                ws.close();
+                reject(new Error('WebSocket error'));
+              };
             });
-            ws.close();
             return { device, success: true };
           } catch (e) {
             return {
@@ -66,17 +87,17 @@ export function BulkActions({ devices }: BulkActionsProps) {
 
       <div className={styles.actions}>
         <button onClick={() => executeBulk(Commands.toggleLed())}>
-          💡 Toggle LEDs
+          Toggle LEDs
         </button>
         <button onClick={() => executeBulk(Commands.start())}>
-          ▶️ Start UWB
+          Start UWB
         </button>
         <button
           onClick={() => executeBulk(Commands.reboot(), {
             confirm: `Reboot ${devices.length} devices?`
           })}
         >
-          🔄 Reboot All
+          Reboot All
         </button>
       </div>
 
@@ -91,7 +112,7 @@ export function BulkActions({ devices }: BulkActionsProps) {
         <div className={styles.results}>
           {results.map(r => (
             <div key={r.device.ip} className={r.success ? styles.success : styles.error}>
-              {r.success ? '✓' : '✗'} {r.device.id} ({r.device.ip})
+              {r.success ? 'OK' : 'FAIL'} {r.device.id} ({r.device.ip})
               {r.error && <span className={styles.errorMsg}>{r.error}</span>}
             </div>
           ))}

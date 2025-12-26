@@ -4,7 +4,7 @@ import { Commands, isJsonCommand } from '../commands.js';
 describe('Commands', () => {
   it('builds readParam command correctly', () => {
     expect(Commands.readParam('wifi', 'mode'))
-      .toBe('read --group wifi --name mode');
+      .toBe('read -group wifi -name mode');
   });
 
   it('builds readAll command with group', () => {
@@ -14,7 +14,7 @@ describe('Commands', () => {
 
   it('builds writeParam command with value', () => {
     expect(Commands.writeParam('uwb', 'mode', 4))
-      .toBe('write --group uwb --name mode --data "4"');
+      .toBe('write -group uwb -name mode -data "4"');
   });
 });
 

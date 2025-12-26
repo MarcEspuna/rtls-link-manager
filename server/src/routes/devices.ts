@@ -1,33 +1,22 @@
 import { FastifyPluginAsync } from 'fastify';
-import { DiscoveryService } from '../services/discovery.js';
+import { discoveryService } from '../services/discovery.js';
 
 export const deviceRoutes: FastifyPluginAsync = async (app) => {
-  const discovery = new DiscoveryService();
-
-  // Get cached devices
+  // Get cached devices (auto-prunes stale devices)
   app.get('/devices', async () => {
-    return { devices: discovery.getDevices() };
+    return { devices: discoveryService.getDevices() };
   });
 
-  // Trigger new discovery
-  app.post('/devices/discover', async (req) => {
-    const {
-      broadcast = '192.168.0.255',
-      port = 3333,
-      timeout = 2000,
-    } = (req.body as any) || {};
-    const devices = await discovery.discover({
-      broadcastAddress: broadcast,
-      port,
-      timeout,
-    });
-    return { devices };
+  // Clear device list
+  app.delete('/devices', async () => {
+    discoveryService.clearDevices();
+    return { success: true };
   });
 
   // Get single device
   app.get('/devices/:ip', async (req) => {
     const { ip } = req.params as { ip: string };
-    const device = discovery.getDevice(ip);
+    const device = discoveryService.getDevice(ip);
     if (!device) {
       return { error: 'Device not found' };
     }

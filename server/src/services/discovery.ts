@@ -1,67 +1,66 @@
 import dgram from 'dgram';
-import { Device, DiscoveryOptions } from '../../../shared/types.js';
-
-const DISCOVER_COMMAND = 'RTLS_DISCOVER';
-const DEFAULT_OPTIONS: DiscoveryOptions = {
-  broadcastAddress: '192.168.0.255',
-  port: 3333,
-  timeout: 2000,
-};
+import { Device } from '../../../shared/types.js';
 
 export class DiscoveryService {
   private devices: Map<string, Device> = new Map();
+  private socket: dgram.Socket | null = null;
+  private readonly TTL_MS = 5 * 1000; // 5 seconds (heartbeat timeout)
+  private readonly PORT = 3333;
+
+  start(): void {
+    if (this.socket) return; // Already running
+
+    this.socket = dgram.createSocket('udp4');
+
+    this.socket.on('message', (msg, rinfo) => {
+      try {
+        const data = JSON.parse(msg.toString());
+        const device = this.parseDeviceResponse(data, rinfo.address);
+        this.devices.set(device.ip, device);
+        console.log(`Heartbeat from ${device.id} (${device.ip})`);
+      } catch (err) {
+        console.error('Invalid heartbeat packet:', err);
+      }
+    });
+
+    this.socket.on('error', (err) => {
+      console.error('Discovery socket error:', err);
+    });
+
+    this.socket.bind(this.PORT, () => {
+      console.log(`Listening for device heartbeats on port ${this.PORT}`);
+    });
+  }
+
+  stop(): void {
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+    }
+  }
 
   getDevices(): Device[] {
+    this.pruneStaleDevices();
     return Array.from(this.devices.values());
   }
 
   getDevice(ip: string): Device | undefined {
+    this.pruneStaleDevices();
     return this.devices.get(ip);
   }
 
-  async discover(options: Partial<DiscoveryOptions> = {}): Promise<Device[]> {
-    const opts = { ...DEFAULT_OPTIONS, ...options };
-    const discovered: Device[] = [];
-    const seen = new Set<string>();
+  clearDevices(): void {
+    this.devices.clear();
+  }
 
-    return new Promise((resolve) => {
-      const socket = dgram.createSocket('udp4');
-
-      socket.on('message', (msg, rinfo) => {
-        if (seen.has(rinfo.address)) return;
-        seen.add(rinfo.address);
-
-        try {
-          const data = JSON.parse(msg.toString());
-          const device = this.parseDeviceResponse(data, rinfo.address);
-          discovered.push(device);
-          this.devices.set(device.ip, device);
-        } catch (e) {
-          // Invalid JSON, skip
-        }
-      });
-
-      socket.bind(() => {
-        socket.setBroadcast(true);
-        socket.send(
-          DISCOVER_COMMAND,
-          opts.port,
-          opts.broadcastAddress,
-          (err) => {
-             if (err) console.error('Error sending discovery packet:', err);
-          }
-        );
-      });
-
-      setTimeout(() => {
-        try {
-            socket.close();
-        } catch (e) {
-            // ignore if already closed
-        }
-        resolve(discovered);
-      }, opts.timeout);
-    });
+  private pruneStaleDevices(): void {
+    const now = Date.now();
+    for (const [ip, device] of this.devices) {
+      if (device.lastSeen && now - device.lastSeen.getTime() > this.TTL_MS) {
+        console.log(`Pruning stale device: ${device.id} (${ip})`);
+        this.devices.delete(ip);
+      }
+    }
   }
 
   private parseDeviceResponse(data: any, ip: string): Device {
@@ -78,3 +77,7 @@ export class DiscoveryService {
     };
   }
 }
+
+// Singleton instance that starts on import
+export const discoveryService = new DiscoveryService();
+discoveryService.start();

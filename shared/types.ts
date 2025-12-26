@@ -68,8 +68,3 @@ export interface CommandResult {
   error?: string;
 }
 
-export interface DiscoveryOptions {
-  broadcastAddress: string;
-  port: number;
-  timeout: number;
-}

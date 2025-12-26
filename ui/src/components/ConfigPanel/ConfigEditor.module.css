@@ -109,6 +109,12 @@
   transition: all 0.2s;
 }
 
+.anchorRowGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .anchorRow:hover {
   border-color: var(--border-color-light);
 }
@@ -135,6 +141,40 @@
   text-align: left;
   font-family: monospace;
   letter-spacing: 0.05em;
+}
+
+.inputError {
+  border-color: var(--accent-danger) !important;
+  box-shadow: 0 0 0 2px var(--accent-danger-muted);
+}
+
+.anchorError {
+  font-size: 0.75rem;
+  color: var(--accent-danger);
+  padding-left: 8px;
+}
+
+.anchorErrorBanner {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--accent-danger-muted);
+  color: var(--accent-danger);
+  font-size: 0.8rem;
+}
+
+.inputWithError {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.fieldError {
+  font-size: 0.75rem;
+  color: var(--accent-danger);
+  max-width: 180px;
+  text-align: right;
 }
 
 .removeBtn {

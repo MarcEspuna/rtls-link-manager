@@ -6,11 +6,11 @@ import styles from './DeviceGrid.module.css';
 
 interface DeviceGridProps {
   devices: Device[];
-  onRefresh: () => void;
+  onClear: () => void;
   onConfigure: (device: Device) => void;
 }
 
-export function DeviceGrid({ devices, onRefresh, onConfigure }: DeviceGridProps) {
+export function DeviceGrid({ devices, onClear, onConfigure }: DeviceGridProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const handleSelectAll = () => {
@@ -36,7 +36,8 @@ export function DeviceGrid({ devices, onRefresh, onConfigure }: DeviceGridProps)
   return (
     <div className={styles.container}>
       <div className={styles.toolbar}>
-        <button className={styles.btnPrimary} onClick={onRefresh}>🔍 Discover</button>
+        <span className={styles.listening}>Listening for devices...</span>
+        <button className={styles.btnSecondary} onClick={onClear}>Clear List</button>
         <button className={styles.btnSecondary} onClick={handleSelectAll}>
           {selected.size === devices.length ? 'Deselect All' : 'Select All'}
         </button>

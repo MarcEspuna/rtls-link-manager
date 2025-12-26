@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Device, DeviceConfig } from '@shared/types';
 import { Commands } from '@shared/commands';
-import { flatToAnchors } from '@shared/anchors';
+import { flatToAnchors, getAnchorWriteCommands, normalizeUwbShortAddr } from '@shared/anchors';
 import { useDeviceCommand } from '../../hooks/useDeviceWebSocket';
 import { ConfigEditor } from './ConfigEditor';
 import styles from './ConfigPanel.module.css';
@@ -12,26 +12,52 @@ interface ConfigPanelProps {
 }
 
 export function ConfigPanel({ device, onClose }: ConfigPanelProps) {
-  const { sendCommand, loading } = useDeviceCommand(device.ip);
+  const { sendCommand, sendCommands, loading, close } = useDeviceCommand(device.ip, { mode: 'persistent' });
   const [config, setConfig] = useState<DeviceConfig | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
   const [activeConfig, setActiveConfig] = useState<string | null>(null);
+  const [previewingConfig, setPreviewingConfig] = useState<string | null>(null);
+  const [anchorBusy, setAnchorBusy] = useState(false);
+  const [anchorError, setAnchorError] = useState<string | null>(null);
+
+  const findCommandError = (responses: string[] | null): string | null => {
+    if (!responses) return 'No response from device';
+    for (const response of responses) {
+      if (/error|fail|invalid|not found/i.test(response)) {
+        return response;
+      }
+    }
+    return null;
+  };
 
   useEffect(() => {
     loadConfig();
     loadSavedConfigs();
-  }, [device.ip]);
+    return () => {
+      close();
+    };
+  }, [device.ip, close]);
+
+  const transformConfigResult = (result: any): DeviceConfig => {
+    // Safe access to uwb object (might be missing in older firmware or error cases)
+    const uwb = result.uwb || {};
+    // Transform flat anchor fields (devId1, x1, y1, z1, etc.) to anchors array
+    const anchors = flatToAnchors(uwb, uwb.anchorCount || 0);
+    return {
+      ...result,
+      uwb: {
+        ...uwb,
+        devShortAddr: normalizeUwbShortAddr(uwb.devShortAddr),
+        anchors,
+      }
+    };
+  };
 
   const loadConfig = async () => {
     const result = await sendCommand<any>(Commands.backupConfig());
     if (result) {
-      // Transform flat anchor fields (devId1, x1, y1, z1, etc.) to anchors array
-      const anchors = flatToAnchors(result.uwb, result.uwb?.anchorCount || 0);
-      const config: DeviceConfig = {
-        ...result,
-        uwb: { ...result.uwb, anchors }
-      };
-      setConfig(config);
+      setConfig(transformConfigResult(result));
+      setPreviewingConfig(null); // Clear preview mode when loading current config
     }
   };
 
@@ -46,21 +72,71 @@ export function ConfigPanel({ device, onClose }: ConfigPanelProps) {
   };
 
   const handleSave = async () => {
-    await sendCommand(Commands.saveConfig());
-    alert('Configuration saved to device');
+    if (!config) return;
+    try {
+      const anchorCommands = getAnchorWriteCommands(config.uwb.anchors || [])
+        .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
+      const batch = [...anchorCommands, Commands.saveConfig()];
+      const result = await sendCommands(batch);
+      const errorMessage = findCommandError(result);
+      if (errorMessage) {
+        throw new Error(errorMessage);
+      }
+      alert('Configuration saved to device');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to save configuration');
+    }
   };
 
   const handleSaveAs = async () => {
     const name = prompt('Configuration name:');
     if (name) {
-      await sendCommand(Commands.saveConfigAs(name));
-      await loadSavedConfigs();
+      try {
+        if (config) {
+          const anchorCommands = getAnchorWriteCommands(config.uwb.anchors || [])
+            .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
+          const batch = [...anchorCommands, Commands.saveConfigAs(name)];
+          const result = await sendCommands(batch);
+          const errorMessage = findCommandError(result);
+          if (errorMessage) {
+            throw new Error(errorMessage);
+          }
+        } else {
+          await sendCommand(Commands.saveConfigAs(name));
+        }
+        await loadSavedConfigs();
+      } catch (e) {
+        alert(e instanceof Error ? e.message : 'Failed to save configuration');
+      }
     }
   };
 
-  const handleLoadNamed = async (name: string) => {
-    await sendCommand(Commands.loadConfigNamed(name));
-    await loadConfig();
+  const handlePreviewConfig = async (name: string) => {
+    const result = await sendCommand<any>(Commands.readConfigNamed(name));
+    if (result && !result.error) {
+      setConfig(transformConfigResult(result));
+      setPreviewingConfig(name);
+    } else {
+      alert(result?.error || 'Failed to load configuration preview');
+    }
+  };
+
+  const handleActivate = async () => {
+    if (!previewingConfig) return;
+    try {
+      const result = await sendCommand<{ success: boolean; error?: string }>(
+        Commands.loadConfigNamed(previewingConfig)
+      );
+      if (result?.success) {
+        await loadSavedConfigs(); // Refresh active config badge
+        setPreviewingConfig(null);
+        alert(`Configuration "${previewingConfig}" activated successfully`);
+      } else {
+        throw new Error(result?.error || 'Failed to activate configuration');
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Failed to activate configuration');
+    }
   };
 
   return (
@@ -72,10 +148,24 @@ export function ConfigPanel({ device, onClose }: ConfigPanelProps) {
             <h3>Config: {device.id}</h3>
             <button className={styles.closeBtn} onClick={onClose}>×</button>
           </div>
+          {previewingConfig && (
+            <div className={styles.previewBanner}>
+              <span>Previewing: <strong>{previewingConfig}</strong></span>
+              {previewingConfig !== activeConfig && (
+                <button
+                  className={styles.btnActivate}
+                  onClick={handleActivate}
+                  disabled={loading}
+                >
+                  Activate
+                </button>
+              )}
+            </div>
+          )}
           <div className={styles.actions}>
-              <button className={styles.btnPrimary} onClick={handleSave} disabled={loading}>Save</button>
-              <button className={styles.btnSecondary} onClick={handleSaveAs} disabled={loading}>Save As...</button>
-              <button className={styles.btnSecondary} onClick={loadConfig} disabled={loading}>Reload</button>
+              <button className={styles.btnPrimary} onClick={handleSave} disabled={loading || anchorBusy}>Save</button>
+              <button className={styles.btnSecondary} onClick={handleSaveAs} disabled={loading || anchorBusy}>Save As...</button>
+              <button className={styles.btnSecondary} onClick={loadConfig} disabled={loading || anchorBusy}>Reload</button>
           </div>
         </div>
 
@@ -87,8 +177,8 @@ export function ConfigPanel({ device, onClose }: ConfigPanelProps) {
                   {savedConfigs.map(name => (
                     <button
                       key={name}
-                      onClick={() => handleLoadNamed(name)}
-                      className={`${styles.tag} ${name === activeConfig ? styles.tagActive : ''}`}
+                      onClick={() => handlePreviewConfig(name)}
+                      className={`${styles.tag} ${name === activeConfig ? styles.tagActive : ''} ${name === previewingConfig ? styles.tagPreviewing : ''}`}
                     >
                       {name}
                       {name === activeConfig && <span className={styles.activeIndicator}>Active</span>}
@@ -105,9 +195,19 @@ export function ConfigPanel({ device, onClose }: ConfigPanelProps) {
               onApply={async (group, name, value) => {
                 await sendCommand(Commands.writeParam(group, name, value));
               }}
+              onApplyBatch={async (commands) => {
+                const result = await sendCommands(commands);
+                const errorMessage = findCommandError(result);
+                if (errorMessage) {
+                  throw new Error(errorMessage);
+                }
+              }}
+              onAnchorsBusyChange={setAnchorBusy}
+              onAnchorsError={setAnchorError}
+              anchorError={anchorError}
             />
           ) : (
-            <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>
               {loading ? 'Loading configuration...' : 'Failed to load configuration'}
             </div>
           )}

@@ -4,11 +4,11 @@ export const Commands = {
     group ? `readall ${group}` : 'readall all',
 
   readParam: (group: string, name: string) =>
-    `read --group ${group} --name ${name}`,
+    `read -group ${group} -name ${name}`,
 
   writeParam: (group: string, name: string, value: string | number) => {
     const safeValue = String(value).replace(/["\\]/g, '\\$&');
-    return `write --group ${group} --name ${name} --data "${safeValue}"`;
+    return `write -group ${group} -name ${name} -data "${safeValue}"`;
   },
 
   // Config commands
@@ -16,9 +16,10 @@ export const Commands = {
   saveConfig: () => 'save-config',
   loadConfig: () => 'load-config',
   listConfigs: () => 'list-configs',
-  saveConfigAs: (name: string) => `save-config-as --name ${name}`,
-  loadConfigNamed: (name: string) => `load-config-named --name ${name}`,
-  deleteConfig: (name: string) => `delete-config --name ${name}`,
+  saveConfigAs: (name: string) => `save-config-as -name ${name}`,
+  loadConfigNamed: (name: string) => `load-config-named -name ${name}`,
+  readConfigNamed: (name: string) => `read-config-named -name ${name}`,
+  deleteConfig: (name: string) => `delete-config -name ${name}`,
 
   // Control commands
   toggleLed: () => 'toggle-led2',
@@ -33,6 +34,7 @@ export const JSON_COMMANDS = [
   'list-configs',
   'save-config-as',
   'load-config-named',
+  'read-config-named',
   'delete-config',
   'toggle-led2',
   'get-led2-state',

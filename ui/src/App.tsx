@@ -20,24 +20,20 @@ function App() {
     }
   };
 
-  const handleDiscover = async () => {
+  const handleClearDevices = async () => {
     try {
-      const res = await fetch('/api/devices/discover', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timeout: 2000 })
-      });
-      const data = await res.json();
-      if (data.devices) {
-        setDevices(data.devices);
-      }
+      await fetch('/api/devices', { method: 'DELETE' });
+      setDevices([]);
     } catch (e) {
-      console.error('Discovery failed', e);
+      console.error('Failed to clear devices', e);
     }
   };
 
+  // Auto-refresh: fetch devices every 3 seconds
   useEffect(() => {
-    fetchDevices();
+    fetchDevices(); // Initial fetch
+    const interval = setInterval(fetchDevices, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -46,14 +42,14 @@ function App() {
         <h1>RTLS-Link Swarm Manager</h1>
       </header>
       <main>
-        <DeviceGrid 
-          devices={devices} 
-          onRefresh={handleDiscover}
+        <DeviceGrid
+          devices={devices}
+          onClear={handleClearDevices}
           onConfigure={setSelectedDevice}
         />
         {selectedDevice && (
-          <ConfigPanel 
-            device={selectedDevice} 
+          <ConfigPanel
+            device={selectedDevice}
             onClose={() => setSelectedDevice(null)}
           />
         )}

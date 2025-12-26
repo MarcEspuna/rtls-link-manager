@@ -48,6 +48,29 @@
   border-color: var(--border-color-light);
 }
 
+.listening {
+  color: var(--accent-success);
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.listening::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--accent-success);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
 .count {
   margin-left: auto;
   color: var(--text-secondary);
