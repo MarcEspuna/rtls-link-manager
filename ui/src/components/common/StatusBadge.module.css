@@ -1,0 +1,36 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.online {
+  color: var(--accent-success);
+  background: var(--accent-success-muted);
+}
+
+.offline {
+  color: var(--accent-danger);
+  background: var(--accent-danger-muted);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.online .dot {
+  background-color: var(--accent-success);
+  box-shadow: 0 0 6px var(--accent-success);
+}
+
+.offline .dot {
+  background-color: var(--accent-danger);
+}
