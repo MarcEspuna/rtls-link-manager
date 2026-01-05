@@ -74,6 +74,12 @@ export class DiscoveryService {
       firmware: data.fw ?? '',
       online: true,
       lastSeen: new Date(),
+      // Telemetry fields - undefined if not present (old firmware)
+      sendingPos: data.sending_pos,
+      anchorsSeen: data.anchors_seen,
+      originSent: data.origin_sent,
+      rfEnabled: data.rf_enabled,
+      rfHealthy: data.rf_healthy,
     };
   }
 }

@@ -52,6 +52,27 @@ export function DeviceCard({ device, selected, onSelect, onConfigure }: DeviceCa
         <div><span>FW:</span> {device.firmware}</div>
       </div>
 
+      {device.role === 'tag_tdoa' && (
+        <div className={styles.telemetry}>
+          <span className={device.sendingPos === undefined ? styles.statusUnknown : (device.sendingPos ? styles.statusOk : styles.statusWarn)}>
+            {device.sendingPos === undefined ? '?' : (device.sendingPos ? 'Sending' : 'Not sending')}
+          </span>
+          <span>Anchors: {device.anchorsSeen ?? '?'}</span>
+          <span className={device.originSent === undefined ? styles.statusUnknown : (device.originSent ? styles.statusOk : styles.statusPending)}>
+            Origin: {device.originSent === undefined ? '?' : (device.originSent ? 'Sent' : 'Pending')}
+          </span>
+          <span className={
+            device.rfEnabled === undefined ? styles.statusUnknown :
+            !device.rfEnabled ? styles.statusPending :
+            device.rfHealthy ? styles.statusOk : styles.statusWarn
+          }>
+            RF: {device.rfEnabled === undefined ? '?' :
+                 !device.rfEnabled ? 'Disabled' :
+                 device.rfHealthy ? 'Healthy' : 'Unhealthy'}
+          </span>
+        </div>
+      )}
+
       <div className={styles.actions}>
         <button onClick={handleToggleLed} disabled={loading}>
           {ledState ? '💡 LED On' : '⚫ LED Off'}

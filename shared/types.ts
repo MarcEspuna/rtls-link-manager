@@ -9,6 +9,12 @@ export interface Device {
   // Runtime state (not from discovery)
   online?: boolean;
   lastSeen?: Date;
+  // Telemetry (from discovery heartbeat)
+  sendingPos?: boolean;     // True if sending positions to ArduPilot
+  anchorsSeen?: number;     // Number of unique anchors in measurement set
+  originSent?: boolean;     // True if GPS origin sent to ArduPilot
+  rfEnabled?: boolean;      // True if zCalcMode == RANGEFINDER
+  rfHealthy?: boolean;      // True if receiving non-stale rangefinder data
 }
 
 export type DeviceRole =
@@ -48,6 +54,7 @@ export interface UwbConfig {
   originAlt?: number;
   mavlinkTargetSystemId?: number;
   rotationDegrees?: number;
+  zCalcMode?: 0 | 1 | 2;  // 0=None (TDoA Z), 1=Rangefinder, 2=UWB (reserved)
 }
 
 export interface AnchorConfig {
@@ -65,6 +72,25 @@ export interface AppConfig {
 export interface CommandResult {
   success: boolean;
   data?: unknown;
+  error?: string;
+}
+
+// Local config storage types
+export interface LocalConfigInfo {
+  name: string;
+  createdAt: string;  // ISO date string
+  updatedAt: string;  // ISO date string
+}
+
+export interface LocalConfig extends LocalConfigInfo {
+  config: DeviceConfig;
+}
+
+// Bulk operation result
+export interface BulkOperationResult {
+  ip: string;
+  deviceId?: string;
+  success: boolean;
   error?: string;
 }
 

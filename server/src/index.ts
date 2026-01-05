@@ -4,6 +4,7 @@ import fastifyStatic from '@fastify/static';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { deviceRoutes } from './routes/devices.js';
+import { configRoutes } from './routes/configs.js';
 // import { templateRoutes } from './routes/templates.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,6 +17,7 @@ async function start() {
 
   // API routes
   await app.register(deviceRoutes, { prefix: '/api' });
+  await app.register(configRoutes, { prefix: '/api' });
   // await app.register(templateRoutes, { prefix: '/api' });
 
   // Serve UI in production

@@ -1,33 +1,29 @@
 # Dependencies
 node_modules/
-.pnpm-store/
 
-# Production build
+# Build output
 dist/
 build/
-coverage/
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
 # Environment variables
 .env
 .env.local
 .env.*.local
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-.idea
-.DS_Store
-*.sw?
+# Logs
+*.log
+npm-debug.log*
 
-# Temporary
-tmp/
-temp/
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Local configuration files (user-specific)
+server/configs/

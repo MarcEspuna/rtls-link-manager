@@ -274,6 +274,21 @@ export function ConfigEditor({
             }}
           />
         </div>
+        <div className={styles.field}>
+          <label>Z Calculation Mode</label>
+          <select
+            value={config.uwb.zCalcMode ?? 0}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              handleChange('uwb', 'zCalcMode', val);
+              handleApply('uwb', 'zCalcMode', val);
+            }}
+          >
+            <option value={0}>None (TDoA Z)</option>
+            <option value={1}>Rangefinder</option>
+            <option value={2}>UWB (reserved)</option>
+          </select>
+        </div>
       </div>
 
       {/* App Settings */}
