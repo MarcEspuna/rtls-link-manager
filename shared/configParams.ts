@@ -48,6 +48,14 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.uwb.mavlinkTargetSystemId !== undefined) params.push(['uwb', 'mavlinkTargetSystemId', String(config.uwb.mavlinkTargetSystemId)]);
     if (config.uwb.rotationDegrees !== undefined) params.push(['uwb', 'rotationDegrees', String(config.uwb.rotationDegrees)]);
     if (config.uwb.zCalcMode !== undefined) params.push(['uwb', 'zCalcMode', String(config.uwb.zCalcMode)]);
+    // Rangefinder forwarding parameters
+    if (config.uwb.rfForwardEnable !== undefined) params.push(['uwb', 'rfForwardEnable', String(config.uwb.rfForwardEnable)]);
+    if (config.uwb.rfForwardSensorId !== undefined) params.push(['uwb', 'rfForwardSensorId', String(config.uwb.rfForwardSensorId)]);
+    if (config.uwb.rfForwardOrientation !== undefined) params.push(['uwb', 'rfForwardOrientation', String(config.uwb.rfForwardOrientation)]);
+    if (config.uwb.rfForwardPreserveSrcIds !== undefined) params.push(['uwb', 'rfForwardPreserveSrcIds', String(config.uwb.rfForwardPreserveSrcIds)]);
+    // Position estimation parameters
+    if (config.uwb.enableCovMatrix !== undefined) params.push(['uwb', 'enableCovMatrix', String(config.uwb.enableCovMatrix)]);
+    if (config.uwb.rmseThreshold !== undefined) params.push(['uwb', 'rmseThreshold', String(config.uwb.rmseThreshold)]);
   }
 
   // App params

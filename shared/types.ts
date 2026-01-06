@@ -55,6 +55,14 @@ export interface UwbConfig {
   mavlinkTargetSystemId?: number;
   rotationDegrees?: number;
   zCalcMode?: 0 | 1 | 2;  // 0=None (TDoA Z), 1=Rangefinder, 2=UWB (reserved)
+  // Rangefinder forwarding parameters
+  rfForwardEnable?: 0 | 1;        // 0=disabled, 1=enabled (forward DISTANCE_SENSOR to ArduPilot)
+  rfForwardSensorId?: number;     // 0-254 = override, 255 = preserve source
+  rfForwardOrientation?: number;  // 0-254 = override, 255 = preserve source
+  rfForwardPreserveSrcIds?: 0 | 1; // 0=use UWB device IDs (default), 1=preserve source IDs
+  // Position estimation parameters
+  enableCovMatrix?: 0 | 1;        // 0=disabled, 1=enabled (send covariance to ArduPilot)
+  rmseThreshold?: number;         // RMSE threshold in meters (default 0.8)
 }
 
 export interface AnchorConfig {

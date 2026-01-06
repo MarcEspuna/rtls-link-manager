@@ -289,6 +289,109 @@ export function ConfigEditor({
             <option value={2}>UWB (reserved)</option>
           </select>
         </div>
+
+        {/* Rangefinder Forwarding */}
+        <div className={styles.field}>
+          <label>Rangefinder Forward to ArduPilot</label>
+          <select
+            value={config.uwb.rfForwardEnable ?? 0}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              handleChange('uwb', 'rfForwardEnable', val);
+              handleApply('uwb', 'rfForwardEnable', val);
+            }}
+          >
+            <option value={0}>Disabled</option>
+            <option value={1}>Enabled</option>
+          </select>
+        </div>
+        <div className={styles.field}>
+          <label>Forward Sensor ID</label>
+          <input
+            type="number"
+            min={0}
+            max={255}
+            value={config.uwb.rfForwardSensorId ?? 255}
+            disabled={!config.uwb.rfForwardEnable}
+            onChange={(e) => handleChange('uwb', 'rfForwardSensorId', safeParseInt(e.target.value, 255))}
+            onBlur={(e) => {
+              const val = Math.min(255, Math.max(0, safeParseInt(e.target.value, 255)));
+              handleChange('uwb', 'rfForwardSensorId', val);
+              handleApply('uwb', 'rfForwardSensorId', val);
+            }}
+            placeholder="255 = preserve source"
+          />
+          <small>255 = preserve original sensor ID</small>
+        </div>
+        <div className={styles.field}>
+          <label>Forward Orientation</label>
+          <select
+            value={config.uwb.rfForwardOrientation ?? 255}
+            disabled={!config.uwb.rfForwardEnable}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              handleChange('uwb', 'rfForwardOrientation', val);
+              handleApply('uwb', 'rfForwardOrientation', val);
+            }}
+          >
+            <option value={255}>Preserve Source (255)</option>
+            <option value={25}>Downward / PITCH_270 (25)</option>
+            <option value={24}>Upward / PITCH_90 (24)</option>
+            <option value={0}>Forward / NONE (0)</option>
+            <option value={4}>Backward / YAW_180 (4)</option>
+            <option value={2}>Left / YAW_90 (2)</option>
+            <option value={6}>Right / YAW_270 (6)</option>
+          </select>
+        </div>
+        <div className={styles.field}>
+          <label>Preserve Source IDs</label>
+          <select
+            value={config.uwb.rfForwardPreserveSrcIds ?? 0}
+            disabled={!config.uwb.rfForwardEnable}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              handleChange('uwb', 'rfForwardPreserveSrcIds', val);
+              handleApply('uwb', 'rfForwardPreserveSrcIds', val);
+            }}
+          >
+            <option value={0}>Use UWB Device IDs (default)</option>
+            <option value={1}>Preserve Source IDs</option>
+          </select>
+        </div>
+
+        {/* Position Estimation Settings */}
+        <div className={styles.field}>
+          <label>Send Covariance Matrix</label>
+          <select
+            value={config.uwb.enableCovMatrix ?? 0}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              handleChange('uwb', 'enableCovMatrix', val);
+              handleApply('uwb', 'enableCovMatrix', val);
+            }}
+          >
+            <option value={0}>Disabled</option>
+            <option value={1}>Enabled</option>
+          </select>
+          <small>Send position covariance to ArduPilot EKF</small>
+        </div>
+        <div className={styles.field}>
+          <label>RMSE Threshold (m)</label>
+          <input
+            type="number"
+            step="0.1"
+            min="0.1"
+            max="5.0"
+            value={config.uwb.rmseThreshold ?? 0.8}
+            onChange={(e) => handleChange('uwb', 'rmseThreshold', safeParseFloat(e.target.value, 0.8))}
+            onBlur={(e) => {
+              const val = Math.min(5.0, Math.max(0.1, safeParseFloat(e.target.value, 0.8)));
+              handleChange('uwb', 'rmseThreshold', val);
+              handleApply('uwb', 'rmseThreshold', val);
+            }}
+          />
+          <small>Position rejected if RMSE exceeds this value</small>
+        </div>
       </div>
 
       {/* App Settings */}
