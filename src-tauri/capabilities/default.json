@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/schema/2/capability",
+  "identifier": "default",
+  "description": "Default capabilities for the RTLS Link Manager",
+  "local": true,
+  "windows": ["*"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "shell:allow-open"
+  ]
+}
