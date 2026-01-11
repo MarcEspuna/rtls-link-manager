@@ -95,7 +95,7 @@ impl DiscoveryService {
                             .insert(device.ip.clone(), (device.clone(), Instant::now()));
                     }
                 }
-                Ok(Err(e)) => {
+                Ok(Err(ref e)) => {
                     eprintln!("UDP receive error: {}", e);
                 }
                 Err(_) => {
