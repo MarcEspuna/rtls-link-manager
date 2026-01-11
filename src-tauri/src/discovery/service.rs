@@ -76,19 +76,29 @@ impl DiscoveryService {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut buf = vec![0u8; 1024];
 
+        println!("[Discovery] Starting discovery loop...");
+
         loop {
             match self.socket.recv_from(&mut buf).await {
                 Ok((len, addr)) => {
                     let ip = addr.ip().to_string();
+                    println!("[Discovery] Received {} bytes from {}", len, ip);
 
                     match parse_heartbeat(&buf[..len], ip) {
                         Ok(device) => {
+                            println!("[Discovery] Parsed device: id={}, role={:?}, ip={}", device.id, device.role, device.ip);
+
                             // Update local cache with timestamp
                             self.devices
                                 .insert(device.ip.clone(), (device.clone(), Instant::now()));
 
                             // Prune stale devices
+                            let before_prune = self.devices.len();
                             prune_stale_devices(&mut self.devices);
+                            let after_prune = self.devices.len();
+                            if before_prune != after_prune {
+                                println!("[Discovery] Pruned {} stale devices", before_prune - after_prune);
+                            }
 
                             // Update shared state
                             let device_list: Vec<Device> = {
@@ -101,20 +111,23 @@ impl DiscoveryService {
                                 state.values().cloned().collect()
                             };
 
+                            println!("[Discovery] Emitting devices-updated event with {} devices", device_list.len());
+
                             // Emit event to frontend
-                            if let Err(e) = app_handle.emit("devices-updated", &device_list) {
-                                eprintln!("Failed to emit devices-updated event: {}", e);
+                            match app_handle.emit("devices-updated", &device_list) {
+                                Ok(_) => println!("[Discovery] Event emitted successfully"),
+                                Err(e) => eprintln!("[Discovery] Failed to emit event: {}", e),
                             }
                         }
                         Err(_e) => {
                             // Silently ignore malformed packets in production
                             #[cfg(debug_assertions)]
-                            eprintln!("Failed to parse heartbeat: {}", _e);
+                            eprintln!("[Discovery] Failed to parse heartbeat: {}", _e);
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("UDP receive error: {}", e);
+                    eprintln!("[Discovery] UDP receive error: {}", e);
                 }
             }
         }

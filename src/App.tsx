@@ -32,22 +32,53 @@ function App() {
 
   // Event-driven device updates instead of polling
   useEffect(() => {
+    let isMounted = true;
     let unlisten: (() => void) | undefined;
 
-    // Initial fetch
-    getDevices()
-      .then(setDevices)
-      .catch(e => console.error('Failed to fetch devices', e));
+    console.log('[App] useEffect triggered, setting up listener...');
 
-    // Listen for real-time updates from discovery service
-    onDevicesUpdated((updatedDevices) => {
-      setDevices(updatedDevices);
-    }).then((unlistenFn) => {
-      unlisten = unlistenFn;
-    }).catch(e => console.error('Failed to setup device listener', e));
+    const setup = async () => {
+      try {
+        // Initial fetch
+        console.log('[App] Fetching initial devices...');
+        const initialDevices = await getDevices();
+        console.log('[App] Initial devices fetched:', initialDevices.length);
+        if (isMounted) {
+          setDevices(initialDevices);
+          console.log('[App] Initial devices set to state');
+        } else {
+          console.log('[App] Component unmounted before initial fetch completed');
+        }
+
+        // Setup listener - properly await to avoid race condition
+        console.log('[App] Setting up event listener...');
+        unlisten = await onDevicesUpdated((updatedDevices) => {
+          console.log('[App] EVENT RECEIVED: devices-updated with', updatedDevices.length, 'devices');
+          console.log('[App] Device IPs:', updatedDevices.map(d => d.ip));
+          if (isMounted) {
+            console.log('[App] Setting devices to state...');
+            setDevices(updatedDevices);
+          } else {
+            console.log('[App] Component unmounted, skipping state update');
+          }
+        });
+        console.log('[App] Event listener setup complete, unlisten:', typeof unlisten);
+      } catch (e) {
+        console.error('[App] Failed to setup device listener', e);
+      }
+    };
+
+    setup();
 
     return () => {
-      if (unlisten) unlisten();
+      console.log('[App] Cleanup called, isMounted was:', isMounted);
+      isMounted = false;
+      if (unlisten) {
+        console.log('[App] Calling unlisten()');
+        unlisten();
+      } else {
+        console.log('[App] No unlisten function to call');
+      }
     };
   }, []);
 
