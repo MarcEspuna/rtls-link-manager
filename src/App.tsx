@@ -35,50 +35,26 @@ function App() {
     let isMounted = true;
     let unlisten: (() => void) | undefined;
 
-    console.log('[App] useEffect triggered, setting up listener...');
-
     const setup = async () => {
       try {
         // Initial fetch
-        console.log('[App] Fetching initial devices...');
         const initialDevices = await getDevices();
-        console.log('[App] Initial devices fetched:', initialDevices.length);
-        if (isMounted) {
-          setDevices(initialDevices);
-          console.log('[App] Initial devices set to state');
-        } else {
-          console.log('[App] Component unmounted before initial fetch completed');
-        }
+        if (isMounted) setDevices(initialDevices);
 
         // Setup listener - properly await to avoid race condition
-        console.log('[App] Setting up event listener...');
         unlisten = await onDevicesUpdated((updatedDevices) => {
-          console.log('[App] EVENT RECEIVED: devices-updated with', updatedDevices.length, 'devices');
-          console.log('[App] Device IPs:', updatedDevices.map(d => d.ip));
-          if (isMounted) {
-            console.log('[App] Setting devices to state...');
-            setDevices(updatedDevices);
-          } else {
-            console.log('[App] Component unmounted, skipping state update');
-          }
+          if (isMounted) setDevices(updatedDevices);
         });
-        console.log('[App] Event listener setup complete, unlisten:', typeof unlisten);
       } catch (e) {
-        console.error('[App] Failed to setup device listener', e);
+        console.error('Failed to setup device listener', e);
       }
     };
 
     setup();
 
     return () => {
-      console.log('[App] Cleanup called, isMounted was:', isMounted);
       isMounted = false;
-      if (unlisten) {
-        console.log('[App] Calling unlisten()');
-        unlisten();
-      } else {
-        console.log('[App] No unlisten function to call');
-      }
+      unlisten?.();
     };
   }, []);
 

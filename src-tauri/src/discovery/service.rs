@@ -81,8 +81,6 @@ impl DiscoveryService {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut buf = vec![0u8; 1024];
 
-        println!("[Discovery] Starting discovery loop...");
-
         loop {
             // Use timeout so we can prune stale devices even when no packets arrive
             let recv_result = timeout(RECEIVE_TIMEOUT, self.socket.recv_from(&mut buf)).await;
@@ -90,29 +88,18 @@ impl DiscoveryService {
             match recv_result {
                 Ok(Ok((len, addr))) => {
                     let ip = addr.ip().to_string();
-                    println!("[Discovery] Received {} bytes from {}", len, ip);
 
-                    match parse_heartbeat(&buf[..len], ip) {
-                        Ok(device) => {
-                            println!("[Discovery] Parsed device: id={}, role={:?}, ip={}", device.id, device.role, device.ip);
-
-                            // Update local cache with timestamp
-                            self.devices
-                                .insert(device.ip.clone(), (device.clone(), Instant::now()));
-                        }
-                        Err(_e) => {
-                            // Silently ignore malformed packets in production
-                            #[cfg(debug_assertions)]
-                            eprintln!("[Discovery] Failed to parse heartbeat: {}", _e);
-                        }
+                    if let Ok(device) = parse_heartbeat(&buf[..len], ip) {
+                        // Update local cache with timestamp
+                        self.devices
+                            .insert(device.ip.clone(), (device.clone(), Instant::now()));
                     }
                 }
-                Ok(Err(ref e)) => {
-                    eprintln!("[Discovery] UDP receive error: {}", e);
+                Ok(Err(e)) => {
+                    eprintln!("UDP receive error: {}", e);
                 }
                 Err(_) => {
-                    // Timeout - no packet received, but we still need to prune
-                    // This is normal and expected
+                    // Timeout - no packet received, continue to prune
                 }
             }
 
@@ -122,9 +109,7 @@ impl DiscoveryService {
             let after_prune = self.devices.len();
 
             // Only emit update if devices changed (pruned or new device added)
-            if before_prune != after_prune {
-                println!("[Discovery] Pruned {} stale devices", before_prune - after_prune);
-
+            if before_prune != after_prune || matches!(recv_result, Ok(Ok(_))) {
                 // Update shared state and emit event
                 let mut device_list: Vec<Device> = {
                     let mut state = devices_state.write().await;
@@ -139,33 +124,7 @@ impl DiscoveryService {
                 // Sort by IP for consistent UI ordering
                 device_list.sort_by(|a, b| a.ip.cmp(&b.ip));
 
-                println!("[Discovery] Emitting devices-updated event with {} devices", device_list.len());
-
-                match app_handle.emit("devices-updated", &device_list) {
-                    Ok(_) => println!("[Discovery] Event emitted successfully"),
-                    Err(e) => eprintln!("[Discovery] Failed to emit event: {}", e),
-                }
-            } else if matches!(recv_result, Ok(Ok(_))) {
-                // New packet received (not timeout), emit update for new/updated device
-                let mut device_list: Vec<Device> = {
-                    let mut state = devices_state.write().await;
-                    *state = self
-                        .devices
-                        .iter()
-                        .map(|(ip, (dev, _))| (ip.clone(), dev.clone()))
-                        .collect();
-                    state.values().cloned().collect()
-                };
-
-                // Sort by IP for consistent UI ordering
-                device_list.sort_by(|a, b| a.ip.cmp(&b.ip));
-
-                println!("[Discovery] Emitting devices-updated event with {} devices", device_list.len());
-
-                match app_handle.emit("devices-updated", &device_list) {
-                    Ok(_) => println!("[Discovery] Event emitted successfully"),
-                    Err(e) => eprintln!("[Discovery] Failed to emit event: {}", e),
-                }
+                let _ = app_handle.emit("devices-updated", &device_list);
             }
         }
     }

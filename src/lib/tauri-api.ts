@@ -90,14 +90,9 @@ export async function deleteConfig(name: string): Promise<boolean> {
 export async function onDevicesUpdated(
   callback: (devices: Device[]) => void
 ): Promise<UnlistenFn> {
-  console.log('[tauri-api] Setting up devices-updated listener...');
-  const unlisten = await listen<Device[]>('devices-updated', (event) => {
-    console.log('[tauri-api] Received devices-updated event:', event);
-    console.log('[tauri-api] Payload device count:', event.payload?.length);
+  return await listen<Device[]>('devices-updated', (event) => {
     callback(event.payload);
   });
-  console.log('[tauri-api] Listener setup complete');
-  return unlisten;
 }
 
 // ============================================================================
