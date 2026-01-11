@@ -107,7 +107,7 @@ impl DiscoveryService {
                         }
                     }
                 }
-                Ok(Err(e)) => {
+                Ok(Err(ref e)) => {
                     eprintln!("[Discovery] UDP receive error: {}", e);
                 }
                 Err(_) => {
