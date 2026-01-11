@@ -126,7 +126,7 @@ impl DiscoveryService {
                 println!("[Discovery] Pruned {} stale devices", before_prune - after_prune);
 
                 // Update shared state and emit event
-                let device_list: Vec<Device> = {
+                let mut device_list: Vec<Device> = {
                     let mut state = devices_state.write().await;
                     *state = self
                         .devices
@@ -135,6 +135,9 @@ impl DiscoveryService {
                         .collect();
                     state.values().cloned().collect()
                 };
+
+                // Sort by IP for consistent UI ordering
+                device_list.sort_by(|a, b| a.ip.cmp(&b.ip));
 
                 println!("[Discovery] Emitting devices-updated event with {} devices", device_list.len());
 
@@ -144,7 +147,7 @@ impl DiscoveryService {
                 }
             } else if matches!(recv_result, Ok(Ok(_))) {
                 // New packet received (not timeout), emit update for new/updated device
-                let device_list: Vec<Device> = {
+                let mut device_list: Vec<Device> = {
                     let mut state = devices_state.write().await;
                     *state = self
                         .devices
@@ -153,6 +156,9 @@ impl DiscoveryService {
                         .collect();
                     state.values().cloned().collect()
                 };
+
+                // Sort by IP for consistent UI ordering
+                device_list.sort_by(|a, b| a.ip.cmp(&b.ip));
 
                 println!("[Discovery] Emitting devices-updated event with {} devices", device_list.len());
 
