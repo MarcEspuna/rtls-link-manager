@@ -3,6 +3,7 @@ import { Device, DeviceConfig, LocalConfigInfo } from '@shared/types';
 import { Commands, isJsonCommand } from '@shared/commands';
 import { configToParams } from '@shared/configParams';
 import { flatToAnchors, normalizeUwbShortAddr } from '@shared/anchors';
+import { listConfigs, getConfig, saveConfig, deleteConfig } from '../../lib/tauri-api';
 import { ProgressBar } from '../common/ProgressBar';
 import styles from './LocalConfigPanel.module.css';
 
@@ -74,11 +75,8 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
   // Fetch list of local configs
   const fetchConfigs = useCallback(async () => {
     try {
-      const res = await fetch('/api/configs');
-      const data = await res.json();
-      if (data.configs) {
-        setConfigs(data.configs);
-      }
+      const data = await listConfigs();
+      setConfigs(data);
     } catch (e) {
       console.error('Failed to fetch configs', e);
     }
@@ -96,10 +94,9 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
     }
     (async () => {
       try {
-        const res = await fetch(`/api/configs/${selectedConfig}`);
-        const data = await res.json();
-        if (data.config?.config) {
-          setConfigPreview(data.config.config);
+        const localConfig = await getConfig(selectedConfig);
+        if (localConfig?.config) {
+          setConfigPreview(localConfig.config);
         }
       } catch (e) {
         console.error('Failed to load config', e);
@@ -337,14 +334,9 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
       const rawConfig = JSON.parse(response.substring(jsonStart));
       const config = transformConfigResult(rawConfig);
 
-      // Save to server
-      const res = await fetch(`/api/configs/${newConfigName}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
-      });
-
-      if (!res.ok) throw new Error('Failed to save config');
+      // Save to local storage
+      const success = await saveConfig(newConfigName, config);
+      if (!success) throw new Error('Failed to save config');
 
       await fetchConfigs();
       setSelectedConfig(newConfigName);
@@ -362,7 +354,7 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
     if (!confirm(`Delete config "${selectedConfig}"?`)) return;
 
     try {
-      await fetch(`/api/configs/${selectedConfig}`, { method: 'DELETE' });
+      await deleteConfig(selectedConfig);
       setSelectedConfig(null);
       setConfigPreview(null);
       await fetchConfigs();

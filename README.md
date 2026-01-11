@@ -1,109 +1,124 @@
 # RTLS-Link Manager
 
-Web-based configuration and monitoring tool for RTLS-Link devices.
+Desktop application for configuring and monitoring RTLS-Link UWB devices.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview
 
-RTLS-Link Manager is a full-stack web application for managing RTLS-Link devices - ESP32S3 microcontrollers with DW1000 UWB modules that perform Time Difference of Arrival (TDoA) localization for minidrones.
+RTLS-Link Manager is a cross-platform desktop application built with Tauri for managing RTLS-Link devices - ESP32S3 microcontrollers with DW1000 UWB modules that perform Time Difference of Arrival (TDoA) localization for minidrones.
 
 The tool provides:
 - Automatic device discovery on the network
 - Real-time device status monitoring
 - Configuration management for WiFi, UWB, and anchor networks
 - Bulk operations for multi-device control
+- Local configuration storage
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        RTLS-Link System                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────────┐         ┌─────────────────────────────┐   │
-│  │   Minidrone     │ ◄─UWB─► │     RTLS-Link Anchors      │   │
-│  │   (Tag Mode)    │         │  (ESP32S3 + DW1000 × 4-6)   │   │
-│  └─────────────────┘         └──────────────┬──────────────┘   │
-│                                             │                   │
-│                                        WiFi/UDP                 │
-│                                             │                   │
-│                              ┌──────────────▼──────────────┐   │
-│                              │   RTLS-Link Manager (Web)   │   │
-│                              │  ┌────────┐    ┌────────┐   │   │
-│                              │  │ React  │◄──►│Fastify │   │   │
-│                              │  │   UI   │    │ Server │   │   │
-│                              │  └────────┘    └────────┘   │   │
-│                              └─────────────────────────────┘   │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+|                      RTLS-Link System                       |
++-------------------------------------------------------------+
+|                                                             |
+|  +-----------------+         +-------------------------+    |
+|  |   Minidrone     | <-UWB-> |   RTLS-Link Anchors     |    |
+|  |   (Tag Mode)    |         | (ESP32S3 + DW1000 x4-6) |    |
+|  +-----------------+         +------------+------------+    |
+|                                           |                 |
+|                                      WiFi/UDP               |
+|                                           |                 |
+|                           +---------------v---------------+ |
+|                           | RTLS-Link Manager (Desktop)   | |
+|                           | +----------+   +------------+ | |
+|                           | | React UI |<->| Rust/Tauri | | |
+|                           | +----------+   +------------+ | |
+|                           +-------------------------------+ |
+|                                                             |
++-------------------------------------------------------------+
 ```
 
 ## Features
 
 - **Auto Device Discovery** - UDP-based discovery automatically finds RTLS-Link devices on the network
-- **Real-time Monitoring** - Live device status with online/offline indicators
-- **Web-based Configuration** - Intuitive UI for WiFi, UWB, and anchor setup
+- **Real-time Monitoring** - Live device status with online/offline indicators via event-driven updates
+- **Desktop Application** - Native app experience with no browser required
 - **Bulk Operations** - Toggle LEDs, start UWB, or reboot multiple devices at once
-- **Named Configurations** - Save, load, and switch between configuration presets
-- **Anchor Network Management** - Define up to 6 anchors with precise 3D coordinates
+- **Local Config Storage** - Save and manage configurations locally in app data directory
+- **Cross-Platform** - Runs on Windows and Linux
 
 ## Prerequisites
 
-- Node.js 18+
-- npm 10+
+- [Node.js](https://nodejs.org/) 18+
+- [Rust](https://rustup.rs/) (for development)
+- Platform-specific dependencies (see below)
+
+### Linux Dependencies
+
+```bash
+# Debian/Ubuntu
+sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+
+# Fedora
+sudo dnf install webkit2gtk4.1-devel libappindicator-gtk3-devel librsvg2-devel
+```
 
 ## Quick Start
+
+### Development
 
 ```bash
 # Install dependencies
 npm install
 
-# Run in development mode (UI + Server)
+# Run in development mode
 npm run dev
 ```
 
-Access the web interface at `http://localhost:5173`
-
-### Production Build
+### Building
 
 ```bash
+# Build release packages
 npm run build
-NODE_ENV=production npm start
 ```
 
-Access at `http://localhost:3000`
+Outputs:
+- **Linux**: `src-tauri/target/release/bundle/deb/*.deb`, `*.rpm`, `*.AppImage`
+- **Windows**: `src-tauri/target/release/bundle/nsis/*.exe`
 
 ## Project Structure
 
 ```
 rtls-link-manager/
-├── package.json              # Root workspace config
-├── tsconfig.json             # TypeScript configuration
-├── server/                   # Fastify backend
-│   ├── package.json
+├── package.json              # Frontend dependencies
+├── index.html                # HTML entry point
+├── vite.config.ts            # Vite bundler config
+├── src/                      # React frontend
+│   ├── main.tsx              # React entry point
+│   ├── App.tsx               # Main application component
+│   ├── lib/
+│   │   └── tauri-api.ts      # Tauri IPC wrapper
+│   └── components/
+│       ├── ConfigPanel/      # Device configuration UI
+│       ├── DeviceGrid/       # Device list display
+│       ├── LocalConfigs/     # Local config management
+│       └── common/           # Shared UI components
+├── src-tauri/                # Rust backend
+│   ├── Cargo.toml            # Rust dependencies
+│   ├── tauri.conf.json       # Tauri configuration
 │   └── src/
-│       ├── index.ts          # Server entry point (port 3000)
-│       ├── routes/
-│       │   └── devices.ts    # Device API endpoints
-│       └── services/
-│           └── discovery.ts  # UDP device discovery
-├── ui/                       # React frontend
-│   ├── package.json
-│   ├── vite.config.ts
-│   └── src/
-│       ├── main.tsx          # React entry point
-│       ├── App.tsx           # Main application component
-│       ├── components/
-│       │   ├── ConfigPanel/  # Device configuration UI
-│       │   ├── DeviceGrid/   # Device list display
-│       │   ├── Controls/     # Bulk action controls
-│       │   └── common/       # Shared UI components
-│       └── hooks/
-│           └── useDeviceWebSocket.ts  # Device communication
+│       ├── main.rs           # Application entry point
+│       ├── lib.rs            # Library root
+│       ├── types.rs          # Type definitions
+│       ├── state.rs          # Shared app state
+│       ├── error.rs          # Error handling
+│       ├── discovery/        # UDP device discovery
+│       ├── config_storage/   # Local config storage
+│       └── commands/         # Tauri IPC commands
 └── shared/                   # Shared types and utilities
     ├── types.ts              # TypeScript interfaces
-    ├── commands.ts           # Command builders
+    ├── commands.ts           # Device command builders
     ├── config.ts             # Configuration validation
     └── anchors.ts            # Anchor data transformations
 ```
@@ -147,29 +162,36 @@ npm run dev
 # Build for production
 npm run build
 
-# Run tests
+# Run frontend tests
 npm test
 
-# Start production server
-npm start
+# Run Rust tests
+cd src-tauri && cargo test
 ```
 
 ### Network Ports
 
 | Service | Port | Description |
 |---------|------|-------------|
-| Fastify Server | 3000 | HTTP API and static files |
-| Vite Dev Server | 5173 | Development UI with HMR |
+| Vite Dev Server | 1420 | Development UI with HMR |
 | Device Discovery | 3333 | UDP broadcast listening |
 | Device WebSocket | 80 | Device communication (ws://{ip}/ws) |
 
-### API Endpoints
+### Config Storage Location
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/devices | List discovered devices |
-| GET | /api/devices/:ip | Get single device details |
-| DELETE | /api/devices | Clear device cache |
+Configurations are stored in the OS-specific app data directory:
+- **Linux**: `~/.local/share/com.rtls.link-manager/configs/`
+- **Windows**: `%APPDATA%\com.rtls.link-manager\configs\`
+
+## Testing
+
+```bash
+# Run all Rust tests
+cd src-tauri && cargo test
+
+# Run frontend tests
+npm test
+```
 
 ## Troubleshooting
 
@@ -187,30 +209,10 @@ npm start
 
 ### Configuration not saving
 
-- Check browser console for error messages
+- Check app console for error messages (Ctrl+Shift+I)
 - Verify device is online (green status indicator)
-- Try reloading the device configuration
+- Ensure config name contains only alphanumeric, dash, or underscore
 
 ## License
 
-MIT License
-
-Copyright (c) 2024
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+MIT License - See LICENSE file for details.

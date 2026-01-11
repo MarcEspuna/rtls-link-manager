@@ -3,6 +3,7 @@ import { Device } from '@shared/types';
 import { DeviceGrid } from './components/DeviceGrid/DeviceGrid';
 import { ConfigPanel } from './components/ConfigPanel/ConfigPanel';
 import { LocalConfigPanel } from './components/LocalConfigs/LocalConfigPanel';
+import { getDevices, clearDevices, onDevicesUpdated } from './lib/tauri-api';
 import './App.css';
 
 function App() {
@@ -10,21 +11,9 @@ function App() {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [selectedDeviceIps, setSelectedDeviceIps] = useState<Set<string>>(new Set());
 
-  const fetchDevices = async () => {
-    try {
-      const res = await fetch('/api/devices');
-      const data = await res.json();
-      if (data.devices) {
-        setDevices(data.devices);
-      }
-    } catch (e) {
-      console.error('Failed to fetch devices', e);
-    }
-  };
-
   const handleClearDevices = async () => {
     try {
-      await fetch('/api/devices', { method: 'DELETE' });
+      await clearDevices();
       setDevices([]);
       setSelectedDeviceIps(new Set());
     } catch (e) {
@@ -41,17 +30,31 @@ function App() {
     });
   }, [devices]);
 
-  // Auto-refresh: fetch devices every 3 seconds
+  // Event-driven device updates instead of polling
   useEffect(() => {
-    fetchDevices(); // Initial fetch
-    const interval = setInterval(fetchDevices, 3000);
-    return () => clearInterval(interval);
+    let unlisten: (() => void) | undefined;
+
+    // Initial fetch
+    getDevices()
+      .then(setDevices)
+      .catch(e => console.error('Failed to fetch devices', e));
+
+    // Listen for real-time updates from discovery service
+    onDevicesUpdated((updatedDevices) => {
+      setDevices(updatedDevices);
+    }).then((unlistenFn) => {
+      unlisten = unlistenFn;
+    }).catch(e => console.error('Failed to setup device listener', e));
+
+    return () => {
+      if (unlisten) unlisten();
+    };
   }, []);
 
   return (
     <div className="app-container">
       <header>
-        <h1>RTLS-Link Swarm Manager</h1>
+        <h1>RTLS-Link Manager</h1>
       </header>
       <main>
         <DeviceGrid

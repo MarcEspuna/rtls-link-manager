@@ -25,5 +25,9 @@ Thumbs.db
 # TypeScript
 *.tsbuildinfo
 
-# Local configuration files (user-specific)
-server/configs/
+# Rust / Tauri
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Old server directory (deprecated)
+server/
