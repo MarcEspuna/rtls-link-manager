@@ -10,12 +10,16 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
+use tokio::time::timeout;
 
 /// UDP port for device discovery
 const DISCOVERY_PORT: u16 = 3333;
 
 /// Time-to-live for devices (they're pruned if no heartbeat for this duration)
 const DEVICE_TTL: Duration = Duration::from_secs(5);
+
+/// Timeout for UDP receive - ensures pruning runs even without incoming packets
+const RECEIVE_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// Parse a heartbeat packet into a Device struct.
 ///
@@ -69,6 +73,7 @@ impl DiscoveryService {
     ///
     /// This continuously receives UDP packets, parses device heartbeats,
     /// updates the shared state, and emits events to the frontend.
+    /// Uses a timeout to ensure stale devices are pruned even when no packets arrive.
     pub async fn run(
         &mut self,
         devices_state: Arc<RwLock<HashMap<String, Device>>>,
@@ -79,8 +84,11 @@ impl DiscoveryService {
         println!("[Discovery] Starting discovery loop...");
 
         loop {
-            match self.socket.recv_from(&mut buf).await {
-                Ok((len, addr)) => {
+            // Use timeout so we can prune stale devices even when no packets arrive
+            let recv_result = timeout(RECEIVE_TIMEOUT, self.socket.recv_from(&mut buf)).await;
+
+            match recv_result {
+                Ok(Ok((len, addr))) => {
                     let ip = addr.ip().to_string();
                     println!("[Discovery] Received {} bytes from {}", len, ip);
 
@@ -91,33 +99,6 @@ impl DiscoveryService {
                             // Update local cache with timestamp
                             self.devices
                                 .insert(device.ip.clone(), (device.clone(), Instant::now()));
-
-                            // Prune stale devices
-                            let before_prune = self.devices.len();
-                            prune_stale_devices(&mut self.devices);
-                            let after_prune = self.devices.len();
-                            if before_prune != after_prune {
-                                println!("[Discovery] Pruned {} stale devices", before_prune - after_prune);
-                            }
-
-                            // Update shared state
-                            let device_list: Vec<Device> = {
-                                let mut state = devices_state.write().await;
-                                *state = self
-                                    .devices
-                                    .iter()
-                                    .map(|(ip, (dev, _))| (ip.clone(), dev.clone()))
-                                    .collect();
-                                state.values().cloned().collect()
-                            };
-
-                            println!("[Discovery] Emitting devices-updated event with {} devices", device_list.len());
-
-                            // Emit event to frontend
-                            match app_handle.emit("devices-updated", &device_list) {
-                                Ok(_) => println!("[Discovery] Event emitted successfully"),
-                                Err(e) => eprintln!("[Discovery] Failed to emit event: {}", e),
-                            }
                         }
                         Err(_e) => {
                             // Silently ignore malformed packets in production
@@ -126,8 +107,58 @@ impl DiscoveryService {
                         }
                     }
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
                     eprintln!("[Discovery] UDP receive error: {}", e);
+                }
+                Err(_) => {
+                    // Timeout - no packet received, but we still need to prune
+                    // This is normal and expected
+                }
+            }
+
+            // Always prune stale devices (on packet receive OR timeout)
+            let before_prune = self.devices.len();
+            prune_stale_devices(&mut self.devices);
+            let after_prune = self.devices.len();
+
+            // Only emit update if devices changed (pruned or new device added)
+            if before_prune != after_prune {
+                println!("[Discovery] Pruned {} stale devices", before_prune - after_prune);
+
+                // Update shared state and emit event
+                let device_list: Vec<Device> = {
+                    let mut state = devices_state.write().await;
+                    *state = self
+                        .devices
+                        .iter()
+                        .map(|(ip, (dev, _))| (ip.clone(), dev.clone()))
+                        .collect();
+                    state.values().cloned().collect()
+                };
+
+                println!("[Discovery] Emitting devices-updated event with {} devices", device_list.len());
+
+                match app_handle.emit("devices-updated", &device_list) {
+                    Ok(_) => println!("[Discovery] Event emitted successfully"),
+                    Err(e) => eprintln!("[Discovery] Failed to emit event: {}", e),
+                }
+            } else if matches!(recv_result, Ok(Ok(_))) {
+                // New packet received (not timeout), emit update for new/updated device
+                let device_list: Vec<Device> = {
+                    let mut state = devices_state.write().await;
+                    *state = self
+                        .devices
+                        .iter()
+                        .map(|(ip, (dev, _))| (ip.clone(), dev.clone()))
+                        .collect();
+                    state.values().cloned().collect()
+                };
+
+                println!("[Discovery] Emitting devices-updated event with {} devices", device_list.len());
+
+                match app_handle.emit("devices-updated", &device_list) {
+                    Ok(_) => println!("[Discovery] Event emitted successfully"),
+                    Err(e) => eprintln!("[Discovery] Failed to emit event: {}", e),
                 }
             }
         }
