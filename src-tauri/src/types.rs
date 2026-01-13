@@ -211,6 +211,82 @@ pub struct LocalConfig {
     pub config: DeviceConfig,
 }
 
+// ==================== Unified Preset Types ====================
+
+/// Type of preset: full device configuration or locations only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PresetType {
+    /// Full device configuration
+    Full,
+    /// Locations only (anchors + origin + rotation)
+    Locations,
+}
+
+/// GPS origin coordinates.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GpsOrigin {
+    /// Latitude in degrees
+    pub lat: f64,
+    /// Longitude in degrees
+    pub lon: f64,
+    /// Altitude in meters
+    pub alt: f64,
+}
+
+/// Location data for a preset.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocationData {
+    /// GPS origin coordinates
+    pub origin: GpsOrigin,
+    /// Rotation in degrees
+    pub rotation: f64,
+    /// Anchor configurations
+    pub anchors: Vec<AnchorConfig>,
+}
+
+/// Unified preset that can be either full config or locations only.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Preset {
+    /// Preset name
+    pub name: String,
+    /// Optional description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Preset type
+    #[serde(rename = "type")]
+    pub preset_type: PresetType,
+    /// Full device configuration (for type = Full)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<DeviceConfig>,
+    /// Location data (for type = Locations)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locations: Option<LocationData>,
+    /// Creation timestamp (ISO 8601)
+    pub created_at: String,
+    /// Last update timestamp (ISO 8601)
+    pub updated_at: String,
+}
+
+/// Metadata for a preset (without the full config data).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresetInfo {
+    /// Preset name
+    pub name: String,
+    /// Preset type
+    #[serde(rename = "type")]
+    pub preset_type: PresetType,
+    /// Optional description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Creation timestamp (ISO 8601)
+    pub created_at: String,
+    /// Last update timestamp (ISO 8601)
+    pub updated_at: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

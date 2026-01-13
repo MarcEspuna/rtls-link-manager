@@ -12,6 +12,8 @@ import type {
   LocalConfigInfo,
   LocalConfig,
   DeviceConfig,
+  Preset,
+  PresetInfo,
 } from '@shared/types';
 
 // ============================================================================
@@ -75,6 +77,38 @@ export async function deleteConfig(name: string): Promise<boolean> {
 }
 
 // ============================================================================
+// Preset Commands
+// ============================================================================
+
+/**
+ * List all saved presets.
+ */
+export async function listPresets(): Promise<PresetInfo[]> {
+  return await invoke('list_presets');
+}
+
+/**
+ * Get a specific preset by name.
+ */
+export async function getPreset(name: string): Promise<Preset | null> {
+  return await invoke('get_preset', { name });
+}
+
+/**
+ * Save a preset.
+ */
+export async function savePreset(preset: Preset): Promise<boolean> {
+  return await invoke('save_preset', { preset });
+}
+
+/**
+ * Delete a preset by name.
+ */
+export async function deletePreset(name: string): Promise<boolean> {
+  return await invoke('delete_preset', { name });
+}
+
+// ============================================================================
 // Event Listeners
 // ============================================================================
 
@@ -99,4 +133,4 @@ export async function onDevicesUpdated(
 // Type Re-exports for convenience
 // ============================================================================
 
-export type { Device, LocalConfigInfo, LocalConfig, DeviceConfig };
+export type { Device, LocalConfigInfo, LocalConfig, DeviceConfig, Preset, PresetInfo };

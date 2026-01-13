@@ -9,9 +9,10 @@ import styles from './ConfigPanel.module.css';
 interface ConfigPanelProps {
   device: Device;
   onClose: () => void;
+  isExpertMode?: boolean;
 }
 
-export function ConfigPanel({ device, onClose }: ConfigPanelProps) {
+export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPanelProps) {
   const { sendCommand, sendCommands, loading, close } = useDeviceCommand(device.ip, { mode: 'persistent' });
   const [config, setConfig] = useState<DeviceConfig | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
@@ -205,6 +206,7 @@ export function ConfigPanel({ device, onClose }: ConfigPanelProps) {
               onAnchorsBusyChange={setAnchorBusy}
               onAnchorsError={setAnchorError}
               anchorError={anchorError}
+              isExpertMode={isExpertMode}
             />
           ) : (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>

@@ -25,6 +25,13 @@ export type DeviceRole =
   | 'calibration'
   | 'unknown';
 
+// Role helper functions
+export const isAnchorRole = (role: DeviceRole): boolean =>
+  role === 'anchor' || role === 'anchor_tdoa';
+
+export const isTagRole = (role: DeviceRole): boolean =>
+  role === 'tag' || role === 'tag_tdoa';
+
 export interface DeviceConfig {
   wifi: WifiConfig;
   uwb: UwbConfig;
@@ -84,6 +91,37 @@ export interface LocalConfigInfo {
 
 export interface LocalConfig extends LocalConfigInfo {
   config: DeviceConfig;
+}
+
+// Unified Preset types
+export type PresetType = 'full' | 'locations';
+
+export interface LocationData {
+  origin: {
+    lat: number;
+    lon: number;
+    alt: number;
+  };
+  rotation: number;
+  anchors: AnchorConfig[];
+}
+
+export interface Preset {
+  name: string;
+  description?: string;
+  type: PresetType;
+  config?: DeviceConfig;      // For type='full'
+  locations?: LocationData;   // For type='locations'
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PresetInfo {
+  name: string;
+  type: PresetType;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Bulk operation result

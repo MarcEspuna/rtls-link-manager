@@ -1,21 +1,56 @@
-import { useState, useEffect } from 'react';
-import { Device } from '@shared/types';
-import { DeviceGrid } from './components/DeviceGrid/DeviceGrid';
+import { useState, useEffect, useMemo } from 'react';
+import { Device, isAnchorRole, isTagRole } from '@shared/types';
+import { AppShell } from './components/Layout';
+import { AnchorsPanel } from './components/Anchors';
+import { TagsPanel } from './components/Tags';
 import { ConfigPanel } from './components/ConfigPanel/ConfigPanel';
-import { LocalConfigPanel } from './components/LocalConfigs/LocalConfigPanel';
+import { PresetsPanel } from './components/Presets';
 import { getDevices, clearDevices, onDevicesUpdated } from './lib/tauri-api';
+import { useSettings } from './hooks/useSettings';
 import './App.css';
 
 function App() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-  const [selectedDeviceIps, setSelectedDeviceIps] = useState<Set<string>>(new Set());
+  const [selectedAnchorIps, setSelectedAnchorIps] = useState<Set<string>>(new Set());
+  const [selectedTagIps, setSelectedTagIps] = useState<Set<string>>(new Set());
+
+  const { isExpertMode, activeTab, setIsExpertMode, setActiveTab } = useSettings();
+
+  // Separate devices into anchors and tags
+  const { anchors, tags } = useMemo(() => {
+    const anchors: Device[] = [];
+    const tags: Device[] = [];
+
+    for (const device of devices) {
+      if (isAnchorRole(device.role)) {
+        anchors.push(device);
+      } else if (isTagRole(device.role)) {
+        tags.push(device);
+      }
+      // calibration and unknown roles are not shown in either tab
+    }
+
+    return { anchors, tags };
+  }, [devices]);
+
+  // Get all selected devices (for presets panel)
+  const allSelectedDevices = useMemo(() => {
+    const selected: Device[] = [];
+    for (const device of devices) {
+      if (selectedAnchorIps.has(device.ip) || selectedTagIps.has(device.ip)) {
+        selected.push(device);
+      }
+    }
+    return selected;
+  }, [devices, selectedAnchorIps, selectedTagIps]);
 
   const handleClearDevices = async () => {
     try {
       await clearDevices();
       setDevices([]);
-      setSelectedDeviceIps(new Set());
+      setSelectedAnchorIps(new Set());
+      setSelectedTagIps(new Set());
     } catch (e) {
       console.error('Failed to clear devices', e);
     }
@@ -24,7 +59,13 @@ function App() {
   // Prune stale IPs when devices change (e.g., device goes offline)
   useEffect(() => {
     const deviceIps = new Set(devices.map(d => d.ip));
-    setSelectedDeviceIps(prev => {
+
+    setSelectedAnchorIps(prev => {
+      const pruned = new Set([...prev].filter(ip => deviceIps.has(ip)));
+      return pruned.size !== prev.size ? pruned : prev;
+    });
+
+    setSelectedTagIps(prev => {
       const pruned = new Set([...prev].filter(ip => deviceIps.has(ip)));
       return pruned.size !== prev.size ? pruned : prev;
     });
@@ -58,31 +99,61 @@ function App() {
     };
   }, []);
 
-  return (
-    <div className="app-container">
-      <header>
-        <h1>RTLS-Link Manager</h1>
-      </header>
-      <main>
-        <DeviceGrid
-          devices={devices}
-          selectedDeviceIps={selectedDeviceIps}
-          onSelectionChange={setSelectedDeviceIps}
-          onClear={handleClearDevices}
-          onConfigure={setSelectedDevice}
-        />
-        <LocalConfigPanel
-          selectedDevices={devices.filter(d => selectedDeviceIps.has(d.ip))}
-          allDevices={devices}
-        />
-        {selectedDevice && (
-          <ConfigPanel
-            device={selectedDevice}
-            onClose={() => setSelectedDevice(null)}
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'anchors':
+        return (
+          <AnchorsPanel
+            anchors={anchors}
+            selectedIps={selectedAnchorIps}
+            onSelectionChange={setSelectedAnchorIps}
+            onConfigure={setSelectedDevice}
+            onClear={handleClearDevices}
           />
-        )}
-      </main>
-    </div>
+        );
+      case 'tags':
+        return (
+          <TagsPanel
+            tags={tags}
+            selectedIps={selectedTagIps}
+            onSelectionChange={setSelectedTagIps}
+            onConfigure={setSelectedDevice}
+            onClear={handleClearDevices}
+          />
+        );
+      case 'presets':
+        return (
+          <PresetsPanel
+            selectedDevices={allSelectedDevices}
+            allDevices={devices}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <>
+      <AppShell
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        anchorCount={anchors.length}
+        tagCount={tags.length}
+        isExpertMode={isExpertMode}
+        onExpertModeChange={setIsExpertMode}
+      >
+        {renderContent()}
+      </AppShell>
+
+      {selectedDevice && (
+        <ConfigPanel
+          device={selectedDevice}
+          onClose={() => setSelectedDevice(null)}
+          isExpertMode={isExpertMode}
+        />
+      )}
+    </>
   );
 }
 

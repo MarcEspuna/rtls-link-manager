@@ -13,6 +13,7 @@ interface ConfigEditorProps {
   onAnchorsBusyChange?: (busy: boolean) => void;
   onAnchorsError?: (message: string | null) => void;
   anchorError?: string | null;
+  isExpertMode?: boolean;
 }
 
 const safeParseFloat = (value: string, fallback: number = 0): number => {
@@ -32,7 +33,8 @@ export function ConfigEditor({
   onApplyBatch,
   onAnchorsBusyChange,
   onAnchorsError,
-  anchorError
+  anchorError,
+  isExpertMode = false
 }: ConfigEditorProps) {
   const [shortAddrError, setShortAddrError] = useState<string | null>(null);
   const anchorApplyRef = useRef<Promise<void> | null>(null);
@@ -105,47 +107,49 @@ export function ConfigEditor({
   return (
     <div className={styles.editor}>
 
-      {/* WiFi Section */}
-      <div className={styles.section}>
-        <h4>WiFi Settings</h4>
-        <div className={styles.field}>
-          <label>Mode</label>
-          <select
-            value={config.wifi.mode}
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              handleChange('wifi', 'mode', val);
-              handleApply('wifi', 'mode', val);
-            }}
-          >
-            <option value={0}>Access Point (AP)</option>
-            <option value={1}>Station (Client)</option>
-          </select>
+      {/* WiFi Section - Expert Mode Only */}
+      {isExpertMode && (
+        <div className={styles.section}>
+          <h4>WiFi Settings</h4>
+          <div className={styles.field}>
+            <label>Mode</label>
+            <select
+              value={config.wifi.mode}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('wifi', 'mode', val);
+                handleApply('wifi', 'mode', val);
+              }}
+            >
+              <option value={0}>Access Point (AP)</option>
+              <option value={1}>Station (Client)</option>
+            </select>
+          </div>
+          {config.wifi.mode === 1 && (
+            <>
+              <div className={styles.field}>
+                <label>SSID</label>
+                <input
+                  value={config.wifi.ssidST || ''}
+                  onChange={(e) => handleChange('wifi', 'ssidST', e.target.value)}
+                  onBlur={(e) => handleApply('wifi', 'ssidST', e.target.value)}
+                />
+              </div>
+               <div className={styles.field}>
+                <label>Password</label>
+                <input
+                  type="password"
+                  value={config.wifi.pswdST || ''}
+                  onChange={(e) => handleChange('wifi', 'pswdST', e.target.value)}
+                  onBlur={(e) => handleApply('wifi', 'pswdST', e.target.value)}
+                />
+              </div>
+            </>
+          )}
         </div>
-        {config.wifi.mode === 1 && (
-          <>
-            <div className={styles.field}>
-              <label>SSID</label>
-              <input
-                value={config.wifi.ssidST || ''}
-                onChange={(e) => handleChange('wifi', 'ssidST', e.target.value)}
-                onBlur={(e) => handleApply('wifi', 'ssidST', e.target.value)}
-              />
-            </div>
-             <div className={styles.field}>
-              <label>Password</label>
-              <input
-                type="password"
-                value={config.wifi.pswdST || ''}
-                onChange={(e) => handleChange('wifi', 'pswdST', e.target.value)}
-                onBlur={(e) => handleApply('wifi', 'pswdST', e.target.value)}
-              />
-            </div>
-          </>
-        )}
-      </div>
+      )}
 
-      {/* UWB Basic Section */}
+      {/* UWB Basic Section - Always Visible */}
       <div className={styles.section}>
         <h4>UWB Configuration</h4>
         <div className={styles.field}>
@@ -166,7 +170,7 @@ export function ConfigEditor({
           </select>
         </div>
         <div className={styles.field}>
-          <label>Device ID (Short)</label>
+          <label>UWB Short Address</label>
           <div className={styles.inputWithError}>
             <input
               value={config.uwb.devShortAddr || ''}
@@ -190,7 +194,7 @@ export function ConfigEditor({
         </div>
       </div>
 
-      {/* Anchor List Section */}
+      {/* Anchor List Section - Always Visible */}
       <div className={styles.section}>
         <h4>Anchor List</h4>
         <AnchorListEditor
@@ -206,9 +210,9 @@ export function ConfigEditor({
         </div>
       </div>
 
-      {/* Advanced / Geo Section */}
+      {/* Origin Coordinates Section - Always Visible */}
       <div className={styles.section}>
-        <h4>Advanced / Geo-Reference</h4>
+        <h4>Origin / Geo-Reference</h4>
         <div className={styles.field}>
           <label>Origin Latitude</label>
           <input
@@ -248,66 +252,75 @@ export function ConfigEditor({
             }}
           />
         </div>
-        <div className={styles.field}>
-          <label>North Rotation (deg)</label>
-          <input
-            type="number" step="1"
-            value={config.uwb.rotationDegrees || 0}
-            onChange={(e) => handleChange('uwb', 'rotationDegrees', safeParseFloat(e.target.value, config.uwb.rotationDegrees || 0))}
-            onBlur={(e) => {
-              const val = safeParseFloat(e.target.value, config.uwb.rotationDegrees || 0);
-              handleChange('uwb', 'rotationDegrees', val);
-              handleApply('uwb', 'rotationDegrees', val);
-            }}
-          />
-        </div>
-        <div className={styles.field}>
-          <label>MAVLink System ID</label>
-          <input
-            type="number" step="1"
-            value={config.uwb.mavlinkTargetSystemId || 1}
-            onChange={(e) => handleChange('uwb', 'mavlinkTargetSystemId', safeParseInt(e.target.value, config.uwb.mavlinkTargetSystemId || 1))}
-            onBlur={(e) => {
-              const val = safeParseInt(e.target.value, config.uwb.mavlinkTargetSystemId || 1);
-              handleChange('uwb', 'mavlinkTargetSystemId', val);
-              handleApply('uwb', 'mavlinkTargetSystemId', val);
-            }}
-          />
-        </div>
-        <div className={styles.field}>
-          <label>Z Calculation Mode</label>
-          <select
-            value={config.uwb.zCalcMode ?? 0}
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              handleChange('uwb', 'zCalcMode', val);
-              handleApply('uwb', 'zCalcMode', val);
-            }}
-          >
-            <option value={0}>None (TDoA Z)</option>
-            <option value={1}>Rangefinder</option>
-            <option value={2}>UWB (reserved)</option>
-          </select>
-        </div>
       </div>
 
-      {/* App Settings */}
-      <div className={styles.section}>
-        <h4>Hardware Settings</h4>
-        <div className={styles.field}>
-          <label>LED Pin</label>
-          <input
-            type="number" step="1"
-            value={config.app.led2Pin || 2}
-            onChange={(e) => handleChange('app', 'led2Pin', safeParseInt(e.target.value, config.app.led2Pin || 2))}
-            onBlur={(e) => {
-              const val = safeParseInt(e.target.value, config.app.led2Pin || 2);
-              handleChange('app', 'led2Pin', val);
-              handleApply('app', 'led2Pin', val);
-            }}
-          />
+      {/* Advanced Settings - Expert Mode Only */}
+      {isExpertMode && (
+        <div className={styles.section}>
+          <h4>Advanced Settings</h4>
+          <div className={styles.field}>
+            <label>North Rotation (deg)</label>
+            <input
+              type="number" step="1"
+              value={config.uwb.rotationDegrees || 0}
+              onChange={(e) => handleChange('uwb', 'rotationDegrees', safeParseFloat(e.target.value, config.uwb.rotationDegrees || 0))}
+              onBlur={(e) => {
+                const val = safeParseFloat(e.target.value, config.uwb.rotationDegrees || 0);
+                handleChange('uwb', 'rotationDegrees', val);
+                handleApply('uwb', 'rotationDegrees', val);
+              }}
+            />
+          </div>
+          <div className={styles.field}>
+            <label>MAVLink Target System ID</label>
+            <input
+              type="number" step="1"
+              value={config.uwb.mavlinkTargetSystemId || 1}
+              onChange={(e) => handleChange('uwb', 'mavlinkTargetSystemId', safeParseInt(e.target.value, config.uwb.mavlinkTargetSystemId || 1))}
+              onBlur={(e) => {
+                const val = safeParseInt(e.target.value, config.uwb.mavlinkTargetSystemId || 1);
+                handleChange('uwb', 'mavlinkTargetSystemId', val);
+                handleApply('uwb', 'mavlinkTargetSystemId', val);
+              }}
+            />
+          </div>
+          <div className={styles.field}>
+            <label>Z Calculation Mode</label>
+            <select
+              value={config.uwb.zCalcMode ?? 0}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('uwb', 'zCalcMode', val);
+                handleApply('uwb', 'zCalcMode', val);
+              }}
+            >
+              <option value={0}>None (TDoA Z)</option>
+              <option value={1}>Rangefinder</option>
+              <option value={2}>UWB (reserved)</option>
+            </select>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Hardware Settings - Expert Mode Only */}
+      {isExpertMode && (
+        <div className={styles.section}>
+          <h4>Hardware Settings</h4>
+          <div className={styles.field}>
+            <label>LED Pin</label>
+            <input
+              type="number" step="1"
+              value={config.app.led2Pin || 2}
+              onChange={(e) => handleChange('app', 'led2Pin', safeParseInt(e.target.value, config.app.led2Pin || 2))}
+              onBlur={(e) => {
+                const val = safeParseInt(e.target.value, config.app.led2Pin || 2);
+                handleChange('app', 'led2Pin', val);
+                handleApply('app', 'led2Pin', val);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   );
