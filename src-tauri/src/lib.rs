@@ -8,10 +8,12 @@ pub mod commands;
 pub mod config_storage;
 pub mod discovery;
 pub mod error;
+pub mod preset_storage;
 pub mod state;
 pub mod types;
 
 use config_storage::ConfigStorageService;
+use preset_storage::PresetStorageService;
 use state::AppState;
 use std::sync::Arc;
 use tauri::Manager;
@@ -27,6 +29,10 @@ pub fn run() {
             // Initialize config storage service
             let config_service = ConfigStorageService::new(&app_handle)
                 .expect("Failed to initialize config storage");
+
+            // Initialize preset storage service
+            let preset_service = PresetStorageService::new(&app_handle)
+                .expect("Failed to initialize preset storage");
 
             // Setup app state
             let app_state = AppState::new();
@@ -50,6 +56,7 @@ pub fn run() {
             // Register managed state
             app.manage(app_state);
             app.manage(Arc::new(config_service));
+            app.manage(Arc::new(preset_service));
 
             Ok(())
         })
@@ -61,6 +68,10 @@ pub fn run() {
             commands::configs::get_config,
             commands::configs::save_config,
             commands::configs::delete_config,
+            commands::presets::list_presets,
+            commands::presets::get_preset,
+            commands::presets::save_preset,
+            commands::presets::delete_preset,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

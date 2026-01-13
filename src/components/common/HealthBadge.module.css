@@ -1,0 +1,64 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.md .dot {
+  width: 10px;
+  height: 10px;
+}
+
+.sm .dot {
+  width: 8px;
+  height: 8px;
+}
+
+.label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Health levels */
+.healthy .dot {
+  background-color: var(--accent-success);
+  box-shadow: 0 0 6px var(--accent-success);
+}
+
+.healthy .label {
+  color: var(--accent-success);
+}
+
+.warning .dot {
+  background-color: var(--accent-warning);
+  box-shadow: 0 0 6px var(--accent-warning);
+}
+
+.warning .label {
+  color: var(--accent-warning);
+}
+
+.degraded .dot {
+  background-color: var(--accent-degraded);
+  box-shadow: 0 0 6px var(--accent-degraded);
+}
+
+.degraded .label {
+  color: var(--accent-degraded);
+}
+
+.unknown .dot {
+  background-color: var(--text-secondary);
+  box-shadow: none;
+}
+
+.unknown .label {
+  color: var(--text-secondary);
+}

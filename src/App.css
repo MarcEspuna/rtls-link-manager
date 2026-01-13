@@ -1,27 +1,6 @@
-.app-container {
-  width: 100%;
+/* App.css - minimal styles, most layout handled by components */
+
+/* Ensure root takes full viewport */
+#root {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--bg-primary);
-}
-
-header {
-  background: var(--bg-secondary);
-  padding: 1rem 2rem;
-  border-bottom: 1px solid var(--border-color);
-  box-shadow: var(--shadow-sm);
-}
-
-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-}
-
-main {
-  flex: 1;
-  background-color: var(--bg-primary);
 }

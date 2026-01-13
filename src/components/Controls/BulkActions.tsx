@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Device } from '@shared/types';
 import { Commands } from '@shared/commands';
+import { executeBulkCommand, BulkCommandResult } from '../../lib/deviceCommands';
 import { ProgressBar } from '../common/ProgressBar';
 import styles from './BulkActions.module.css';
 
@@ -8,74 +9,20 @@ interface BulkActionsProps {
   devices: Device[];
 }
 
-interface BulkResult {
-  device: Device;
-  success: boolean;
-  error?: string;
-}
-
-const COMMAND_TIMEOUT_MS = 5000;
-
 export function BulkActions({ devices }: BulkActionsProps) {
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
-  const [results, setResults] = useState<BulkResult[]>([]);
+  const [results, setResults] = useState<BulkCommandResult[]>([]);
 
-  const executeBulk = async (
-    command: string,
-    options?: { confirm?: string }
-  ) => {
+  const executeBulk = async (command: string, options?: { confirm?: string }) => {
     if (options?.confirm && !confirm(options.confirm)) return;
 
     setProgress({ current: 0, total: devices.length });
     setResults([]);
-    const newResults: BulkResult[] = [];
 
-    // Execute in parallel with concurrency limit
-    const CONCURRENT = 5;
-    for (let i = 0; i < devices.length; i += CONCURRENT) {
-      const batch = devices.slice(i, i + CONCURRENT);
-      const batchResults = await Promise.all(
-        batch.map(async (device) => {
-          try {
-            const ws = new WebSocket(`ws://${device.ip}/ws`);
-            await new Promise<void>((resolve, reject) => {
-              const timeout = setTimeout(() => {
-                ws.close();
-                reject(new Error('Timeout'));
-              }, COMMAND_TIMEOUT_MS);
-
-              ws.onopen = () => ws.send(command);
-
-              ws.onmessage = (event) => {
-                clearTimeout(timeout);
-                const response = event.data.toString().toLowerCase();
-                if (response.includes('error') || response.includes('fail')) {
-                  reject(new Error(event.data.toString()));
-                } else {
-                  resolve();
-                }
-                ws.close();
-              };
-
-              ws.onerror = () => {
-                clearTimeout(timeout);
-                ws.close();
-                reject(new Error('WebSocket error'));
-              };
-            });
-            return { device, success: true };
-          } catch (e) {
-            return {
-              device,
-              success: false,
-              error: e instanceof Error ? e.message : 'Failed'
-            };
-          }
-        })
-      );
-      newResults.push(...batchResults);
-      setProgress({ current: newResults.length, total: devices.length });
-    }
+    const newResults = await executeBulkCommand(devices, command, {
+      concurrency: 5,
+      onProgress: (completed, total) => setProgress({ current: completed, total }),
+    });
 
     setResults(newResults);
     setProgress(null);
@@ -93,24 +40,21 @@ export function BulkActions({ devices }: BulkActionsProps) {
           Start UWB
         </button>
         <button
-          onClick={() => executeBulk(Commands.reboot(), {
-            confirm: `Reboot ${devices.length} devices?`
-          })}
+          onClick={() =>
+            executeBulk(Commands.reboot(), {
+              confirm: `Reboot ${devices.length} devices?`,
+            })
+          }
         >
           Reboot All
         </button>
       </div>
 
-      {progress && (
-        <ProgressBar
-          current={progress.current}
-          total={progress.total}
-        />
-      )}
+      {progress && <ProgressBar current={progress.current} total={progress.total} />}
 
       {results.length > 0 && (
         <div className={styles.results}>
-          {results.map(r => (
+          {results.map((r) => (
             <div key={r.device.ip} className={r.success ? styles.success : styles.error}>
               {r.success ? 'OK' : 'FAIL'} {r.device.id} ({r.device.ip})
               {r.error && <span className={styles.errorMsg}>{r.error}</span>}
