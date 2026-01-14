@@ -59,6 +59,9 @@ mod tests {
                     origin_sent: None,
                     rf_enabled: None,
                     rf_healthy: None,
+                    avg_rate_c_hz: None,
+                    min_rate_c_hz: None,
+                    max_rate_c_hz: None,
                 },
             );
         }

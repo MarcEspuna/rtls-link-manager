@@ -385,6 +385,10 @@ mod tests {
                 mavlink_target_system_id: Some(1),
                 rotation_degrees: Some(0.0),
                 z_calc_mode: Some(1),
+                channel: None,
+                dw_mode: None,
+                tx_power_level: None,
+                smart_power_enable: None,
             },
             app: AppConfig {
                 led2_pin: Some(2),
