@@ -58,7 +58,6 @@ export function TagCard({ device, selected, onSelect, onConfigure }: TagCardProp
       </div>
 
       <div className={styles.info}>
-        <div><span>UWB ID:</span> {device.uwbShort}</div>
         <div><span>Role:</span> {device.role}</div>
         <div><span>MAV ID:</span> {device.mavSysId}</div>
         <div><span>FW:</span> {device.firmware}</div>
@@ -93,6 +92,24 @@ export function TagCard({ device, selected, onSelect, onConfigure }: TagCardProp
             }>
               {!device.rfEnabled ? 'Disabled' :
                device.rfHealthy ? 'Healthy' : 'Unhealthy'}
+            </span>
+          </div>
+        )}
+        <div className={styles.telemetryRow}>
+          <span className={styles.telemetryLabel}>Rate:</span>
+          <span className={
+            device.avgRateCHz !== undefined && device.avgRateCHz >= 500 ? styles.statusOk :
+            device.avgRateCHz !== undefined && device.avgRateCHz >= 100 ? styles.statusWarn :
+            styles.statusMuted
+          }>
+            {device.avgRateCHz !== undefined ? `${(device.avgRateCHz / 100).toFixed(1)} Hz` : '?'}
+          </span>
+        </div>
+        {device.minRateCHz !== undefined && device.maxRateCHz !== undefined && (
+          <div className={styles.telemetryRow}>
+            <span className={styles.telemetryLabel}>Rate (5s):</span>
+            <span className={styles.statusMuted}>
+              {(device.minRateCHz / 100).toFixed(1)}–{(device.maxRateCHz / 100).toFixed(1)} Hz
             </span>
           </div>
         )}

@@ -48,6 +48,11 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.uwb.mavlinkTargetSystemId !== undefined) params.push(['uwb', 'mavlinkTargetSystemId', String(config.uwb.mavlinkTargetSystemId)]);
     if (config.uwb.rotationDegrees !== undefined) params.push(['uwb', 'rotationDegrees', String(config.uwb.rotationDegrees)]);
     if (config.uwb.zCalcMode !== undefined) params.push(['uwb', 'zCalcMode', String(config.uwb.zCalcMode)]);
+    // UWB Radio settings (TDoA mode only, expert mode)
+    if (config.uwb.channel !== undefined) params.push(['uwb', 'channel', String(config.uwb.channel)]);
+    if (config.uwb.dwMode !== undefined) params.push(['uwb', 'dwMode', String(config.uwb.dwMode)]);
+    if (config.uwb.txPowerLevel !== undefined) params.push(['uwb', 'txPowerLevel', String(config.uwb.txPowerLevel)]);
+    if (config.uwb.smartPowerEnable !== undefined) params.push(['uwb', 'smartPowerEnable', String(config.uwb.smartPowerEnable)]);
   }
 
   // App params

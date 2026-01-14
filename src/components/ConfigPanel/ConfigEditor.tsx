@@ -322,6 +322,81 @@ export function ConfigEditor({
         </div>
       )}
 
+      {/* UWB Radio Settings - Expert Mode + TDoA modes only */}
+      {isExpertMode && (config.uwb.mode === 3 || config.uwb.mode === 4) && (
+        <div className={styles.section}>
+          <h4>UWB Radio Settings</h4>
+          <div className={styles.field}>
+            <label>Channel</label>
+            <select
+              value={config.uwb.channel ?? 2}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('uwb', 'channel', val);
+                handleApply('uwb', 'channel', val);
+              }}
+            >
+              <option value={1}>Channel 1</option>
+              <option value={2}>Channel 2 (Default)</option>
+              <option value={3}>Channel 3</option>
+              <option value={4}>Channel 4</option>
+              <option value={5}>Channel 5</option>
+              <option value={7}>Channel 7</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label>Mode</label>
+            <select
+              value={config.uwb.dwMode ?? 0}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('uwb', 'dwMode', val);
+                handleApply('uwb', 'dwMode', val);
+              }}
+            >
+              <option value={0}>Short Data, Fast Accuracy (Default)</option>
+              <option value={1}>Long Data, Fast Accuracy</option>
+              <option value={2}>Short Data, Fast Low Power</option>
+              <option value={3}>Long Data, Fast Low Power</option>
+              <option value={4}>Short Data, Mid Accuracy</option>
+              <option value={5}>Long Data, Mid Accuracy</option>
+              <option value={6}>Long Data, Range Accuracy</option>
+              <option value={7}>Long Data, Range Low Power</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label>TX Power</label>
+            <select
+              value={config.uwb.txPowerLevel ?? 3}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('uwb', 'txPowerLevel', val);
+                handleApply('uwb', 'txPowerLevel', val);
+              }}
+            >
+              <option value={0}>Low</option>
+              <option value={1}>Medium-Low</option>
+              <option value={2}>Medium-High</option>
+              <option value={3}>High (Default)</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label>Smart Power</label>
+            <select
+              value={config.uwb.smartPowerEnable ?? 0}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('uwb', 'smartPowerEnable', val);
+                handleApply('uwb', 'smartPowerEnable', val);
+              }}
+            >
+              <option value={0}>Disabled (Default)</option>
+              <option value={1}>Enabled</option>
+            </select>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

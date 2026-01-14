@@ -48,7 +48,6 @@ export function AnchorCard({ device, selected, onSelect, onConfigure }: AnchorCa
       </div>
 
       <div className={styles.info}>
-        <div><span>UWB ID:</span> {device.uwbShort}</div>
         <div><span>Role:</span> {device.role}</div>
         <div><span>MAC:</span> {device.mac}</div>
         <div><span>FW:</span> {device.firmware}</div>

@@ -15,6 +15,10 @@ export interface Device {
   originSent?: boolean;     // True if GPS origin sent to ArduPilot
   rfEnabled?: boolean;      // True if zCalcMode == RANGEFINDER
   rfHealthy?: boolean;      // True if receiving non-stale rangefinder data
+  // Update rate statistics (centi-Hz for 0.01 Hz precision)
+  avgRateCHz?: number;      // Average update rate in centi-Hz (e.g., 1000 = 10.0 Hz)
+  minRateCHz?: number;      // Min rate in last 5s window
+  maxRateCHz?: number;      // Max rate in last 5s window
 }
 
 export type DeviceRole =
@@ -62,6 +66,11 @@ export interface UwbConfig {
   mavlinkTargetSystemId?: number;
   rotationDegrees?: number;
   zCalcMode?: 0 | 1 | 2;  // 0=None (TDoA Z), 1=Rangefinder, 2=UWB (reserved)
+  // UWB Radio settings (TDoA mode only, expert mode)
+  channel?: number;           // UWB channel (1-7), default 2
+  dwMode?: number;            // DW1000 mode index (0-7), default 0 (SHORTDATA_FAST_ACCURACY)
+  txPowerLevel?: number;      // TX power level (0-3), default 3 (high)
+  smartPowerEnable?: 0 | 1;   // Smart power (0=disabled, 1=enabled)
 }
 
 export interface AnchorConfig {
