@@ -254,6 +254,9 @@ mod tests {
                 enable_web_server: None,
                 enable_discovery: None,
                 discovery_port: None,
+                log_udp_port: None,
+                log_serial_enabled: None,
+                log_udp_enabled: None,
             },
             uwb: crate::types::UwbConfig {
                 mode: 4,
@@ -308,6 +311,9 @@ mod tests {
                 enable_web_server: None,
                 enable_discovery: None,
                 discovery_port: None,
+                log_udp_port: None,
+                log_serial_enabled: None,
+                log_udp_enabled: None,
             },
             uwb: crate::types::UwbConfig {
                 mode: 0,
@@ -362,6 +368,9 @@ mod tests {
                 enable_web_server: None,
                 enable_discovery: None,
                 discovery_port: None,
+                log_udp_port: None,
+                log_serial_enabled: None,
+                log_udp_enabled: None,
             },
             uwb: crate::types::UwbConfig {
                 mode: 0,

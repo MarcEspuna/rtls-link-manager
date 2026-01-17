@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Device } from '@shared/types';
+import { Device, logLevelToShort } from '@shared/types';
 import { Commands } from '@shared/commands';
 import { useDeviceCommand } from '../../hooks/useDeviceWebSocket';
 import { StatusBadge } from '../common/StatusBadge';
@@ -12,9 +12,10 @@ interface TagCardProps {
   selected: boolean;
   onSelect: (selected: boolean) => void;
   onConfigure: () => void;
+  isExpertMode?: boolean;
 }
 
-export function TagCard({ device, selected, onSelect, onConfigure }: TagCardProps) {
+export function TagCard({ device, selected, onSelect, onConfigure, isExpertMode = false }: TagCardProps) {
   const { sendCommand, loading } = useDeviceCommand(device.ip);
   const [ledState, setLedState] = useState<boolean | null>(null);
   const health = calculateDeviceHealth(device);
@@ -54,6 +55,11 @@ export function TagCard({ device, selected, onSelect, onConfigure }: TagCardProp
         />
         <HealthBadge health={health} size="sm" />
         <span className={styles.ip}>{device.ip}</span>
+        {isExpertMode && device.logLevel !== undefined && (
+          <span className={styles.logBadge} title={`Compiled log level: ${device.logLevel}`}>
+            {logLevelToShort(device.logLevel)}
+          </span>
+        )}
         <StatusBadge status={device.online ? 'online' : 'offline'} />
       </div>
 

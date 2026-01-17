@@ -21,6 +21,10 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.wifi.enableWebServer !== undefined) params.push(['wifi', 'enableWebServer', String(config.wifi.enableWebServer)]);
     if (config.wifi.enableDiscovery !== undefined) params.push(['wifi', 'enableDiscovery', String(config.wifi.enableDiscovery)]);
     if (config.wifi.discoveryPort !== undefined) params.push(['wifi', 'discoveryPort', String(config.wifi.discoveryPort)]);
+    // Logging parameters
+    if (config.wifi.logUdpPort !== undefined) params.push(['wifi', 'logUdpPort', String(config.wifi.logUdpPort)]);
+    if (config.wifi.logSerialEnabled !== undefined) params.push(['wifi', 'logSerialEnabled', String(config.wifi.logSerialEnabled)]);
+    if (config.wifi.logUdpEnabled !== undefined) params.push(['wifi', 'logUdpEnabled', String(config.wifi.logUdpEnabled)]);
   }
 
   // UWB params

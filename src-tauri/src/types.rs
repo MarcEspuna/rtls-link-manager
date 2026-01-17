@@ -55,6 +55,18 @@ pub struct Device {
     /// Max update rate in last 5s window (centi-Hz)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_rate_c_hz: Option<u16>,
+    /// Compiled log level (0=NONE, 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG, 5=VERBOSE)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_level: Option<u8>,
+    /// UDP port for log streaming
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_udp_port: Option<u16>,
+    /// Whether Serial logging is enabled at runtime
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_serial_enabled: Option<bool>,
+    /// Whether UDP log streaming is enabled at runtime
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_udp_enabled: Option<bool>,
 }
 
 /// Device operating role/mode.
@@ -133,6 +145,15 @@ pub struct WifiConfig {
     /// UDP discovery port
     #[serde(skip_serializing_if = "Option::is_none")]
     pub discovery_port: Option<u16>,
+    /// UDP port for log streaming
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_udp_port: Option<u16>,
+    /// Whether Serial logging is enabled at runtime
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_serial_enabled: Option<u8>,
+    /// Whether UDP log streaming is enabled at runtime
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_udp_enabled: Option<u8>,
 }
 
 /// UWB and positioning configuration.
@@ -332,6 +353,10 @@ mod tests {
             avg_rate_c_hz: None,
             min_rate_c_hz: None,
             max_rate_c_hz: None,
+            log_level: None,
+            log_udp_port: None,
+            log_serial_enabled: None,
+            log_udp_enabled: None,
         };
 
         let json = serde_json::to_string(&device).unwrap();
@@ -369,6 +394,9 @@ mod tests {
                 enable_web_server: Some(1),
                 enable_discovery: Some(1),
                 discovery_port: Some(3333),
+                log_udp_port: None,
+                log_serial_enabled: None,
+                log_udp_enabled: None,
             },
             uwb: UwbConfig {
                 mode: 4,

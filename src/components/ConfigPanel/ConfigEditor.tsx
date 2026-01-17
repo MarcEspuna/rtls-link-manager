@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { DeviceConfig, AnchorConfig } from '@shared/types';
+import { DeviceConfig, AnchorConfig, Device, logLevelToName } from '@shared/types';
 import { Commands } from '@shared/commands';
 import { getAnchorWriteCommands } from '@shared/anchors';
 import { AnchorListEditor } from './AnchorListEditor';
@@ -7,6 +7,7 @@ import styles from './ConfigEditor.module.css';
 
 interface ConfigEditorProps {
   config: DeviceConfig;
+  device?: Device;  // For reading telemetry like logLevel
   onChange: (config: DeviceConfig) => void;
   onApply: (group: string, name: string, value: any) => Promise<void>;
   onApplyBatch?: (commands: string[]) => Promise<void>;
@@ -14,6 +15,7 @@ interface ConfigEditorProps {
   onAnchorsError?: (message: string | null) => void;
   anchorError?: string | null;
   isExpertMode?: boolean;
+  onOpenLogTerminal?: () => void;
 }
 
 const safeParseFloat = (value: string, fallback: number = 0): number => {
@@ -28,13 +30,15 @@ const safeParseInt = (value: string, fallback: number = 0): number => {
 
 export function ConfigEditor({
   config,
+  device,
   onChange,
   onApply,
   onApplyBatch,
   onAnchorsBusyChange,
   onAnchorsError,
   anchorError,
-  isExpertMode = false
+  isExpertMode = false,
+  onOpenLogTerminal
 }: ConfigEditorProps) {
   const [shortAddrError, setShortAddrError] = useState<string | null>(null);
   const anchorApplyRef = useRef<Promise<void> | null>(null);
@@ -394,6 +398,74 @@ export function ConfigEditor({
               <option value={1}>Enabled</option>
             </select>
           </div>
+        </div>
+      )}
+
+      {/* Debug & Logging - Expert Mode Only */}
+      {isExpertMode && (
+        <div className={styles.section}>
+          <h4>Debug & Logging</h4>
+          <div className={styles.field}>
+            <label>Compiled Log Level</label>
+            <div className={styles.readonlyField}>
+              {device?.logLevel !== undefined
+                ? `${logLevelToName(device.logLevel)} (${device.logLevel})`
+                : 'Unknown'}
+            </div>
+          </div>
+          <div className={styles.field}>
+            <label>Serial Logging</label>
+            <select
+              value={config.wifi.logSerialEnabled ?? 1}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('wifi', 'logSerialEnabled', val);
+                handleApply('wifi', 'logSerialEnabled', val);
+              }}
+            >
+              <option value={1}>Enabled (Default)</option>
+              <option value={0}>Disabled</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label>UDP Log Streaming</label>
+            <select
+              value={config.wifi.logUdpEnabled ?? 0}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('wifi', 'logUdpEnabled', val);
+                handleApply('wifi', 'logUdpEnabled', val);
+              }}
+            >
+              <option value={0}>Disabled (Default)</option>
+              <option value={1}>Enabled</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label>UDP Log Port</label>
+            <input
+              type="number"
+              step="1"
+              value={config.wifi.logUdpPort ?? 3334}
+              onChange={(e) => handleChange('wifi', 'logUdpPort', safeParseInt(e.target.value, 3334))}
+              onBlur={(e) => {
+                const val = safeParseInt(e.target.value, 3334);
+                handleChange('wifi', 'logUdpPort', val);
+                handleApply('wifi', 'logUdpPort', val);
+              }}
+            />
+          </div>
+          {onOpenLogTerminal && (
+            <div className={styles.field}>
+              <button
+                type="button"
+                onClick={onOpenLogTerminal}
+                className={styles.logTerminalButton}
+              >
+                Open Log Terminal
+              </button>
+            </div>
+          )}
         </div>
       )}
 
