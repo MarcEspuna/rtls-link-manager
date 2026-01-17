@@ -26,6 +26,10 @@ export const Commands = {
   getLedState: () => 'get-led2-state',
   reboot: () => 'reboot',
   start: () => 'start',
+
+  // System info
+  getVersion: () => 'version',
+  getFirmwareInfo: () => 'firmware-info',
 } as const;
 
 // Commands that return JSON responses
@@ -38,6 +42,7 @@ export const JSON_COMMANDS = [
   'delete-config',
   'toggle-led2',
   'get-led2-state',
+  'firmware-info',
 ];
 
 export function isJsonCommand(cmd: string): boolean {

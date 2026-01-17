@@ -219,6 +219,124 @@ export async function executeBulkCommand(
 }
 
 /**
+ * OTA response from firmware after successful upload.
+ */
+export interface OtaResponse {
+  success: boolean;
+  message: string;
+  version?: string;
+  rebooting?: boolean;
+}
+
+/**
+ * Upload firmware to a device via HTTP POST to /update endpoint.
+ * Returns the OTA response containing version info on success.
+ */
+export async function uploadFirmware(
+  deviceIp: string,
+  firmwareData: ArrayBuffer,
+  options?: {
+    onProgress?: (percent: number) => void;
+    timeout?: number;
+  }
+): Promise<OtaResponse> {
+  const { onProgress, timeout = 120000 } = options ?? {};
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `http://${deviceIp}/update`, true);
+    xhr.timeout = timeout;
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      // Try to parse JSON response
+      let response: OtaResponse;
+      try {
+        response = JSON.parse(xhr.responseText);
+      } catch {
+        // Fallback for legacy plain text response
+        if (xhr.status === 200) {
+          response = { success: true, message: xhr.responseText || 'Update successful' };
+        } else {
+          response = { success: false, message: xhr.responseText || 'Update failed' };
+        }
+      }
+
+      if (xhr.status === 200 && response.success !== false) {
+        resolve(response);
+      } else {
+        reject(new Error(response.message || `Upload failed with status ${xhr.status}`));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Network error during firmware upload'));
+    };
+
+    xhr.ontimeout = () => {
+      reject(new Error('Firmware upload timed out'));
+    };
+
+    const formData = new FormData();
+    formData.append('firmware', new Blob([firmwareData]), 'firmware.bin');
+    xhr.send(formData);
+  });
+}
+
+/**
+ * Upload firmware to multiple devices with optional parallelism.
+ */
+export interface FirmwareUploadResult {
+  device: Device;
+  success: boolean;
+  version?: string;
+  error?: string;
+}
+
+export async function uploadFirmwareBulk(
+  devices: Device[],
+  firmwareData: ArrayBuffer,
+  options?: {
+    concurrency?: number;  // Number of parallel uploads (default: 3)
+    onDeviceProgress?: (device: Device, percent: number) => void;
+    onDeviceComplete?: (device: Device, success: boolean, version?: string, error?: string) => void;
+    onOverallProgress?: (completed: number, total: number) => void;
+  }
+): Promise<FirmwareUploadResult[]> {
+  const { concurrency = 3, onDeviceProgress, onDeviceComplete, onOverallProgress } = options ?? {};
+  const results: FirmwareUploadResult[] = [];
+
+  // Process devices in batches for parallel uploads
+  for (let i = 0; i < devices.length; i += concurrency) {
+    const batch = devices.slice(i, i + concurrency);
+    const batchResults = await Promise.all(
+      batch.map(async (device): Promise<FirmwareUploadResult> => {
+        try {
+          const response = await uploadFirmware(device.ip, firmwareData, {
+            onProgress: (percent) => onDeviceProgress?.(device, percent),
+          });
+          onDeviceComplete?.(device, true, response.version);
+          return { device, success: true, version: response.version };
+        } catch (e) {
+          const error = e instanceof Error ? e.message : 'Upload failed';
+          onDeviceComplete?.(device, false, undefined, error);
+          return { device, success: false, error };
+        }
+      })
+    );
+    results.push(...batchResults);
+    onOverallProgress?.(results.length, devices.length);
+  }
+
+  return results;
+}
+
+/**
  * Execute a function on multiple devices concurrently with a concurrency limit.
  * More flexible than executeBulkCommand - allows custom logic per device.
  */
