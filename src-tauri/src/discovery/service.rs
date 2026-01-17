@@ -45,6 +45,10 @@ pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Er
         avg_rate_c_hz: json["avg_rate_cHz"].as_u64().map(|v| v as u16),
         min_rate_c_hz: json["min_rate_cHz"].as_u64().map(|v| v as u16),
         max_rate_c_hz: json["max_rate_cHz"].as_u64().map(|v| v as u16),
+        log_level: json["log_level"].as_u64().map(|v| v as u8),
+        log_udp_port: json["log_udp_port"].as_u64().map(|v| v as u16),
+        log_serial_enabled: json["log_serial_enabled"].as_bool(),
+        log_udp_enabled: json["log_udp_enabled"].as_bool(),
     })
 }
 
@@ -209,6 +213,10 @@ mod tests {
                     avg_rate_c_hz: None,
                     min_rate_c_hz: None,
                     max_rate_c_hz: None,
+                    log_level: None,
+                    log_udp_port: None,
+                    log_serial_enabled: None,
+                    log_udp_enabled: None,
                 },
                 Instant::now(),
             ),
@@ -236,6 +244,10 @@ mod tests {
                     avg_rate_c_hz: None,
                     min_rate_c_hz: None,
                     max_rate_c_hz: None,
+                    log_level: None,
+                    log_udp_port: None,
+                    log_serial_enabled: None,
+                    log_udp_enabled: None,
                 },
                 Instant::now() - Duration::from_secs(6),
             ),

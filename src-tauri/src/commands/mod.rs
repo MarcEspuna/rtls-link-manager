@@ -5,4 +5,5 @@
 
 pub mod configs;
 pub mod devices;
+pub mod logging;
 pub mod presets;

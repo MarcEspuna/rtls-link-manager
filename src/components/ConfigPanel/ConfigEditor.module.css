@@ -218,3 +218,34 @@
   border-color: var(--border-color-light);
   color: var(--text-primary);
 }
+
+/* Read-only field display */
+.readonlyField {
+  width: 180px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  font-family: monospace;
+}
+
+/* Log terminal button */
+.logTerminalButton {
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--accent-primary);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logTerminalButton:hover {
+  background: var(--accent-primary-hover);
+  box-shadow: 0 2px 8px var(--accent-primary-muted);
+}

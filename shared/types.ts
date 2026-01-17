@@ -19,6 +19,11 @@ export interface Device {
   avgRateCHz?: number;      // Average update rate in centi-Hz (e.g., 1000 = 10.0 Hz)
   minRateCHz?: number;      // Min rate in last 5s window
   maxRateCHz?: number;      // Max rate in last 5s window
+  // Logging configuration (from heartbeat)
+  logLevel?: number;        // Compiled log level (0=NONE..5=VERBOSE)
+  logUdpPort?: number;      // UDP port for log streaming
+  logSerialEnabled?: boolean; // Runtime: Serial logging enabled
+  logUdpEnabled?: boolean;  // Runtime: UDP log streaming enabled
 }
 
 export type DeviceRole =
@@ -53,6 +58,10 @@ export interface WifiConfig {
   enableWebServer?: 0 | 1;
   enableDiscovery?: 0 | 1;
   discoveryPort?: number;
+  // Logging parameters
+  logUdpPort?: number;      // UDP port for log streaming (default: 3334)
+  logSerialEnabled?: 0 | 1; // Runtime: Serial logging enabled
+  logUdpEnabled?: 0 | 1;    // Runtime: UDP log streaming enabled
 }
 
 export interface UwbConfig {
@@ -139,5 +148,42 @@ export interface BulkOperationResult {
   deviceId?: string;
   success: boolean;
   error?: string;
+}
+
+// Log message from device (received via UDP)
+export interface LogMessage {
+  deviceIp: string;       // Source device IP
+  ts: number;             // Device timestamp (ms)
+  lvl: string;            // Log level (ERROR, WARN, INFO, DEBUG, VERBOSE)
+  tag: string;            // Module/file tag
+  msg: string;            // Log message content
+  receivedAt: number;     // Local receive timestamp (ms)
+}
+
+// Log level helpers
+export const LOG_LEVEL_NAMES: Record<number, string> = {
+  0: 'NONE',
+  1: 'ERROR',
+  2: 'WARN',
+  3: 'INFO',
+  4: 'DEBUG',
+  5: 'VERBOSE',
+};
+
+export const LOG_LEVEL_SHORT: Record<number, string> = {
+  0: 'OFF',
+  1: 'ERR',
+  2: 'WRN',
+  3: 'INF',
+  4: 'DBG',
+  5: 'VRB',
+};
+
+export function logLevelToName(level: number): string {
+  return LOG_LEVEL_NAMES[level] ?? 'UNKNOWN';
+}
+
+export function logLevelToShort(level: number): string {
+  return LOG_LEVEL_SHORT[level] ?? '?';
 }
 
