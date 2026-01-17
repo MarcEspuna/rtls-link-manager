@@ -2,7 +2,7 @@
 //!
 //! Commands for starting and stopping log streams from devices.
 
-use crate::error::Error;
+use crate::error::AppError;
 use crate::state::AppState;
 use tauri::State;
 
@@ -14,7 +14,7 @@ use tauri::State;
 pub async fn start_log_stream(
     device_ip: String,
     state: State<'_, AppState>,
-) -> Result<(), Error> {
+) -> Result<(), AppError> {
     let mut streams = state.log_streams.write().await;
     streams.active_streams.insert(device_ip.clone(), true);
     println!("Started log stream for device: {}", device_ip);
@@ -28,7 +28,7 @@ pub async fn start_log_stream(
 pub async fn stop_log_stream(
     device_ip: String,
     state: State<'_, AppState>,
-) -> Result<(), Error> {
+) -> Result<(), AppError> {
     let mut streams = state.log_streams.write().await;
     streams.active_streams.remove(&device_ip);
     println!("Stopped log stream for device: {}", device_ip);
@@ -39,7 +39,7 @@ pub async fn stop_log_stream(
 #[tauri::command]
 pub async fn get_active_log_streams(
     state: State<'_, AppState>,
-) -> Result<Vec<String>, Error> {
+) -> Result<Vec<String>, AppError> {
     let streams = state.log_streams.read().await;
     let active: Vec<String> = streams
         .active_streams
