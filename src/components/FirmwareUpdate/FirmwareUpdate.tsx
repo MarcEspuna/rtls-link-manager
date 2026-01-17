@@ -10,12 +10,20 @@ interface FirmwareUpdateProps {
   onComplete?: () => void;
 }
 
+// Track upload status for each device
+interface DeviceUploadStatus {
+  device: Device;
+  progress: number;
+  status: 'pending' | 'uploading' | 'complete' | 'error';
+  version?: string;
+  error?: string;
+}
+
 export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdateProps) {
   const [firmwareFile, setFirmwareFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [overallProgress, setOverallProgress] = useState<{ current: number; total: number } | null>(null);
-  const [currentDevice, setCurrentDevice] = useState<Device | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);  // For single device mode
+  const [deviceStatuses, setDeviceStatuses] = useState<Map<string, DeviceUploadStatus>>(new Map());
   const [results, setResults] = useState<FirmwareUploadResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -49,21 +57,50 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
     setUploadProgress(0);
     setUpdatedVersion(null);
 
+    // Initialize device statuses for bulk mode
+    if (isBulkMode) {
+      const initialStatuses = new Map<string, DeviceUploadStatus>();
+      targetDevices.forEach(dev => {
+        initialStatuses.set(dev.ip, {
+          device: dev,
+          progress: 0,
+          status: 'pending',
+        });
+      });
+      setDeviceStatuses(initialStatuses);
+    }
+
     try {
       const firmwareData = await firmwareFile.arrayBuffer();
 
       if (isBulkMode) {
-        setOverallProgress({ current: 0, total: targetDevices.length });
         const uploadResults = await uploadFirmwareBulk(targetDevices, firmwareData, {
           onDeviceProgress: (dev, percent) => {
-            setCurrentDevice(dev);
-            setUploadProgress(percent);
+            setDeviceStatuses(prev => {
+              const next = new Map(prev);
+              const current = next.get(dev.ip);
+              if (current) {
+                next.set(dev.ip, { ...current, progress: percent, status: 'uploading' });
+              }
+              return next;
+            });
           },
           onDeviceComplete: (dev, didSucceed, version, err) => {
+            setDeviceStatuses(prev => {
+              const next = new Map(prev);
+              const current = next.get(dev.ip);
+              if (current) {
+                next.set(dev.ip, {
+                  ...current,
+                  progress: 100,
+                  status: didSucceed ? 'complete' : 'error',
+                  version,
+                  error: err,
+                });
+              }
+              return next;
+            });
             setResults(prev => [...prev, { device: dev, success: didSucceed, version, error: err }]);
-          },
-          onOverallProgress: (completed, total) => {
-            setOverallProgress({ current: completed, total });
           },
         });
 
@@ -94,8 +131,7 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
       setError(e instanceof Error ? e.message : 'Upload failed');
     } finally {
       setUploading(false);
-      setCurrentDevice(null);
-      setOverallProgress(null);
+      setDeviceStatuses(new Map());
     }
   };
 
@@ -157,17 +193,35 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
 
       {uploading && (
         <div className={styles.progress}>
-          {currentDevice && isBulkMode && (
-            <div className={styles.currentDevice}>
-              Updating: {currentDevice.id} ({currentDevice.ip})
+          {isBulkMode ? (
+            // Bulk mode: show individual progress for each device
+            <div className={styles.deviceProgressList}>
+              {Array.from(deviceStatuses.values()).map((status) => (
+                <div key={status.device.ip} className={styles.deviceProgressItem}>
+                  <div className={styles.deviceProgressHeader}>
+                    <span className={styles.deviceProgressName}>
+                      {status.device.id || status.device.ip}
+                    </span>
+                    <span className={`${styles.deviceProgressStatus} ${styles[`status${status.status.charAt(0).toUpperCase() + status.status.slice(1)}`]}`}>
+                      {status.status === 'pending' && 'Waiting...'}
+                      {status.status === 'uploading' && `${status.progress}%`}
+                      {status.status === 'complete' && (status.version ? `v${status.version}` : 'Done')}
+                      {status.status === 'error' && 'Failed'}
+                    </span>
+                  </div>
+                  <ProgressBar
+                    current={status.progress}
+                    total={100}
+                  />
+                </div>
+              ))}
             </div>
-          )}
-          <ProgressBar current={uploadProgress} total={100} />
-          <div className={styles.progressText}>{uploadProgress}%</div>
-          {overallProgress && (
-            <div className={styles.overallProgress}>
-              Device {overallProgress.current} of {overallProgress.total}
-            </div>
+          ) : (
+            // Single device mode: simple progress bar
+            <>
+              <ProgressBar current={uploadProgress} total={100} />
+              <div className={styles.progressText}>{uploadProgress}%</div>
+            </>
           )}
         </div>
       )}

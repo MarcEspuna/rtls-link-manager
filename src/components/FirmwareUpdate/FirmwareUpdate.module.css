@@ -193,3 +193,53 @@
   font-size: 0.8rem;
   color: #ef4444;
 }
+
+/* Device progress list for bulk uploads */
+.deviceProgressList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.deviceProgressItem {
+  background: var(--bg-tertiary);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.deviceProgressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.deviceProgressName {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.deviceProgressStatus {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.statusPending {
+  color: var(--text-tertiary);
+}
+
+.statusUploading {
+  color: var(--accent-primary);
+}
+
+.statusComplete {
+  color: #22c55e;
+}
+
+.statusError {
+  color: #ef4444;
+}
