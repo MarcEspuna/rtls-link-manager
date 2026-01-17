@@ -5,6 +5,7 @@ import { flatToAnchors, getAnchorWriteCommands, normalizeUwbShortAddr } from '@s
 import { useDeviceCommand } from '../../hooks/useDeviceWebSocket';
 import { ConfigEditor } from './ConfigEditor';
 import { FirmwareUpdate } from '../FirmwareUpdate';
+import { LogTerminal } from '../ExpertMode/LogTerminal';
 import styles from './ConfigPanel.module.css';
 
 interface ConfigPanelProps {
@@ -21,6 +22,7 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
   const [previewingConfig, setPreviewingConfig] = useState<string | null>(null);
   const [anchorBusy, setAnchorBusy] = useState(false);
   const [anchorError, setAnchorError] = useState<string | null>(null);
+  const [showLogTerminal, setShowLogTerminal] = useState(false);
 
   const findCommandError = (responses: string[] | null): string | null => {
     if (!responses) return 'No response from device';
@@ -208,6 +210,7 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
               onAnchorsError={setAnchorError}
               anchorError={anchorError}
               isExpertMode={isExpertMode}
+              onOpenLogTerminal={() => setShowLogTerminal(true)}
             />
           ) : (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>
@@ -220,6 +223,13 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
           </div>
         </div>
       </div>
+
+      {showLogTerminal && (
+        <LogTerminal
+          deviceIp={device.ip}
+          onClose={() => setShowLogTerminal(false)}
+        />
+      )}
     </>
   );
 }
