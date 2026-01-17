@@ -27,16 +27,7 @@ const RECEIVE_TIMEOUT: Duration = Duration::from_secs(2);
 pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Error> {
     let json: serde_json::Value = serde_json::from_slice(data)?;
 
-    // Debug: print raw log_level value from heartbeat
-    let log_level_raw = &json["log_level"];
     let log_level = json["log_level"].as_u64().map(|v| v as u8);
-    println!(
-        "[Heartbeat] {} - log_level raw: {:?}, parsed: {:?}, log_udp_enabled: {:?}",
-        ip,
-        log_level_raw,
-        log_level,
-        json["log_udp_enabled"]
-    );
 
     Ok(Device {
         ip,

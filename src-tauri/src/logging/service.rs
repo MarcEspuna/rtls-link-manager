@@ -114,23 +114,10 @@ impl LogReceiverService {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut buf = vec![0u8; 1024];
 
-        // Debug: track packets received
-        let mut packet_count: u64 = 0;
-
         loop {
             match self.socket.recv_from(&mut buf).await {
                 Ok((len, addr)) => {
-                    packet_count += 1;
                     let device_ip = addr.ip().to_string();
-
-                    // Debug: print first few packets
-                    if packet_count <= 5 {
-                        let raw_str = String::from_utf8_lossy(&buf[..len]);
-                        println!(
-                            "[LogReceiver] Packet #{} from {}: {} bytes - {:?}",
-                            packet_count, device_ip, len, raw_str
-                        );
-                    }
 
                     // Try to parse the log message
                     if let Ok(raw) = serde_json::from_slice::<RawLogMessage>(&buf[..len]) {

@@ -19,7 +19,6 @@ pub async fn start_log_stream(
 ) -> Result<(), AppError> {
     let mut streams = state.log_streams.write().await;
     streams.active_streams.insert(device_ip.clone(), true);
-    println!("Started log stream for device: {}", device_ip);
     Ok(())
 }
 
@@ -33,7 +32,6 @@ pub async fn stop_log_stream(
 ) -> Result<(), AppError> {
     let mut streams = state.log_streams.write().await;
     streams.active_streams.remove(&device_ip);
-    println!("Stopped log stream for device: {}", device_ip);
     Ok(())
 }
 
@@ -63,7 +61,6 @@ pub async fn get_buffered_logs(
 ) -> Result<Vec<LogMessage>, AppError> {
     let streams = state.log_streams.read().await;
     let logs = streams.get_logs(&device_ip);
-    println!("Retrieved {} buffered logs for device: {}", logs.len(), device_ip);
     Ok(logs)
 }
 
@@ -77,6 +74,5 @@ pub async fn clear_buffered_logs(
 ) -> Result<(), AppError> {
     let mut streams = state.log_streams.write().await;
     streams.clear_logs(&device_ip);
-    println!("Cleared buffered logs for device: {}", device_ip);
     Ok(())
 }
