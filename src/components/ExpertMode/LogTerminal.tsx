@@ -125,8 +125,10 @@ export function LogTerminal({ deviceIp, onClose }: LogTerminalProps) {
   const clearLogs = () => setLogs([]);
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
+    <>
+      <div className={styles.overlay} onClick={onClose} />
+      <div className={styles.container}>
+        <div className={styles.header}>
         <h3>Log Terminal - {deviceIp}</h3>
         <div className={styles.controls}>
           <button
@@ -219,6 +221,7 @@ export function LogTerminal({ deviceIp, onClose }: LogTerminalProps) {
           {isStreaming ? (isPaused ? 'Paused' : 'Streaming') : 'Connecting...'}
         </span>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

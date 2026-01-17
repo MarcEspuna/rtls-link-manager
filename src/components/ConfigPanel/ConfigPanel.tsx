@@ -195,6 +195,7 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
           {config ? (
             <ConfigEditor
               config={config}
+              device={device}
               onChange={setConfig}
               onApply={async (group, name, value) => {
                 await sendCommand(Commands.writeParam(group, name, value));
