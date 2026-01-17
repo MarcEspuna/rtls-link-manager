@@ -4,6 +4,7 @@ import { Commands } from '@shared/commands';
 import { flatToAnchors, getAnchorWriteCommands, normalizeUwbShortAddr } from '@shared/anchors';
 import { useDeviceCommand } from '../../hooks/useDeviceWebSocket';
 import { ConfigEditor } from './ConfigEditor';
+import { FirmwareUpdate } from '../FirmwareUpdate';
 import styles from './ConfigPanel.module.css';
 
 interface ConfigPanelProps {
@@ -213,6 +214,10 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
               {loading ? 'Loading configuration...' : 'Failed to load configuration'}
             </div>
           )}
+
+          <div style={{ marginTop: 24 }}>
+            <FirmwareUpdate device={device} />
+          </div>
         </div>
       </div>
     </>

@@ -26,6 +26,9 @@ export const Commands = {
   getLedState: () => 'get-led2-state',
   reboot: () => 'reboot',
   start: () => 'start',
+
+  // System info
+  getVersion: () => 'version',
 } as const;
 
 // Commands that return JSON responses

@@ -219,6 +219,93 @@ export async function executeBulkCommand(
 }
 
 /**
+ * Upload firmware to a device via HTTP POST to /update endpoint.
+ */
+export async function uploadFirmware(
+  deviceIp: string,
+  firmwareData: ArrayBuffer,
+  options?: {
+    onProgress?: (percent: number) => void;
+    timeout?: number;
+  }
+): Promise<void> {
+  const { onProgress, timeout = 120000 } = options ?? {};
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `http://${deviceIp}/update`, true);
+    xhr.timeout = timeout;
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        resolve();
+      } else {
+        reject(new Error(xhr.responseText || `Upload failed with status ${xhr.status}`));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Network error during firmware upload'));
+    };
+
+    xhr.ontimeout = () => {
+      reject(new Error('Firmware upload timed out'));
+    };
+
+    const formData = new FormData();
+    formData.append('firmware', new Blob([firmwareData]), 'firmware.bin');
+    xhr.send(formData);
+  });
+}
+
+/**
+ * Upload firmware to multiple devices sequentially.
+ * Sequential upload is preferred to avoid network congestion and ensure reliability.
+ */
+export interface FirmwareUploadResult {
+  device: Device;
+  success: boolean;
+  error?: string;
+}
+
+export async function uploadFirmwareBulk(
+  devices: Device[],
+  firmwareData: ArrayBuffer,
+  options?: {
+    onDeviceProgress?: (device: Device, percent: number) => void;
+    onDeviceComplete?: (device: Device, success: boolean, error?: string) => void;
+    onOverallProgress?: (completed: number, total: number) => void;
+  }
+): Promise<FirmwareUploadResult[]> {
+  const { onDeviceProgress, onDeviceComplete, onOverallProgress } = options ?? {};
+  const results: FirmwareUploadResult[] = [];
+
+  for (let i = 0; i < devices.length; i++) {
+    const device = devices[i];
+    try {
+      await uploadFirmware(device.ip, firmwareData, {
+        onProgress: (percent) => onDeviceProgress?.(device, percent),
+      });
+      results.push({ device, success: true });
+      onDeviceComplete?.(device, true);
+    } catch (e) {
+      const error = e instanceof Error ? e.message : 'Upload failed';
+      results.push({ device, success: false, error });
+      onDeviceComplete?.(device, false, error);
+    }
+    onOverallProgress?.(i + 1, devices.length);
+  }
+
+  return results;
+}
+
+/**
  * Execute a function on multiple devices concurrently with a concurrency limit.
  * More flexible than executeBulkCommand - allows custom logic per device.
  */

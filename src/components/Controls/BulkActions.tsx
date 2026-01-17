@@ -3,6 +3,7 @@ import { Device } from '@shared/types';
 import { Commands } from '@shared/commands';
 import { executeBulkCommand, BulkCommandResult } from '../../lib/deviceCommands';
 import { ProgressBar } from '../common/ProgressBar';
+import { FirmwareUpdate } from '../FirmwareUpdate';
 import styles from './BulkActions.module.css';
 
 interface BulkActionsProps {
@@ -12,6 +13,7 @@ interface BulkActionsProps {
 export function BulkActions({ devices }: BulkActionsProps) {
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [results, setResults] = useState<BulkCommandResult[]>([]);
+  const [showFirmwareUpdate, setShowFirmwareUpdate] = useState(false);
 
   const executeBulk = async (command: string, options?: { confirm?: string }) => {
     if (options?.confirm && !confirm(options.confirm)) return;
@@ -48,7 +50,16 @@ export function BulkActions({ devices }: BulkActionsProps) {
         >
           Reboot All
         </button>
+        <button onClick={() => setShowFirmwareUpdate(!showFirmwareUpdate)}>
+          {showFirmwareUpdate ? 'Hide Firmware Update' : 'Firmware Update'}
+        </button>
       </div>
+
+      {showFirmwareUpdate && (
+        <div style={{ marginTop: 16 }}>
+          <FirmwareUpdate devices={devices} />
+        </div>
+      )}
 
       {progress && <ProgressBar current={progress.current} total={progress.total} />}
 
