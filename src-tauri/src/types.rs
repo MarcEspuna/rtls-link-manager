@@ -46,6 +46,15 @@ pub struct Device {
     /// Whether receiving non-stale rangefinder data
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rf_healthy: Option<bool>,
+    /// Average update rate in centi-Hz (e.g., 1000 = 10.0 Hz)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avg_rate_c_hz: Option<u16>,
+    /// Min update rate in last 5s window (centi-Hz)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_rate_c_hz: Option<u16>,
+    /// Max update rate in last 5s window (centi-Hz)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_rate_c_hz: Option<u16>,
 }
 
 /// Device operating role/mode.
@@ -158,6 +167,18 @@ pub struct UwbConfig {
     /// Z calculation mode: 0=None (TDoA Z), 1=Rangefinder, 2=UWB (reserved)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub z_calc_mode: Option<u8>,
+    /// UWB channel (1-7), default 2
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel: Option<u8>,
+    /// DW1000 mode index (0-7), default 0 (SHORTDATA_FAST_ACCURACY)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dw_mode: Option<u8>,
+    /// TX power level (0-3), default 3 (high)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_power_level: Option<u8>,
+    /// Smart power enable (0=disabled, 1=enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub smart_power_enable: Option<u8>,
 }
 
 /// Single anchor configuration.
@@ -308,6 +329,9 @@ mod tests {
             origin_sent: None,
             rf_enabled: None,
             rf_healthy: None,
+            avg_rate_c_hz: None,
+            min_rate_c_hz: None,
+            max_rate_c_hz: None,
         };
 
         let json = serde_json::to_string(&device).unwrap();
@@ -361,6 +385,10 @@ mod tests {
                 mavlink_target_system_id: Some(1),
                 rotation_degrees: Some(0.0),
                 z_calc_mode: Some(1),
+                channel: None,
+                dw_mode: None,
+                tx_power_level: None,
+                smart_power_enable: None,
             },
             app: AppConfig {
                 led2_pin: Some(2),

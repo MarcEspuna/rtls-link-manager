@@ -42,6 +42,9 @@ pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Er
         origin_sent: json["origin_sent"].as_bool(),
         rf_enabled: json["rf_enabled"].as_bool(),
         rf_healthy: json["rf_healthy"].as_bool(),
+        avg_rate_c_hz: json["avg_rate_cHz"].as_u64().map(|v| v as u16),
+        min_rate_c_hz: json["min_rate_cHz"].as_u64().map(|v| v as u16),
+        max_rate_c_hz: json["max_rate_cHz"].as_u64().map(|v| v as u16),
     })
 }
 
@@ -203,6 +206,9 @@ mod tests {
                     origin_sent: None,
                     rf_enabled: None,
                     rf_healthy: None,
+                    avg_rate_c_hz: None,
+                    min_rate_c_hz: None,
+                    max_rate_c_hz: None,
                 },
                 Instant::now(),
             ),
@@ -227,6 +233,9 @@ mod tests {
                     origin_sent: None,
                     rf_enabled: None,
                     rf_healthy: None,
+                    avg_rate_c_hz: None,
+                    min_rate_c_hz: None,
+                    max_rate_c_hz: None,
                 },
                 Instant::now() - Duration::from_secs(6),
             ),
