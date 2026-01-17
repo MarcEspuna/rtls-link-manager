@@ -213,6 +213,9 @@ mod tests {
                     enable_web_server: None,
                     enable_discovery: None,
                     discovery_port: None,
+                    log_udp_port: None,
+                    log_serial_enabled: None,
+                    log_udp_enabled: None,
                 },
                 uwb: UwbConfig {
                     mode: 4,

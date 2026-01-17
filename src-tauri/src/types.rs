@@ -145,6 +145,15 @@ pub struct WifiConfig {
     /// UDP discovery port
     #[serde(skip_serializing_if = "Option::is_none")]
     pub discovery_port: Option<u16>,
+    /// UDP port for log streaming
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_udp_port: Option<u16>,
+    /// Whether Serial logging is enabled at runtime
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_serial_enabled: Option<u8>,
+    /// Whether UDP log streaming is enabled at runtime
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log_udp_enabled: Option<u8>,
 }
 
 /// UWB and positioning configuration.
@@ -385,6 +394,9 @@ mod tests {
                 enable_web_server: Some(1),
                 enable_discovery: Some(1),
                 discovery_port: Some(3333),
+                log_udp_port: None,
+                log_serial_enabled: None,
+                log_udp_enabled: None,
             },
             uwb: UwbConfig {
                 mode: 4,
