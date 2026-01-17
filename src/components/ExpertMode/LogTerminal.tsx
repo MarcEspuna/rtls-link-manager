@@ -30,20 +30,34 @@ export function LogTerminal({ deviceIp, onClose }: LogTerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
 
-  // Start streaming on mount
+  // Initialize: fetch buffered logs AND start stream
   useEffect(() => {
-    const startStream = async () => {
+    let isMounted = true;
+
+    const initialize = async () => {
       try {
+        // First, start the stream so we don't miss any new logs
         await invoke('start_log_stream', { deviceIp });
-        setIsStreaming(true);
+
+        // Then fetch any buffered logs
+        const buffered = await invoke<LogMessage[]>('get_buffered_logs', { deviceIp });
+
+        if (isMounted) {
+          if (buffered.length > 0) {
+            setLogs(buffered);
+          }
+          setIsStreaming(true);
+        }
       } catch (e) {
-        console.error('Failed to start log stream:', e);
+        console.error('Failed to initialize log stream:', e);
       }
     };
-    startStream();
+
+    initialize();
 
     // Cleanup on unmount
     return () => {
+      isMounted = false;
       invoke('stop_log_stream', { deviceIp }).catch(console.error);
     };
   }, [deviceIp]);
@@ -59,6 +73,17 @@ export function LogTerminal({ deviceIp, onClose }: LogTerminalProps) {
         if (isPaused) return;
 
         setLogs((prev) => {
+          // Avoid duplicates by checking if the log already exists
+          // (buffered logs might overlap with real-time events)
+          const lastLog = prev[prev.length - 1];
+          if (
+            lastLog &&
+            lastLog.ts === event.payload.ts &&
+            lastLog.msg === event.payload.msg
+          ) {
+            return prev;
+          }
+
           // Keep last 1000 logs to prevent memory issues
           const newLogs = [...prev, event.payload];
           if (newLogs.length > 1000) {
@@ -122,7 +147,15 @@ export function LogTerminal({ deviceIp, onClose }: LogTerminalProps) {
   // Get unique tags for dropdown
   const uniqueTags = Array.from(new Set(logs.map((l) => l.tag))).sort();
 
-  const clearLogs = () => setLogs([]);
+  const clearLogs = async () => {
+    setLogs([]);
+    // Also clear the backend buffer
+    try {
+      await invoke('clear_buffered_logs', { deviceIp });
+    } catch (e) {
+      console.error('Failed to clear buffered logs:', e);
+    }
+  };
 
   return (
     <>

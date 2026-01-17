@@ -1,10 +1,11 @@
 //! Log receiver service implementation.
 //!
 //! Listens on a UDP port for JSON log messages from devices and emits
-//! them to the frontend via Tauri events.
+//! them to the frontend via Tauri events. Buffers logs per device so
+//! they can be retrieved even if the log terminal wasn't open.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
@@ -13,6 +14,9 @@ use tokio::sync::RwLock;
 
 /// Default UDP port for receiving log messages
 pub const LOG_RECEIVER_PORT: u16 = 3334;
+
+/// Maximum number of logs to buffer per device
+const MAX_LOGS_PER_DEVICE: usize = 500;
 
 /// A log message received from a device
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,11 +45,49 @@ struct RawLogMessage {
     msg: String,
 }
 
-/// State for tracking active log streams
+/// State for tracking active log streams and buffered logs
 #[derive(Debug, Default)]
 pub struct LogStreamState {
-    /// Set of device IPs we're actively streaming logs from
+    /// Set of device IPs we're actively streaming logs from (for UI display)
     pub active_streams: HashMap<String, bool>,
+    /// Buffered logs per device (ring buffer)
+    pub log_buffers: HashMap<String, VecDeque<LogMessage>>,
+}
+
+impl LogStreamState {
+    /// Add a log message to the device's buffer
+    pub fn add_log(&mut self, device_ip: &str, log: LogMessage) {
+        let buffer = self.log_buffers
+            .entry(device_ip.to_string())
+            .or_insert_with(|| VecDeque::with_capacity(MAX_LOGS_PER_DEVICE));
+
+        // Remove oldest if at capacity
+        if buffer.len() >= MAX_LOGS_PER_DEVICE {
+            buffer.pop_front();
+        }
+
+        buffer.push_back(log);
+    }
+
+    /// Get buffered logs for a device
+    pub fn get_logs(&self, device_ip: &str) -> Vec<LogMessage> {
+        self.log_buffers
+            .get(device_ip)
+            .map(|b| b.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// Clear buffered logs for a device
+    pub fn clear_logs(&mut self, device_ip: &str) {
+        if let Some(buffer) = self.log_buffers.get_mut(device_ip) {
+            buffer.clear();
+        }
+    }
+
+    /// Check if a device stream is active
+    pub fn is_active(&self, device_ip: &str) -> bool {
+        self.active_streams.get(device_ip).copied().unwrap_or(false)
+    }
 }
 
 /// Log receiver service that listens for device logs over UDP
@@ -64,7 +106,7 @@ impl LogReceiverService {
     /// Run the log receiver loop
     ///
     /// Continuously receives UDP packets, parses JSON log messages,
-    /// and emits them to the frontend via Tauri events.
+    /// buffers them per device, and emits to frontend if stream is active.
     pub async fn run(
         &self,
         stream_state: Arc<RwLock<LogStreamState>>,
@@ -90,19 +132,6 @@ impl LogReceiverService {
                         );
                     }
 
-                    // Check if we're actively streaming from this device
-                    {
-                        let state = stream_state.read().await;
-                        let is_active = state.active_streams.get(&device_ip).copied().unwrap_or(false);
-                        if !is_active {
-                            // Debug: print if we're skipping
-                            if packet_count <= 5 {
-                                println!("[LogReceiver] Skipping - device {} not in active streams", device_ip);
-                            }
-                            continue;
-                        }
-                    }
-
                     // Try to parse the log message
                     if let Ok(raw) = serde_json::from_slice::<RawLogMessage>(&buf[..len]) {
                         let log_msg = LogMessage {
@@ -117,8 +146,15 @@ impl LogReceiverService {
                                 .unwrap_or(0),
                         };
 
-                        // Emit to frontend
-                        let _ = app_handle.emit("device-log", &log_msg);
+                        // Always buffer the log
+                        let mut state = stream_state.write().await;
+                        state.add_log(&device_ip, log_msg.clone());
+
+                        // Only emit to frontend if stream is active
+                        if state.is_active(&device_ip) {
+                            drop(state); // Release lock before emitting
+                            let _ = app_handle.emit("device-log", &log_msg);
+                        }
                     }
                 }
                 Err(e) => {
@@ -182,5 +218,51 @@ mod tests {
 
         let result = parse_log_message(invalid, addr);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_log_buffer() {
+        let mut state = LogStreamState::default();
+        let device_ip = "192.168.1.100";
+
+        // Add some logs
+        for i in 0..10 {
+            state.add_log(device_ip, LogMessage {
+                device_ip: device_ip.to_string(),
+                ts: i as u64,
+                lvl: "INFO".to_string(),
+                tag: "test".to_string(),
+                msg: format!("Message {}", i),
+                received_at: 0,
+            });
+        }
+
+        let logs = state.get_logs(device_ip);
+        assert_eq!(logs.len(), 10);
+        assert_eq!(logs[0].ts, 0);
+        assert_eq!(logs[9].ts, 9);
+    }
+
+    #[test]
+    fn test_log_buffer_max_size() {
+        let mut state = LogStreamState::default();
+        let device_ip = "192.168.1.100";
+
+        // Add more than MAX_LOGS_PER_DEVICE logs
+        for i in 0..(MAX_LOGS_PER_DEVICE + 100) {
+            state.add_log(device_ip, LogMessage {
+                device_ip: device_ip.to_string(),
+                ts: i as u64,
+                lvl: "INFO".to_string(),
+                tag: "test".to_string(),
+                msg: format!("Message {}", i),
+                received_at: 0,
+            });
+        }
+
+        let logs = state.get_logs(device_ip);
+        assert_eq!(logs.len(), MAX_LOGS_PER_DEVICE);
+        // Should have the newest logs (100 to 599)
+        assert_eq!(logs[0].ts, 100);
     }
 }

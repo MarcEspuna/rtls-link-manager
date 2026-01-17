@@ -93,6 +93,8 @@ pub fn run() {
             commands::logging::start_log_stream,
             commands::logging::stop_log_stream,
             commands::logging::get_active_log_streams,
+            commands::logging::get_buffered_logs,
+            commands::logging::clear_buffered_logs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
