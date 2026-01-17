@@ -19,6 +19,7 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
   const [results, setResults] = useState<FirmwareUploadResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [updatedVersion, setUpdatedVersion] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isBulkMode = !!devices && devices.length > 0;
@@ -46,6 +47,7 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
     setSuccess(false);
     setResults([]);
     setUploadProgress(0);
+    setUpdatedVersion(null);
 
     try {
       const firmwareData = await firmwareFile.arrayBuffer();
@@ -57,8 +59,8 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
             setCurrentDevice(dev);
             setUploadProgress(percent);
           },
-          onDeviceComplete: (dev, success, err) => {
-            setResults(prev => [...prev, { device: dev, success, error: err }]);
+          onDeviceComplete: (dev, didSucceed, version, err) => {
+            setResults(prev => [...prev, { device: dev, success: didSucceed, version, error: err }]);
           },
           onOverallProgress: (completed, total) => {
             setOverallProgress({ current: completed, total });
@@ -68,15 +70,23 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
         const allSuccess = uploadResults.every(r => r.success);
         if (allSuccess) {
           setSuccess(true);
+          // Get version from first successful result
+          const firstVersion = uploadResults.find(r => r.version)?.version;
+          if (firstVersion) {
+            setUpdatedVersion(firstVersion);
+          }
         } else {
           const failCount = uploadResults.filter(r => !r.success).length;
           setError(`${failCount} of ${uploadResults.length} devices failed to update`);
         }
       } else {
-        await uploadFirmware(targetDevices[0].ip, firmwareData, {
+        const response = await uploadFirmware(targetDevices[0].ip, firmwareData, {
           onProgress: setUploadProgress,
         });
         setSuccess(true);
+        if (response.version) {
+          setUpdatedVersion(response.version);
+        }
       }
 
       onComplete?.();
@@ -165,7 +175,10 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
       {error && <div className={styles.error}>{error}</div>}
       {success && (
         <div className={styles.success}>
-          Firmware updated successfully. Device{isBulkMode ? 's are' : ' is'} rebooting...
+          {updatedVersion
+            ? `Updated to version ${updatedVersion}. Device${isBulkMode ? 's are' : ' is'} rebooting...`
+            : `Firmware updated successfully. Device${isBulkMode ? 's are' : ' is'} rebooting...`
+          }
         </div>
       )}
 
@@ -179,6 +192,7 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
               <span>{r.success ? 'OK' : 'FAIL'}</span>
               <span>{r.device.id}</span>
               <span className={styles.deviceIp}>{r.device.ip}</span>
+              {r.success && r.version && <span className={styles.versionInfo}>v{r.version}</span>}
               {r.error && <span className={styles.errorMsg}>{r.error}</span>}
             </div>
           ))}
