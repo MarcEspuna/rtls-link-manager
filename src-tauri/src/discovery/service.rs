@@ -27,6 +27,17 @@ const RECEIVE_TIMEOUT: Duration = Duration::from_secs(2);
 pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Error> {
     let json: serde_json::Value = serde_json::from_slice(data)?;
 
+    // Debug: print raw log_level value from heartbeat
+    let log_level_raw = &json["log_level"];
+    let log_level = json["log_level"].as_u64().map(|v| v as u8);
+    println!(
+        "[Heartbeat] {} - log_level raw: {:?}, parsed: {:?}, log_udp_enabled: {:?}",
+        ip,
+        log_level_raw,
+        log_level,
+        json["log_udp_enabled"]
+    );
+
     Ok(Device {
         ip,
         id: json["id"].as_str().unwrap_or("").to_string(),
@@ -45,7 +56,7 @@ pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Er
         avg_rate_c_hz: json["avg_rate_cHz"].as_u64().map(|v| v as u16),
         min_rate_c_hz: json["min_rate_cHz"].as_u64().map(|v| v as u16),
         max_rate_c_hz: json["max_rate_cHz"].as_u64().map(|v| v as u16),
-        log_level: json["log_level"].as_u64().map(|v| v as u8),
+        log_level,
         log_udp_port: json["log_udp_port"].as_u64().map(|v| v as u16),
         log_serial_enabled: json["log_serial_enabled"].as_bool(),
         log_udp_enabled: json["log_udp_enabled"].as_bool(),

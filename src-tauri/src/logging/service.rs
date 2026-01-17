@@ -72,16 +72,33 @@ impl LogReceiverService {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut buf = vec![0u8; 1024];
 
+        // Debug: track packets received
+        let mut packet_count: u64 = 0;
+
         loop {
             match self.socket.recv_from(&mut buf).await {
                 Ok((len, addr)) => {
+                    packet_count += 1;
                     let device_ip = addr.ip().to_string();
+
+                    // Debug: print first few packets
+                    if packet_count <= 5 {
+                        let raw_str = String::from_utf8_lossy(&buf[..len]);
+                        println!(
+                            "[LogReceiver] Packet #{} from {}: {} bytes - {:?}",
+                            packet_count, device_ip, len, raw_str
+                        );
+                    }
 
                     // Check if we're actively streaming from this device
                     {
                         let state = stream_state.read().await;
-                        if !state.active_streams.get(&device_ip).copied().unwrap_or(false) {
-                            // Not streaming from this device, skip
+                        let is_active = state.active_streams.get(&device_ip).copied().unwrap_or(false);
+                        if !is_active {
+                            // Debug: print if we're skipping
+                            if packet_count <= 5 {
+                                println!("[LogReceiver] Skipping - device {} not in active streams", device_ip);
+                            }
                             continue;
                         }
                     }
