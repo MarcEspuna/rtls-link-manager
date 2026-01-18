@@ -6,6 +6,10 @@ interface AnchorListEditorProps {
   anchors: AnchorConfig[];
   onChange: (anchors: AnchorConfig[]) => void;
   onApply: (anchors: AnchorConfig[]) => void;
+  /** Optional: bitmask of locked anchor positions (for dynamic positioning) */
+  anchorPosLocked?: number;
+  /** Optional: callback when lock state changes */
+  onLockChange?: (newLockedMask: number) => void;
 }
 
 const MAX_ANCHORS = 6;
@@ -15,8 +19,22 @@ const safeParseFloat = (value: string, fallback: number = 0): number => {
   return isNaN(parsed) ? fallback : parsed;
 };
 
-export function AnchorListEditor({ anchors, onChange, onApply }: AnchorListEditorProps) {
+export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, onLockChange }: AnchorListEditorProps) {
   const [idErrors, setIdErrors] = useState<Record<number, string>>({});
+
+  // Check if lock functionality is enabled
+  const showLockButtons = anchorPosLocked !== undefined && onLockChange !== undefined;
+
+  const isAnchorLocked = (anchorIndex: number): boolean => {
+    if (anchorPosLocked === undefined) return false;
+    return (anchorPosLocked & (1 << anchorIndex)) !== 0;
+  };
+
+  const handleLockToggle = (anchorIndex: number) => {
+    if (anchorPosLocked === undefined || !onLockChange) return;
+    const newMask = anchorPosLocked ^ (1 << anchorIndex);  // Toggle the bit
+    onLockChange(newMask);
+  };
 
   const validateAnchorId = (value: string): string => {
     if (!value) return 'ID is required';
@@ -79,20 +97,25 @@ export function AnchorListEditor({ anchors, onChange, onApply }: AnchorListEdito
 
   const canAdd = anchors.length < MAX_ANCHORS;
 
+  const headerClass = showLockButtons ? styles.anchorHeaderWithLock : styles.anchorHeader;
+  const rowClass = showLockButtons ? styles.anchorRowWithLock : styles.anchorRow;
+
   return (
     <div className={styles.anchorList}>
-      <div className={styles.anchorHeader}>
+      <div className={headerClass}>
         <label>ID</label>
         <label>X (m)</label>
         <label>Y (m)</label>
         <label>Z (m)</label>
+        {showLockButtons && <label title="Lock position">Lock</label>}
         <label></label>
       </div>
       {anchors.map((anchor, index) => {
         const error = idErrors[index];
+        const locked = isAnchorLocked(index);
         return (
           <div key={index} className={styles.anchorRowGroup}>
-            <div className={styles.anchorRow}>
+            <div className={rowClass}>
               <input
                 type="text"
                 value={anchor.id}
@@ -125,6 +148,15 @@ export function AnchorListEditor({ anchors, onChange, onApply }: AnchorListEdito
                 onBlur={(e) => handleBlur(index, 'z', e.target.value)}
                 className={styles.anchorInput}
               />
+              {showLockButtons && (
+                <button
+                  onClick={() => handleLockToggle(index)}
+                  className={`${styles.lockBtn} ${locked ? styles.lockBtnLocked : ''}`}
+                  title={locked ? 'Unlock anchor position' : 'Lock anchor position'}
+                >
+                  {locked ? '🔒' : '🔓'}
+                </button>
+              )}
               <button onClick={() => handleRemove(index)} className={styles.removeBtn} title="Remove Anchor">×</button>
             </div>
             {error && <div className={styles.anchorError}>{error}</div>}

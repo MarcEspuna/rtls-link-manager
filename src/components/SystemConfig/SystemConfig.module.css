@@ -1,0 +1,268 @@
+/* Layout Visualization */
+.layoutVisualization {
+  display: block;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Layout Selector */
+.layoutSelector {
+  width: 100%;
+}
+
+.layoutGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.layoutOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.layoutOption:hover:not(:disabled) {
+  border-color: var(--accent-color);
+  background: var(--bg-tertiary);
+}
+
+.layoutOption.selected {
+  border-color: var(--accent-color);
+  background: var(--bg-tertiary);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.2);
+}
+
+.layoutOption:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.layoutLabel {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.layoutOption.selected .layoutLabel {
+  color: var(--accent-color);
+}
+
+/* System Config Panel */
+.systemConfigPanel {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.systemConfigPanel h2 {
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
+
+.systemConfigPanel h3 {
+  margin: 24px 0 16px;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.section {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.section h4 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.sectionDescription {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.field {
+  margin-bottom: 12px;
+}
+
+.field label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.layoutPreview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.layoutPreviewTitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Device Status List */
+.deviceStatusList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deviceStatusItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.deviceInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.deviceId {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.deviceIp {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.deviceStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.statusDot.online {
+  background: #22c55e;
+}
+
+.statusDot.offline {
+  background: #ef4444;
+}
+
+.statusText {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Bulk Actions */
+.bulkActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.bulkActions button {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.applyButton {
+  background: var(--accent-color);
+  color: white;
+}
+
+.applyButton:hover {
+  background: var(--accent-hover);
+}
+
+.resetButton {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.resetButton:hover {
+  background: var(--border-color);
+}
+
+/* Tabs within panel */
+.panelTabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+}
+
+.panelTab {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.panelTab:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.panelTab.active {
+  color: var(--accent-color);
+  background: var(--bg-secondary);
+  border-color: var(--accent-color);
+}

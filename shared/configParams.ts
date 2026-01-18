@@ -57,6 +57,12 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.uwb.dwMode !== undefined) params.push(['uwb', 'dwMode', String(config.uwb.dwMode)]);
     if (config.uwb.txPowerLevel !== undefined) params.push(['uwb', 'txPowerLevel', String(config.uwb.txPowerLevel)]);
     if (config.uwb.smartPowerEnable !== undefined) params.push(['uwb', 'smartPowerEnable', String(config.uwb.smartPowerEnable)]);
+    // Dynamic anchor positioning (TDoA tags only)
+    if (config.uwb.dynamicAnchorPosEnabled !== undefined) params.push(['uwb', 'dynamicAnchorPosEnabled', String(config.uwb.dynamicAnchorPosEnabled)]);
+    if (config.uwb.anchorLayout !== undefined) params.push(['uwb', 'anchorLayout', String(config.uwb.anchorLayout)]);
+    if (config.uwb.anchorHeight !== undefined) params.push(['uwb', 'anchorHeight', String(config.uwb.anchorHeight)]);
+    if (config.uwb.anchorPosLocked !== undefined) params.push(['uwb', 'anchorPosLocked', String(config.uwb.anchorPosLocked)]);
+    if (config.uwb.distanceAvgSamples !== undefined) params.push(['uwb', 'distanceAvgSamples', String(config.uwb.distanceAvgSamples)]);
   }
 
   // App params

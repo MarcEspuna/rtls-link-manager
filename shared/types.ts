@@ -34,6 +34,15 @@ export type DeviceRole =
   | 'calibration'
   | 'unknown';
 
+// Anchor layout configurations for dynamic position calculation
+export enum AnchorLayout {
+  RECTANGULAR_0_ORIGIN = 0,  // A0 at origin (default)
+  RECTANGULAR_1_ORIGIN = 1,  // A1 at origin
+  RECTANGULAR_2_ORIGIN = 2,  // A2 at origin
+  RECTANGULAR_3_ORIGIN = 3,  // A3 at origin
+  CUSTOM = 255,              // Reserved for future custom layouts
+}
+
 // Role helper functions
 export const isAnchorRole = (role: DeviceRole): boolean =>
   role === 'anchor' || role === 'anchor_tdoa';
@@ -80,6 +89,12 @@ export interface UwbConfig {
   dwMode?: number;            // DW1000 mode index (0-7), default 0 (SHORTDATA_FAST_ACCURACY)
   txPowerLevel?: number;      // TX power level (0-3), default 3 (high)
   smartPowerEnable?: 0 | 1;   // Smart power (0=disabled, 1=enabled)
+  // Dynamic anchor positioning (TDoA tags only)
+  dynamicAnchorPosEnabled?: 0 | 1;  // 0=static (use configured positions), 1=dynamic
+  anchorLayout?: AnchorLayout;      // Layout for dynamic position calculation
+  anchorHeight?: number;            // Height for Z calculation (NED: Z = -height)
+  anchorPosLocked?: number;         // Bitmask: bit N = anchor N position locked
+  distanceAvgSamples?: number;      // Number of samples to average (default: 50)
 }
 
 export interface AnchorConfig {
