@@ -288,6 +288,47 @@ The backend already buffers logs per device (`LogStreamState::log_buffers`). To 
 2. Register it in `src-tauri/src/lib.rs` `invoke_handler`.
 3. Call it from `src/components/ExpertMode/LogTerminal.tsx` before starting live streaming.
 
+## Common Pitfalls & Patterns
+
+### CSS Variable Naming Convention
+
+**IMPORTANT:** All CSS variables are defined in `src/index.css`. Use these exact names:
+
+| Category | Variables |
+|----------|-----------|
+| Backgrounds | `--bg-primary`, `--bg-secondary`, `--bg-tertiary`, `--bg-elevated` |
+| Borders | `--border-color`, `--border-color-light` |
+| Text | `--text-primary`, `--text-secondary`, `--text-muted` |
+| Accents | `--accent-primary`, `--accent-primary-hover`, `--accent-primary-muted` |
+| Status | `--accent-success`, `--accent-danger`, `--accent-warning`, `--accent-degraded` (each has `-muted` variant) |
+| Shadows | `--shadow-sm`, `--shadow-md`, `--shadow-lg` |
+
+**Do NOT use** generic names like `--surface`, `--primary`, `--border`, `--error`, `--success` — these don't exist and will render as transparent/default.
+
+### Passing Device Data to Modals/Panels
+
+**Problem:** If you store a full `Device` object in React state when opening a modal, that object becomes stale when new discovery packets arrive with updated telemetry (e.g., `dynamicAnchors`, rate statistics).
+
+**Solution:** Store only the device IP, then derive the current device from the live `devices` list:
+
+```tsx
+// BAD - device becomes stale
+const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+// ...
+<Modal device={selectedDevice} />
+
+// GOOD - device updates when devices list updates
+const [selectedDeviceIp, setSelectedDeviceIp] = useState<string | null>(null);
+const selectedDevice = useMemo(() =>
+  devices.find(d => d.ip === selectedDeviceIp) ?? null,
+  [devices, selectedDeviceIp]
+);
+// ...
+<Modal device={selectedDevice} />
+```
+
+This pattern ensures modals receive live telemetry updates from the discovery service.
+
 ## Development & Tests
 
 - Dev (Tauri + Vite): `npm run dev`
