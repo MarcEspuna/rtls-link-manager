@@ -1,0 +1,371 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  height: 90vh;
+  max-width: 1200px;
+  max-height: 900px;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-elevated);
+  flex-shrink: 0;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.headerLeft h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.deviceInfo {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.headerRight {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.closeBtn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+}
+
+.closeBtn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.btnPrimary {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--primary);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnSecondary {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.btnSecondary:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.btnSecondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.previewBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 24px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.btnActivate {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 4px;
+  background: var(--primary);
+  color: white;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.btnActivate:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 200px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-elevated);
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.navItem {
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.navItem:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.navItemActive {
+  color: var(--primary);
+  background: var(--primary-bg);
+  border-right: 3px solid var(--primary);
+}
+
+.navItemActive:hover {
+  background: var(--primary-bg);
+  color: var(--primary);
+}
+
+.content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.loadingState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-secondary);
+}
+
+/* Section styles */
+.section {
+  margin-bottom: 24px;
+}
+
+.section h3 {
+  margin: 0 0 16px 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.section p {
+  margin: 0 0 12px 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.field label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.field input,
+.field select {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.inputError {
+  border-color: var(--error) !important;
+}
+
+.fieldError {
+  font-size: 0.75rem;
+  color: var(--error);
+}
+
+/* Positions Grid for Dynamic Anchors */
+.positionsGrid {
+  display: grid;
+  grid-template-columns: 60px repeat(3, 1fr) 60px;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.positionsGridHeader {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.positionsGridRow {
+  display: contents;
+}
+
+.positionsGridRow > * {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.anchorId {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.posValue {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  color: var(--text-primary);
+}
+
+.lockBtn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lockBtn:hover {
+  background: var(--surface-hover);
+}
+
+.lockBtnLocked {
+  background: var(--primary-bg);
+  border-color: var(--primary);
+}
+
+.waitingMessage {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--surface-elevated);
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+/* Saved configurations list */
+.savedConfigs {
+  margin-bottom: 24px;
+}
+
+.configList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.configTag {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.configTag:hover {
+  background: var(--surface-hover);
+}
+
+.configTagActive {
+  border-color: var(--success);
+  background: var(--success-bg);
+}
+
+.configTagPreviewing {
+  border-color: var(--warning);
+  background: var(--warning-bg);
+}
+
+.activeIndicator {
+  margin-left: 6px;
+  font-size: 0.65rem;
+  color: var(--success);
+  font-weight: 600;
+}

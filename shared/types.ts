@@ -24,6 +24,16 @@ export interface Device {
   logUdpPort?: number;      // UDP port for log streaming
   logSerialEnabled?: boolean; // Runtime: Serial logging enabled
   logUdpEnabled?: boolean;  // Runtime: UDP log streaming enabled
+  // Dynamic anchor positions (from heartbeat, TDoA tags only)
+  dynamicAnchors?: DynamicAnchorPosition[];
+}
+
+// Dynamic anchor position from inter-anchor TWR measurements
+export interface DynamicAnchorPosition {
+  id: number;
+  x: number;
+  y: number;
+  z: number;
 }
 
 export type DeviceRole =

@@ -3,7 +3,7 @@ import { Device, isAnchorRole, isTagRole } from '@shared/types';
 import { AppShell } from './components/Layout';
 import { AnchorsPanel } from './components/Anchors';
 import { TagsPanel } from './components/Tags';
-import { ConfigPanel } from './components/ConfigPanel/ConfigPanel';
+import { ConfigModal } from './components/ConfigModal';
 import { PresetsPanel } from './components/Presets';
 import { getDevices, clearDevices, onDevicesUpdated } from './lib/tauri-api';
 import { useSettings } from './hooks/useSettings';
@@ -147,7 +147,7 @@ function App() {
       </AppShell>
 
       {selectedDevice && (
-        <ConfigPanel
+        <ConfigModal
           device={selectedDevice}
           onClose={() => setSelectedDevice(null)}
           isExpertMode={isExpertMode}
