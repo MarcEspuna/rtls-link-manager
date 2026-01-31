@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Device, DeviceConfig } from '@shared/types';
 import { Commands } from '@shared/commands';
 import { flatToAnchors, getAnchorWriteCommands, normalizeUwbShortAddr } from '@shared/anchors';
-import { useDeviceCommand } from '../../hooks/useDeviceWebSocket';
+import { useDeviceCommand } from '../../hooks/useDeviceCommand';
 import { ConfigEditor } from './ConfigEditor';
 import { FirmwareUpdate } from '../FirmwareUpdate';
 import styles from './ConfigPanel.module.css';
@@ -14,7 +14,7 @@ interface ConfigPanelProps {
 }
 
 export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPanelProps) {
-  const { sendCommand, sendCommands, loading, close } = useDeviceCommand(device.ip, { mode: 'persistent' });
+  const { sendCommand, sendCommands, loading, close } = useDeviceCommand(device.ip);
   const [config, setConfig] = useState<DeviceConfig | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
   const [activeConfig, setActiveConfig] = useState<string | null>(null);

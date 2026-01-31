@@ -4,5 +4,6 @@
 //! to the frontend via IPC.
 
 pub mod configs;
+pub mod device_comm;
 pub mod devices;
 pub mod presets;

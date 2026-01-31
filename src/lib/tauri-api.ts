@@ -109,6 +109,77 @@ export async function deletePreset(name: string): Promise<boolean> {
 }
 
 // ============================================================================
+// Device Communication Commands
+// ============================================================================
+
+/**
+ * Send a single WebSocket command to a device and return the response.
+ */
+export async function sendDeviceCommand(
+  ip: string,
+  command: string,
+  timeoutMs?: number
+): Promise<string> {
+  return await invoke('send_device_command', { ip, command, timeoutMs });
+}
+
+/**
+ * Send multiple WebSocket commands to a device sequentially.
+ */
+export async function sendDeviceCommands(
+  ip: string,
+  commands: string[],
+  timeoutMs?: number
+): Promise<string[]> {
+  return await invoke('send_device_commands', { ip, commands, timeoutMs });
+}
+
+/**
+ * Upload firmware to a single device from a file path.
+ *
+ * Progress is reported via `onOtaProgress` events.
+ */
+export async function uploadFirmwareFromFile(
+  ip: string,
+  filePath: string
+): Promise<void> {
+  await invoke('upload_firmware_from_file', { ip, filePath });
+}
+
+export interface FirmwareResult {
+  ip: string;
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Upload firmware to multiple devices concurrently.
+ *
+ * Progress is reported via `onOtaProgress` events per device.
+ */
+export async function uploadFirmwareBulk(
+  ips: string[],
+  filePath: string,
+  concurrency?: number
+): Promise<FirmwareResult[]> {
+  return await invoke('upload_firmware_to_devices', { ips, filePath, concurrency });
+}
+
+export interface FirmwareInfo {
+  [key: string]: unknown;
+}
+
+/**
+ * Get firmware info from a device.
+ */
+export async function getFirmwareInfo(
+  ip: string,
+  timeoutMs?: number
+): Promise<FirmwareInfo> {
+  return await invoke('get_firmware_info', { ip, timeoutMs });
+}
+
+// ============================================================================
 // Event Listeners
 // ============================================================================
 
@@ -125,6 +196,54 @@ export async function onDevicesUpdated(
   callback: (devices: Device[]) => void
 ): Promise<UnlistenFn> {
   return await listen<Device[]>('devices-updated', (event) => {
+    callback(event.payload);
+  });
+}
+
+export interface OtaProgressEvent {
+  ip: string;
+  bytesSent: number;
+  totalBytes: number;
+}
+
+export interface OtaCompleteEvent {
+  ip: string;
+}
+
+export interface OtaErrorEvent {
+  ip: string;
+  error: string;
+}
+
+/**
+ * Listen for OTA firmware upload progress events.
+ */
+export async function onOtaProgress(
+  callback: (event: OtaProgressEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<OtaProgressEvent>('ota-progress', (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Listen for OTA firmware upload completion events.
+ */
+export async function onOtaComplete(
+  callback: (event: OtaCompleteEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<OtaCompleteEvent>('ota-complete', (event) => {
+    callback(event.payload);
+  });
+}
+
+/**
+ * Listen for OTA firmware upload error events.
+ */
+export async function onOtaError(
+  callback: (event: OtaErrorEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<OtaErrorEvent>('ota-error', (event) => {
     callback(event.payload);
   });
 }

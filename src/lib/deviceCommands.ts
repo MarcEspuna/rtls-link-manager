@@ -1,12 +1,25 @@
 /**
- * Device WebSocket command utilities.
+ * Device command utilities.
  *
  * This module provides reusable functions for sending commands to devices
- * via WebSocket, supporting both single and bulk operations.
+ * via the Tauri backend, supporting both single and bulk operations.
+ * All device communication is routed through Rust (WebSocket/HTTP handled there).
  */
 
 import { Device } from '@shared/types';
 import { isJsonCommand } from '@shared/commands';
+import {
+  sendDeviceCommand as tauriSendCommand,
+  sendDeviceCommands as tauriSendCommands,
+  uploadFirmwareFromFile,
+  uploadFirmwareBulk as tauriUploadBulk,
+  onOtaProgress,
+  onOtaComplete,
+  onOtaError,
+  type FirmwareResult,
+  type OtaProgressEvent,
+} from './tauri-api';
+import { open } from '@tauri-apps/plugin-dialog';
 
 // Default timeouts
 export const DEFAULT_COMMAND_TIMEOUT_MS = 5000;
@@ -55,49 +68,14 @@ export async function sendDeviceCommand(
   command: string,
   timeout = DEFAULT_COMMAND_TIMEOUT_MS
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const ws = new WebSocket(`ws://${deviceIp}/ws`);
-
-    const timeoutId = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        ws.close();
-        reject(new Error('Timeout'));
-      }
-    }, timeout);
-
-    ws.onopen = () => ws.send(command);
-
-    ws.onmessage = (event) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeoutId);
-      ws.close();
-      resolve(event.data.toString());
-    };
-
-    ws.onerror = () => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeoutId);
-        ws.close();
-        reject(new Error('WebSocket error'));
-      }
-    };
-
-    ws.onclose = () => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeoutId);
-        reject(new Error('Connection closed'));
-      }
-    };
-  });
+  return tauriSendCommand(deviceIp, command, timeout);
 }
 
 /**
- * Send multiple commands to a device sequentially over a single connection.
+ * Send multiple commands to a device sequentially.
+ *
+ * The Rust backend sends commands sequentially over a single WebSocket connection.
+ * Response validation and progress callbacks are handled on the frontend.
  */
 export async function sendDeviceCommands(
   deviceIp: string,
@@ -109,73 +87,23 @@ export async function sendDeviceCommands(
 ): Promise<void> {
   const { onProgress, perCommandTimeout = DEFAULT_WRITE_TIMEOUT_MS } = options ?? {};
 
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://${deviceIp}/ws`);
-    let currentIndex = 0;
-    let settled = false;
-    let timeoutId: ReturnType<typeof setTimeout>;
+  const responses = await tauriSendCommands(deviceIp, commands, perCommandTimeout);
 
-    const cleanup = () => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeoutId);
-        ws.close();
-      }
-    };
+  // Validate each response and report progress
+  for (let i = 0; i < responses.length; i++) {
+    const response = responses[i];
+    const command = commands[i];
 
-    const resetTimeout = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        cleanup();
-        reject(new Error(`Timeout on command ${currentIndex + 1}`));
-      }, perCommandTimeout);
-    };
+    try {
+      checkCommandResponse(command, response);
+    } catch (e) {
+      throw new Error(
+        `Command ${i + 1} failed: ${e instanceof Error ? e.message : response}`
+      );
+    }
 
-    const sendNext = () => {
-      if (currentIndex >= commands.length) {
-        cleanup();
-        resolve();
-        return;
-      }
-      resetTimeout();
-      ws.send(commands[currentIndex]);
-    };
-
-    ws.onopen = () => sendNext();
-
-    ws.onmessage = (event) => {
-      const response = event.data.toString();
-      const currentCommand = commands[currentIndex];
-
-      try {
-        checkCommandResponse(currentCommand, response);
-      } catch (e) {
-        cleanup();
-        reject(
-          new Error(
-            `Command ${currentIndex + 1} failed: ${e instanceof Error ? e.message : response}`
-          )
-        );
-        return;
-      }
-
-      currentIndex++;
-      onProgress?.(currentIndex, commands.length);
-      sendNext();
-    };
-
-    ws.onerror = () => {
-      cleanup();
-      reject(new Error('WebSocket error'));
-    };
-
-    ws.onclose = () => {
-      if (!settled && currentIndex < commands.length) {
-        cleanup();
-        reject(new Error('Connection closed unexpectedly'));
-      }
-    };
-  });
+    onProgress?.(i + 1, commands.length);
+  }
 }
 
 /**
@@ -229,63 +157,35 @@ export interface OtaResponse {
 }
 
 /**
- * Upload firmware to a device via HTTP POST to /update endpoint.
- * Returns the OTA response containing version info on success.
+ * Upload firmware to a device via the Tauri backend.
+ *
+ * Uses Tauri's file dialog to get the file path, then the Rust backend
+ * handles the HTTP POST to the device's /update endpoint.
  */
 export async function uploadFirmware(
   deviceIp: string,
-  firmwareData: ArrayBuffer,
+  filePath: string,
   options?: {
     onProgress?: (percent: number) => void;
-    timeout?: number;
   }
-): Promise<OtaResponse> {
-  const { onProgress, timeout = 120000 } = options ?? {};
+): Promise<void> {
+  const { onProgress } = options ?? {};
 
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `http://${deviceIp}/update`, true);
-    xhr.timeout = timeout;
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
+  // Listen for progress events for this specific device
+  let unlistenProgress: (() => void) | undefined;
+  if (onProgress) {
+    unlistenProgress = await onOtaProgress((event: OtaProgressEvent) => {
+      if (event.ip === deviceIp && event.totalBytes > 0) {
+        onProgress(Math.round((event.bytesSent / event.totalBytes) * 100));
       }
-    };
+    });
+  }
 
-    xhr.onload = () => {
-      // Try to parse JSON response
-      let response: OtaResponse;
-      try {
-        response = JSON.parse(xhr.responseText);
-      } catch {
-        // Fallback for legacy plain text response
-        if (xhr.status === 200) {
-          response = { success: true, message: xhr.responseText || 'Update successful' };
-        } else {
-          response = { success: false, message: xhr.responseText || 'Update failed' };
-        }
-      }
-
-      if (xhr.status === 200 && response.success !== false) {
-        resolve(response);
-      } else {
-        reject(new Error(response.message || `Upload failed with status ${xhr.status}`));
-      }
-    };
-
-    xhr.onerror = () => {
-      reject(new Error('Network error during firmware upload'));
-    };
-
-    xhr.ontimeout = () => {
-      reject(new Error('Firmware upload timed out'));
-    };
-
-    const formData = new FormData();
-    formData.append('firmware', new Blob([firmwareData]), 'firmware.bin');
-    xhr.send(formData);
-  });
+  try {
+    await uploadFirmwareFromFile(deviceIp, filePath);
+  } finally {
+    unlistenProgress?.();
+  }
 }
 
 /**
@@ -300,40 +200,83 @@ export interface FirmwareUploadResult {
 
 export async function uploadFirmwareBulk(
   devices: Device[],
-  firmwareData: ArrayBuffer,
+  filePath: string,
   options?: {
-    concurrency?: number;  // Number of parallel uploads (default: 3)
+    concurrency?: number;
     onDeviceProgress?: (device: Device, percent: number) => void;
     onDeviceComplete?: (device: Device, success: boolean, version?: string, error?: string) => void;
     onOverallProgress?: (completed: number, total: number) => void;
   }
 ): Promise<FirmwareUploadResult[]> {
   const { concurrency = 3, onDeviceProgress, onDeviceComplete, onOverallProgress } = options ?? {};
-  const results: FirmwareUploadResult[] = [];
 
-  // Process devices in batches for parallel uploads
-  for (let i = 0; i < devices.length; i += concurrency) {
-    const batch = devices.slice(i, i + concurrency);
-    const batchResults = await Promise.all(
-      batch.map(async (device): Promise<FirmwareUploadResult> => {
-        try {
-          const response = await uploadFirmware(device.ip, firmwareData, {
-            onProgress: (percent) => onDeviceProgress?.(device, percent),
-          });
-          onDeviceComplete?.(device, true, response.version);
-          return { device, success: true, version: response.version };
-        } catch (e) {
-          const error = e instanceof Error ? e.message : 'Upload failed';
-          onDeviceComplete?.(device, false, undefined, error);
-          return { device, success: false, error };
-        }
-      })
-    );
-    results.push(...batchResults);
-    onOverallProgress?.(results.length, devices.length);
+  const ips = devices.map(d => d.ip);
+  const ipToDevice = new Map(devices.map(d => [d.ip, d]));
+
+  // Set up progress event listeners
+  let unlistenProgress: (() => void) | undefined;
+  let unlistenComplete: (() => void) | undefined;
+  let unlistenError: (() => void) | undefined;
+
+  if (onDeviceProgress) {
+    unlistenProgress = await onOtaProgress((event) => {
+      const device = ipToDevice.get(event.ip);
+      if (device && event.totalBytes > 0) {
+        onDeviceProgress(device, Math.round((event.bytesSent / event.totalBytes) * 100));
+      }
+    });
   }
 
-  return results;
+  if (onDeviceComplete) {
+    unlistenComplete = await onOtaComplete((event) => {
+      const device = ipToDevice.get(event.ip);
+      if (device) {
+        onDeviceComplete(device, true);
+      }
+    });
+
+    unlistenError = await onOtaError((event) => {
+      const device = ipToDevice.get(event.ip);
+      if (device) {
+        onDeviceComplete(device, false, undefined, event.error);
+      }
+    });
+  }
+
+  try {
+    const tauriResults = await tauriUploadBulk(ips, filePath, concurrency);
+
+    const results: FirmwareUploadResult[] = tauriResults.map((r: FirmwareResult) => {
+      const device = ipToDevice.get(r.ip);
+      return {
+        device: device!,
+        success: r.success,
+        error: r.error,
+      };
+    });
+
+    onOverallProgress?.(results.length, devices.length);
+    return results;
+  } finally {
+    unlistenProgress?.();
+    unlistenComplete?.();
+    unlistenError?.();
+  }
+}
+
+/**
+ * Open a file dialog to select a firmware file.
+ * Returns the selected file path, or null if cancelled.
+ */
+export async function selectFirmwareFile(): Promise<string | null> {
+  const selected = await open({
+    multiple: false,
+    filters: [{ name: 'Firmware', extensions: ['bin'] }],
+  });
+  if (typeof selected === 'string') {
+    return selected;
+  }
+  return null;
 }
 
 /**

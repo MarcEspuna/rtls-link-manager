@@ -62,6 +62,10 @@ mod tests {
                     avg_rate_c_hz: None,
                     min_rate_c_hz: None,
                     max_rate_c_hz: None,
+                    log_level: None,
+                    log_udp_port: None,
+                    log_serial_enabled: None,
+                    log_udp_enabled: None,
                 },
             );
         }

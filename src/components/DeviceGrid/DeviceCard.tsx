@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Device } from '@shared/types';
 import { Commands } from '@shared/commands';
-import { useDeviceCommand } from '../../hooks/useDeviceWebSocket';
+import { useDeviceCommand } from '../../hooks/useDeviceCommand';
 import { StatusBadge } from '../common/StatusBadge';
 import styles from './DeviceCard.module.css';
 
