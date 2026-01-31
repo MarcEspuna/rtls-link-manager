@@ -70,6 +70,7 @@ mod tests {
                     log_udp_port: None,
                     log_serial_enabled: None,
                     log_udp_enabled: None,
+                    dynamic_anchors: None,
                 },
             );
         }
