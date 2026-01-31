@@ -22,10 +22,15 @@ const RECEIVE_TIMEOUT: Duration = Duration::from_secs(2);
 pub fn create_reusable_socket(port: u16) -> Result<std::net::UdpSocket, std::io::Error> {
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
-    socket.set_reuse_address(true)?;
+    // Best-effort: some sandboxed environments block setsockopt() and return EPERM.
+    // Reuse settings are not required for basic discovery; they mainly allow
+    // multiple listeners on the same port (e.g., CLI + Tauri app).
+    let _ = socket.set_reuse_address(true);
 
     #[cfg(unix)]
-    socket.set_reuse_port(true)?;
+    {
+        let _ = socket.set_reuse_port(true);
+    }
 
     let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
     socket.bind(&addr.into())?;
