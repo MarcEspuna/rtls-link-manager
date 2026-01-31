@@ -214,4 +214,3 @@ export function logLevelToName(level: number): string {
 export function logLevelToShort(level: number): string {
   return LOG_LEVEL_SHORT[level] ?? '?';
 }
-
