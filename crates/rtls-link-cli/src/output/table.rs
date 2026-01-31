@@ -14,15 +14,6 @@ impl TableOutput {
         Self
     }
 
-    fn health_color(level: &HealthLevel) -> Color {
-        match level {
-            HealthLevel::Healthy => Color::Green,
-            HealthLevel::Warning => Color::Yellow,
-            HealthLevel::Degraded => Color::Red,
-            HealthLevel::Unknown => Color::Grey,
-        }
-    }
-
     fn health_icon(level: &HealthLevel) -> &'static str {
         match level {
             HealthLevel::Healthy => "[OK]",
@@ -95,7 +86,6 @@ impl OutputFormatter for TableOutput {
             }
 
             if let Some(v) = device.anchors_seen {
-                let _color = if v >= 3 { "green" } else { "red" };
                 lines.push(format!("    Anchors Seen: {} (need 3+)", v));
             }
 
@@ -156,15 +146,13 @@ impl OutputFormatter for TableOutput {
         lines.join("\n")
     }
 
-    fn format_message(&self, message: &str) -> String {
-        message.to_string()
-    }
-
-    fn format_error(&self, error: &str) -> String {
-        format!("{} {}", "Error:".red().bold(), error)
-    }
-
-    fn format_command_result(&self, ip: &str, command: &str, result: &str, success: bool) -> String {
+    fn format_command_result(
+        &self,
+        ip: &str,
+        command: &str,
+        result: &str,
+        success: bool,
+    ) -> String {
         let status = if success {
             "[OK]".green()
         } else {
@@ -191,11 +179,7 @@ impl OutputFormatter for TableOutput {
                 Cell::new("FAIL").fg(Color::Red)
             };
 
-            table.add_row(vec![
-                Cell::new(ip),
-                status_cell,
-                Cell::new(message),
-            ]);
+            table.add_row(vec![Cell::new(ip), status_cell, Cell::new(message)]);
         }
 
         let summary = format!(

@@ -17,10 +17,14 @@ pub async fn run_logs(args: LogsArgs, json: bool) -> Result<(), CliError> {
     let min_level = LogLevel::from_str(&args.level)
         .ok_or_else(|| CliError::InvalidArgument(format!("Invalid log level: {}", args.level)))?;
 
-    let tag_pattern = args.tag.as_ref().map(|p| {
-        let regex_pattern = p.replace('*', ".*").replace('?', ".");
-        Regex::new(&format!("^{}$", regex_pattern)).ok()
-    }).flatten();
+    let tag_pattern = args
+        .tag
+        .as_ref()
+        .map(|p| {
+            let regex_pattern = p.replace('*', ".*").replace('?', ".");
+            Regex::new(&format!("^{}$", regex_pattern)).ok()
+        })
+        .flatten();
 
     let socket = create_log_socket(args.port)?;
     let socket = UdpSocket::from_std(socket.into())?;
@@ -105,7 +109,8 @@ fn parse_log_message(data: &[u8], ip: &str) -> Result<LogMessage, serde_json::Er
         ip: ip.to_string(),
         level,
         tag: json["tag"].as_str().unwrap_or("").to_string(),
-        message: json["msg"].as_str()
+        message: json["msg"]
+            .as_str()
             .or_else(|| json["message"].as_str())
             .unwrap_or("")
             .to_string(),
@@ -127,5 +132,11 @@ fn print_colored_log(log: &LogMessage) {
     let ip_str = format!("{:>15}", log.ip);
     let tag_str = format!("[{}]", log.tag).cyan();
 
-    println!("{} {} {} {}", ip_str.dimmed(), level_colored, tag_str, log.message);
+    println!(
+        "{} {} {} {}",
+        ip_str.dimmed(),
+        level_colored,
+        tag_str,
+        log.message
+    );
 }

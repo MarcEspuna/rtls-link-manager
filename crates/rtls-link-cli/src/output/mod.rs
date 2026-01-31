@@ -6,8 +6,8 @@ pub mod table;
 pub use json::JsonOutput;
 pub use table::TableOutput;
 
-use crate::types::Device;
 use crate::health::DeviceHealth;
+use crate::types::Device;
 
 /// Output formatter trait
 pub trait OutputFormatter {
@@ -17,14 +17,9 @@ pub trait OutputFormatter {
     /// Format device status with optional health
     fn format_device_status(&self, device: &Device, health: Option<&DeviceHealth>) -> String;
 
-    /// Format a generic message
-    fn format_message(&self, message: &str) -> String;
-
-    /// Format an error
-    fn format_error(&self, error: &str) -> String;
-
     /// Format command result
-    fn format_command_result(&self, ip: &str, command: &str, result: &str, success: bool) -> String;
+    fn format_command_result(&self, ip: &str, command: &str, result: &str, success: bool)
+        -> String;
 
     /// Format bulk operation results
     fn format_bulk_results(&self, results: &[(String, bool, String)]) -> String;

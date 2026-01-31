@@ -16,6 +16,55 @@ import type {
   PresetInfo,
 } from '@shared/types';
 
+export type AppError =
+  | { Io: string }
+  | { InvalidName: string }
+  | { NotFound: string }
+  | { Json: string }
+  | { Discovery: string }
+  | { Device: string };
+
+export function formatAppError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+
+  if (error && typeof error === 'object') {
+    if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
+      return (error as { message: string }).message;
+    }
+
+    const entries = Object.entries(error as Record<string, unknown>);
+    if (entries.length === 1) {
+      const [kind, value] = entries[0];
+      if (typeof value === 'string') return value;
+      return `${kind}: ${JSON.stringify(value)}`;
+    }
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
+    }
+  }
+
+  return String(error);
+}
+
+function toError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  const err = new Error(formatAppError(error));
+  (err as any).cause = error;
+  return err;
+}
+
+async function invokeSafe<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  try {
+    return await invoke(command, args);
+  } catch (e) {
+    throw toError(e);
+  }
+}
+
 // ============================================================================
 // Device Commands
 // ============================================================================
@@ -24,21 +73,21 @@ import type {
  * Get all discovered devices.
  */
 export async function getDevices(): Promise<Device[]> {
-  return await invoke('get_devices');
+  return await invokeSafe('get_devices');
 }
 
 /**
  * Get a specific device by IP address.
  */
 export async function getDevice(ip: string): Promise<Device | null> {
-  return await invoke('get_device', { ip });
+  return await invokeSafe('get_device', { ip });
 }
 
 /**
  * Clear all discovered devices from the cache.
  */
 export async function clearDevices(): Promise<void> {
-  await invoke('clear_devices');
+  await invokeSafe('clear_devices');
 }
 
 // ============================================================================
@@ -49,14 +98,14 @@ export async function clearDevices(): Promise<void> {
  * List all saved local configurations.
  */
 export async function listConfigs(): Promise<LocalConfigInfo[]> {
-  return await invoke('list_configs');
+  return await invokeSafe('list_configs');
 }
 
 /**
  * Get a specific configuration by name.
  */
 export async function getConfig(name: string): Promise<LocalConfig | null> {
-  return await invoke('get_config', { name });
+  return await invokeSafe('get_config', { name });
 }
 
 /**
@@ -66,14 +115,14 @@ export async function saveConfig(
   name: string,
   config: DeviceConfig
 ): Promise<boolean> {
-  return await invoke('save_config', { name, config });
+  return await invokeSafe('save_config', { name, config });
 }
 
 /**
  * Delete a configuration by name.
  */
 export async function deleteConfig(name: string): Promise<boolean> {
-  return await invoke('delete_config', { name });
+  return await invokeSafe('delete_config', { name });
 }
 
 // ============================================================================
@@ -84,33 +133,38 @@ export async function deleteConfig(name: string): Promise<boolean> {
  * List all saved presets.
  */
 export async function listPresets(): Promise<PresetInfo[]> {
-  return await invoke('list_presets');
+  return await invokeSafe('list_presets');
 }
 
 /**
  * Get a specific preset by name.
  */
 export async function getPreset(name: string): Promise<Preset | null> {
-  return await invoke('get_preset', { name });
+  return await invokeSafe('get_preset', { name });
 }
 
 /**
  * Save a preset.
  */
 export async function savePreset(preset: Preset): Promise<boolean> {
-  return await invoke('save_preset', { preset });
+  return await invokeSafe('save_preset', { preset });
 }
 
 /**
  * Delete a preset by name.
  */
 export async function deletePreset(name: string): Promise<boolean> {
-  return await invoke('delete_preset', { name });
+  return await invokeSafe('delete_preset', { name });
 }
 
 // ============================================================================
 // Device Communication Commands
 // ============================================================================
+
+export interface DeviceCommandResponse {
+  raw: string;
+  json?: unknown;
+}
 
 /**
  * Send a single WebSocket command to a device and return the response.
@@ -119,8 +173,8 @@ export async function sendDeviceCommand(
   ip: string,
   command: string,
   timeoutMs?: number
-): Promise<string> {
-  return await invoke('send_device_command', { ip, command, timeoutMs });
+): Promise<DeviceCommandResponse> {
+  return await invokeSafe('send_device_command', { ip, command, timeoutMs });
 }
 
 /**
@@ -130,8 +184,8 @@ export async function sendDeviceCommands(
   ip: string,
   commands: string[],
   timeoutMs?: number
-): Promise<string[]> {
-  return await invoke('send_device_commands', { ip, commands, timeoutMs });
+): Promise<DeviceCommandResponse[]> {
+  return await invokeSafe('send_device_commands', { ip, commands, timeoutMs });
 }
 
 /**
@@ -143,7 +197,7 @@ export async function uploadFirmwareFromFile(
   ip: string,
   filePath: string
 ): Promise<void> {
-  await invoke('upload_firmware_from_file', { ip, filePath });
+  await invokeSafe('upload_firmware_from_file', { ip, filePath });
 }
 
 export interface FirmwareResult {
@@ -162,7 +216,7 @@ export async function uploadFirmwareBulk(
   filePath: string,
   concurrency?: number
 ): Promise<FirmwareResult[]> {
-  return await invoke('upload_firmware_to_devices', { ips, filePath, concurrency });
+  return await invokeSafe('upload_firmware_to_devices', { ips, filePath, concurrency });
 }
 
 export interface FirmwareInfo {
@@ -176,7 +230,7 @@ export async function getFirmwareInfo(
   ip: string,
   timeoutMs?: number
 ): Promise<FirmwareInfo> {
-  return await invoke('get_firmware_info', { ip, timeoutMs });
+  return await invokeSafe('get_firmware_info', { ip, timeoutMs });
 }
 
 // ============================================================================

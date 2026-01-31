@@ -235,11 +235,7 @@ export function PresetsPanel({ selectedDevices, allDevices: _allDevices }: Prese
 
     try {
       const device = selectedDevices[0];
-      const response = await sendDeviceCommand(device.ip, Commands.backupConfig());
-
-      const jsonStart = response.indexOf('{');
-      if (jsonStart === -1) throw new Error('Invalid response');
-      const rawConfig = JSON.parse(response.substring(jsonStart));
+      const rawConfig = await sendDeviceCommand<any>(device.ip, Commands.backupConfig());
       const config = transformConfigResult(rawConfig);
 
       const now = new Date().toISOString();

@@ -7,8 +7,11 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use crate::error::AppError;
 use rtls_link_core::device::ota::{upload_firmware, upload_firmware_bulk, OtaProgressHandler};
-use rtls_link_core::device::websocket::send_command;
+use rtls_link_core::device::websocket::{
+    send_command_parsed, DeviceCommandResponse, DeviceConnection,
+};
 use tauri::{AppHandle, Emitter};
 
 /// Progress handler that emits Tauri events for OTA progress tracking.
@@ -29,17 +32,15 @@ impl OtaProgressHandler for TauriOtaProgress {
     }
 
     fn on_complete(&self, ip: &str) {
-        let _ = self.app_handle.emit(
-            "ota-complete",
-            serde_json::json!({ "ip": ip }),
-        );
+        let _ = self
+            .app_handle
+            .emit("ota-complete", serde_json::json!({ "ip": ip }));
     }
 
     fn on_error(&self, ip: &str, error: &str) {
-        let _ = self.app_handle.emit(
-            "ota-error",
-            serde_json::json!({ "ip": ip, "error": error }),
-        );
+        let _ = self
+            .app_handle
+            .emit("ota-error", serde_json::json!({ "ip": ip, "error": error }));
     }
 }
 
@@ -49,11 +50,11 @@ pub async fn send_device_command(
     ip: String,
     command: String,
     timeout_ms: Option<u64>,
-) -> Result<String, String> {
+) -> Result<DeviceCommandResponse, AppError> {
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(5000));
-    send_command(&ip, &command, timeout)
+    send_command_parsed(&ip, &command, timeout)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(AppError::from)
 }
 
 /// Send multiple commands to a device sequentially and return all responses.
@@ -62,14 +63,37 @@ pub async fn send_device_commands(
     ip: String,
     commands: Vec<String>,
     timeout_ms: Option<u64>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<DeviceCommandResponse>, AppError> {
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(5000));
     let mut responses = Vec::new();
 
-    for cmd in &commands {
-        let response = send_command(&ip, cmd, timeout)
-            .await
-            .map_err(|e| e.to_string())?;
+    let mut conn = DeviceConnection::connect(&ip, timeout)
+        .await
+        .map_err(AppError::from)?;
+
+    for (index, cmd) in commands.iter().enumerate() {
+        let response = conn.send(cmd).await.map_err(|e| {
+            let err = AppError::from(e);
+            match err {
+                AppError::Device(msg) => {
+                    AppError::Device(format!("Command {} failed: {}", index + 1, msg))
+                }
+                AppError::Io(msg) => AppError::Io(format!("Command {} failed: {}", index + 1, msg)),
+                AppError::InvalidName(msg) => {
+                    AppError::InvalidName(format!("Command {} failed: {}", index + 1, msg))
+                }
+                AppError::NotFound(msg) => {
+                    AppError::NotFound(format!("Command {} failed: {}", index + 1, msg))
+                }
+                AppError::Json(msg) => {
+                    AppError::Json(format!("Command {} failed: {}", index + 1, msg))
+                }
+                AppError::Discovery(msg) => {
+                    AppError::Discovery(format!("Command {} failed: {}", index + 1, msg))
+                }
+            }
+        })?;
+
         responses.push(response);
     }
 
@@ -82,12 +106,12 @@ pub async fn upload_firmware_from_file(
     ip: String,
     file_path: String,
     app_handle: AppHandle,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let path = PathBuf::from(&file_path);
 
     let data = tokio::fs::read(&path)
         .await
-        .map_err(|e| format!("Failed to read firmware file: {}", e))?;
+        .map_err(|e| AppError::Io(format!("Failed to read firmware file: {}", e)))?;
 
     let filename = path
         .file_name()
@@ -101,7 +125,7 @@ pub async fn upload_firmware_from_file(
 
     upload_firmware(&ip, data, filename)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(AppError::from)?;
 
     progress.on_complete(&ip);
 
@@ -117,12 +141,12 @@ pub async fn upload_firmware_to_devices(
     file_path: String,
     concurrency: Option<usize>,
     app_handle: AppHandle,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> Result<Vec<serde_json::Value>, AppError> {
     let path = PathBuf::from(&file_path);
 
     let data = tokio::fs::read(&path)
         .await
-        .map_err(|e| format!("Failed to read firmware file: {}", e))?;
+        .map_err(|e| AppError::Io(format!("Failed to read firmware file: {}", e)))?;
 
     let filename = path
         .file_name()
@@ -130,7 +154,7 @@ pub async fn upload_firmware_to_devices(
         .unwrap_or("firmware.bin");
 
     let progress = TauriOtaProgress { app_handle };
-    let concurrency = concurrency.unwrap_or(3);
+    let concurrency = concurrency.unwrap_or(3).max(1);
 
     let results = upload_firmware_bulk(&ips, data, filename, concurrency, &progress).await;
 
@@ -153,18 +177,13 @@ pub async fn upload_firmware_to_devices(
 pub async fn get_firmware_info(
     ip: String,
     timeout_ms: Option<u64>,
-) -> Result<serde_json::Value, String> {
+) -> Result<serde_json::Value, AppError> {
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(5000));
 
-    let response = send_command(&ip, "firmware-info", timeout)
+    let response = send_command_parsed(&ip, "firmware-info", timeout)
         .await
-        .map_err(|e| e.to_string())?;
-
-    // Parse JSON from response (may have prefix text)
-    if let Some(start) = response.find('{') {
-        serde_json::from_str(&response[start..])
-            .map_err(|e| format!("Failed to parse firmware info: {}", e))
-    } else {
-        Err("No JSON found in firmware info response".to_string())
-    }
+        .map_err(AppError::from)?;
+    response
+        .json
+        .ok_or_else(|| AppError::Json("No JSON found in firmware info response".to_string()))
 }

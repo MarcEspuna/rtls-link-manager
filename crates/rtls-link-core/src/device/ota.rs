@@ -2,7 +2,9 @@
 
 use std::time::Duration;
 
+use bytes::Bytes;
 use reqwest::multipart;
+use reqwest::Client;
 
 use crate::error::{CoreError, DeviceError};
 
@@ -26,12 +28,9 @@ impl OtaProgressHandler for NoopProgress {
 }
 
 /// Upload firmware data to a device via HTTP multipart POST.
-pub async fn upload_firmware(
-    ip: &str,
-    data: Vec<u8>,
-    filename: &str,
-) -> Result<(), CoreError> {
-    upload_firmware_data(ip, data, filename).await
+pub async fn upload_firmware(ip: &str, data: Vec<u8>, filename: &str) -> Result<(), CoreError> {
+    let client = build_client()?;
+    upload_firmware_data(&client, ip, Bytes::from(data), filename).await
 }
 
 /// Upload firmware to multiple devices concurrently.
@@ -44,15 +43,30 @@ pub async fn upload_firmware_bulk<P: OtaProgressHandler>(
 ) -> Vec<(String, Result<(), CoreError>)> {
     use futures::stream::{self, StreamExt};
 
+    let concurrency = concurrency.max(1);
+    let data = Bytes::from(data);
     let total_bytes = data.len() as u64;
+    let client = match build_client() {
+        Ok(c) => c,
+        Err(e) => {
+            let msg = e.to_string();
+            return ips
+                .iter()
+                .cloned()
+                .map(|ip| (ip, Err(CoreError::Other(msg.clone()))))
+                .collect();
+        }
+    };
+    let filename = filename.to_string();
 
     let results: Vec<_> = stream::iter(ips.iter().cloned())
         .map(|ip| {
             let data = data.clone();
-            let name = filename.to_string();
+            let name = filename.clone();
+            let client = client.clone();
             async move {
                 progress.on_progress(&ip, 0, total_bytes);
-                let result = upload_firmware_data(&ip, data, &name).await;
+                let result = upload_firmware_data(&client, &ip, data, &name).await;
                 match &result {
                     Ok(()) => {
                         progress.on_progress(&ip, total_bytes, total_bytes);
@@ -72,19 +86,26 @@ pub async fn upload_firmware_bulk<P: OtaProgressHandler>(
     results
 }
 
+fn build_client() -> Result<Client, CoreError> {
+    Client::builder()
+        .timeout(Duration::from_secs(120))
+        .build()
+        .map_err(|e| CoreError::Other(format!("HTTP client error: {}", e)))
+}
+
 /// Upload firmware data (already loaded) to a single device.
-async fn upload_firmware_data(ip: &str, data: Vec<u8>, file_name: &str) -> Result<(), CoreError> {
-    let part = multipart::Part::bytes(data)
+async fn upload_firmware_data(
+    client: &Client,
+    ip: &str,
+    data: Bytes,
+    file_name: &str,
+) -> Result<(), CoreError> {
+    let part = multipart::Part::stream(data)
         .file_name(file_name.to_string())
         .mime_str("application/octet-stream")
         .map_err(|e| CoreError::Other(format!("Failed to create multipart: {}", e)))?;
 
     let form = multipart::Form::new().part("firmware", part);
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(120))
-        .build()
-        .map_err(|e| CoreError::Other(format!("HTTP client error: {}", e)))?;
 
     let url = format!("http://{}/update", ip);
 

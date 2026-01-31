@@ -36,7 +36,9 @@ impl ConfigStorage {
 
     fn validate_name(&self, name: &str) -> Result<(), StorageError> {
         if name.is_empty() {
-            return Err(StorageError::InvalidName("Name cannot be empty".to_string()));
+            return Err(StorageError::InvalidName(
+                "Name cannot be empty".to_string(),
+            ));
         }
 
         if name.len() > MAX_NAME_LENGTH {
@@ -63,7 +65,9 @@ impl ConfigStorage {
     /// List all saved configurations.
     pub async fn list(&self) -> Result<Vec<LocalConfigInfo>, StorageError> {
         let mut configs = Vec::new();
-        let mut entries = fs::read_dir(&self.config_dir).await.map_err(StorageError::Io)?;
+        let mut entries = fs::read_dir(&self.config_dir)
+            .await
+            .map_err(StorageError::Io)?;
 
         while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
@@ -116,7 +120,8 @@ impl ConfigStorage {
         }
 
         let content = fs::read_to_string(&path).await.map_err(StorageError::Io)?;
-        let config: DeviceConfig = serde_json::from_str(&content).map_err(StorageError::Serialization)?;
+        let config: DeviceConfig =
+            serde_json::from_str(&content).map_err(StorageError::Serialization)?;
 
         let metadata = fs::metadata(&path).await.map_err(StorageError::Io)?;
 

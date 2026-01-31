@@ -10,7 +10,15 @@ pub fn parse_json_response<T: serde::de::DeserializeOwned>(
     response: &str,
     device_ip: &str,
 ) -> Result<T, DeviceError> {
-    let json_start = response.find('{').ok_or_else(|| DeviceError::InvalidResponse {
+    let obj_start = response.find('{');
+    let arr_start = response.find('[');
+    let json_start = match (obj_start, arr_start) {
+        (Some(o), Some(a)) => Some(o.min(a)),
+        (Some(o), None) => Some(o),
+        (None, Some(a)) => Some(a),
+        (None, None) => None,
+    }
+    .ok_or_else(|| DeviceError::InvalidResponse {
         ip: device_ip.to_string(),
         message: "No JSON found in response".to_string(),
     })?;
@@ -91,12 +99,27 @@ pub fn is_error_response(response: &str) -> Option<String> {
         }
     }
 
-    if lower.contains("failed") || lower.contains("invalid") {
+    let looks_like_text_error = (lower.contains("error")
+        || lower.contains("fail")
+        || lower.contains("invalid")
+        || lower.contains("not found"))
+        && !lower.contains("success");
+
+    if looks_like_text_error {
         return Some(response.trim().to_string());
     }
 
     // Check for JSON error response
-    if let Some(start) = response.find('{') {
+    let obj_start = response.find('{');
+    let arr_start = response.find('[');
+    let start = match (obj_start, arr_start) {
+        (Some(o), Some(a)) => Some(o.min(a)),
+        (Some(o), None) => Some(o),
+        (None, Some(a)) => Some(a),
+        (None, None) => None,
+    };
+
+    if let Some(start) = start {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response[start..]) {
             if let Some(success) = json.get("success") {
                 if success == false {
@@ -129,14 +152,14 @@ pub fn parse_readall_response(response: &str) -> Vec<(String, String, String)> {
 
         // Check for group header (e.g., "[wifi]")
         if line.starts_with('[') && line.ends_with(']') {
-            current_group = line[1..line.len()-1].to_string();
+            current_group = line[1..line.len() - 1].to_string();
             continue;
         }
 
         // Parse key=value pairs
         if let Some(eq_pos) = line.find('=') {
             let name = line[..eq_pos].trim().to_string();
-            let value = line[eq_pos+1..].trim().to_string();
+            let value = line[eq_pos + 1..].trim().to_string();
 
             if !current_group.is_empty() {
                 params.push((current_group.clone(), name, value));
@@ -161,6 +184,15 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_json_array_with_prefix() {
+        let response = "OK\n[{\"success\": true}]";
+
+        let result: serde_json::Value = parse_json_response(response, "192.168.1.1").unwrap();
+        assert!(result.is_array());
+        assert_eq!(result[0]["success"], true);
+    }
+
+    #[test]
     fn test_parse_json_no_prefix() {
         let response = r#"{"success": true}"#;
         let result: serde_json::Value = parse_json_response(response, "192.168.1.1").unwrap();
@@ -178,6 +210,8 @@ mod tests {
     fn test_is_error_response() {
         assert!(is_error_response("Error: command not found").is_some());
         assert!(is_error_response("Failed to write parameter").is_some());
+        assert!(is_error_response("Fail to write parameter").is_some());
+        assert!(is_error_response("Not found").is_some());
         assert!(is_error_response(r#"{"success": false, "message": "Invalid param"}"#).is_some());
         assert!(is_error_response("OK - success").is_none());
         assert!(is_error_response(r#"{"success": true}"#).is_none());
@@ -189,8 +223,21 @@ mod tests {
 
         let params = parse_readall_response(response);
         assert_eq!(params.len(), 5);
-        assert_eq!(params[0], ("wifi".to_string(), "mode".to_string(), "1".to_string()));
-        assert_eq!(params[1], ("wifi".to_string(), "ssidST".to_string(), "TestNetwork".to_string()));
-        assert_eq!(params[3], ("uwb".to_string(), "mode".to_string(), "4".to_string()));
+        assert_eq!(
+            params[0],
+            ("wifi".to_string(), "mode".to_string(), "1".to_string())
+        );
+        assert_eq!(
+            params[1],
+            (
+                "wifi".to_string(),
+                "ssidST".to_string(),
+                "TestNetwork".to_string()
+            )
+        );
+        assert_eq!(
+            params[3],
+            ("uwb".to_string(), "mode".to_string(), "4".to_string())
+        );
     }
 }

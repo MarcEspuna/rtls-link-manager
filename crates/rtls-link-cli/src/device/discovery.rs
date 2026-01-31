@@ -19,10 +19,6 @@ pub struct DiscoveryOptions {
     pub port: u16,
     /// Discovery duration
     pub duration: Duration,
-    /// Whether to run continuously (watch mode)
-    pub watch: bool,
-    /// Callback for new devices (watch mode)
-    pub on_device: Option<fn(&Device)>,
 }
 
 impl Default for DiscoveryOptions {
@@ -30,8 +26,6 @@ impl Default for DiscoveryOptions {
         Self {
             port: DISCOVERY_PORT,
             duration: Duration::from_secs(5),
-            watch: false,
-            on_device: None,
         }
     }
 }

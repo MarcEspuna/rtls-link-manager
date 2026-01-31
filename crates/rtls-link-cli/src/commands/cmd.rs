@@ -23,19 +23,36 @@ pub async fn run_cmd(args: CmdArgs, timeout: u64, json: bool) -> Result<(), CliE
             if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&response) {
                 println!(
                     "{}",
-                    formatter.format_command_result(&args.ip, &args.command, &serde_json::to_string_pretty(&json_value).unwrap(), true)
+                    formatter.format_command_result(
+                        &args.ip,
+                        &args.command,
+                        &serde_json::to_string_pretty(&json_value).unwrap(),
+                        true
+                    )
                 );
             } else {
                 if let Some(start) = response.find('{') {
-                    if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&response[start..]) {
+                    if let Ok(json_value) =
+                        serde_json::from_str::<serde_json::Value>(&response[start..])
+                    {
                         println!(
                             "{}",
-                            formatter.format_command_result(&args.ip, &args.command, &serde_json::to_string_pretty(&json_value).unwrap(), true)
+                            formatter.format_command_result(
+                                &args.ip,
+                                &args.command,
+                                &serde_json::to_string_pretty(&json_value).unwrap(),
+                                true
+                            )
                         );
                     } else {
                         println!(
                             "{}",
-                            formatter.format_command_result(&args.ip, &args.command, &response, true)
+                            formatter.format_command_result(
+                                &args.ip,
+                                &args.command,
+                                &response,
+                                true
+                            )
                         );
                     }
                 } else {
@@ -54,7 +71,9 @@ pub async fn run_cmd(args: CmdArgs, timeout: u64, json: bool) -> Result<(), CliE
     } else {
         if expect_json {
             if let Some(start) = response.find('{') {
-                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&response[start..]) {
+                if let Ok(json_value) =
+                    serde_json::from_str::<serde_json::Value>(&response[start..])
+                {
                     println!("{}", serde_json::to_string_pretty(&json_value).unwrap());
                     return Ok(());
                 }

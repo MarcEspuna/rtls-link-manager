@@ -32,3 +32,6 @@ src-tauri/Cargo.lock
 
 # Old server directory (deprecated)
 server/
+
+# Internal docs
+docs/REVIEW_GUIDE.md

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Device } from '@shared/types';
 import {
   uploadFirmware,
@@ -6,7 +6,6 @@ import {
   selectFirmwareFile,
   FirmwareUploadResult,
 } from '../../lib/deviceCommands';
-import { onOtaProgress, type OtaProgressEvent } from '../../lib/tauri-api';
 import { ProgressBar } from '../common/ProgressBar';
 import styles from './FirmwareUpdate.module.css';
 

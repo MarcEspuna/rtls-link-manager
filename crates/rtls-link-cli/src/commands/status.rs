@@ -18,8 +18,6 @@ pub async fn run_status(args: StatusArgs, timeout: u64, json: bool) -> Result<()
         let options = DiscoveryOptions {
             port: DISCOVERY_PORT,
             duration: Duration::from_secs(args.discovery_duration),
-            watch: false,
-            on_device: None,
         };
 
         let devices = discover_devices(options).await?;
@@ -66,7 +64,10 @@ pub async fn run_status(args: StatusArgs, timeout: u64, json: bool) -> Result<()
                 } else {
                     None
                 };
-                println!("{}\n", formatter.format_device_status(device, health.as_ref()));
+                println!(
+                    "{}\n",
+                    formatter.format_device_status(device, health.as_ref())
+                );
             }
         }
     } else {
@@ -79,7 +80,10 @@ pub async fn run_status(args: StatusArgs, timeout: u64, json: bool) -> Result<()
             None
         };
 
-        println!("{}", formatter.format_device_status(&device, health.as_ref()));
+        println!(
+            "{}",
+            formatter.format_device_status(&device, health.as_ref())
+        );
     }
 
     Ok(())
@@ -89,8 +93,6 @@ async fn get_device_status(ip: &str, timeout: Duration) -> Result<Device, CliErr
     let options = DiscoveryOptions {
         port: DISCOVERY_PORT,
         duration: timeout,
-        watch: false,
-        on_device: None,
     };
 
     let devices = discover_devices(options).await?;

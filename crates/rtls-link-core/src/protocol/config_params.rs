@@ -15,7 +15,11 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
     let mut params = Vec::new();
 
     // WiFi params
-    params.push(("wifi".to_string(), "mode".to_string(), config.wifi.mode.to_string()));
+    params.push((
+        "wifi".to_string(),
+        "mode".to_string(),
+        config.wifi.mode.to_string(),
+    ));
 
     if let Some(ref v) = config.wifi.ssid_a_p {
         params.push(("wifi".to_string(), "ssidAP".to_string(), v.clone()));
@@ -36,35 +40,67 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
         params.push(("wifi".to_string(), "udpPort".to_string(), v.to_string()));
     }
     if let Some(v) = config.wifi.enable_web_server {
-        params.push(("wifi".to_string(), "enableWebServer".to_string(), v.to_string()));
+        params.push((
+            "wifi".to_string(),
+            "enableWebServer".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.wifi.enable_discovery {
-        params.push(("wifi".to_string(), "enableDiscovery".to_string(), v.to_string()));
+        params.push((
+            "wifi".to_string(),
+            "enableDiscovery".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.wifi.discovery_port {
-        params.push(("wifi".to_string(), "discoveryPort".to_string(), v.to_string()));
+        params.push((
+            "wifi".to_string(),
+            "discoveryPort".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.wifi.log_udp_port {
         params.push(("wifi".to_string(), "logUdpPort".to_string(), v.to_string()));
     }
     if let Some(v) = config.wifi.log_serial_enabled {
-        params.push(("wifi".to_string(), "logSerialEnabled".to_string(), v.to_string()));
+        params.push((
+            "wifi".to_string(),
+            "logSerialEnabled".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.wifi.log_udp_enabled {
-        params.push(("wifi".to_string(), "logUdpEnabled".to_string(), v.to_string()));
+        params.push((
+            "wifi".to_string(),
+            "logUdpEnabled".to_string(),
+            v.to_string(),
+        ));
     }
 
     // UWB params
-    params.push(("uwb".to_string(), "mode".to_string(), config.uwb.mode.to_string()));
+    params.push((
+        "uwb".to_string(),
+        "mode".to_string(),
+        config.uwb.mode.to_string(),
+    ));
     // NOTE: devShortAddr intentionally skipped - preserved per-device
 
     // Flatten anchors array to devId1/x1/y1/z1, devId2/x2/y2/z2, etc.
     if let Some(ref anchors) = config.uwb.anchors {
         if !anchors.is_empty() {
-            params.push(("uwb".to_string(), "anchorCount".to_string(), anchors.len().to_string()));
+            params.push((
+                "uwb".to_string(),
+                "anchorCount".to_string(),
+                anchors.len().to_string(),
+            ));
             for (i, anchor) in anchors.iter().enumerate() {
                 let idx = i + 1; // 1-indexed in firmware
-                params.push(("uwb".to_string(), format!("devId{}", idx), anchor.id.clone()));
+                params.push((
+                    "uwb".to_string(),
+                    format!("devId{}", idx),
+                    anchor.id.clone(),
+                ));
                 params.push(("uwb".to_string(), format!("x{}", idx), anchor.x.to_string()));
                 params.push(("uwb".to_string(), format!("y{}", idx), anchor.y.to_string()));
                 params.push(("uwb".to_string(), format!("z{}", idx), anchor.z.to_string()));
@@ -84,10 +120,18 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
         params.push(("uwb".to_string(), "originAlt".to_string(), v.to_string()));
     }
     if let Some(v) = config.uwb.mavlink_target_system_id {
-        params.push(("uwb".to_string(), "mavlinkTargetSystemId".to_string(), v.to_string()));
+        params.push((
+            "uwb".to_string(),
+            "mavlinkTargetSystemId".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.uwb.rotation_degrees {
-        params.push(("uwb".to_string(), "rotationDegrees".to_string(), v.to_string()));
+        params.push((
+            "uwb".to_string(),
+            "rotationDegrees".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.uwb.z_calc_mode {
         params.push(("uwb".to_string(), "zCalcMode".to_string(), v.to_string()));
@@ -102,7 +146,11 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
         params.push(("uwb".to_string(), "txPowerLevel".to_string(), v.to_string()));
     }
     if let Some(v) = config.uwb.smart_power_enable {
-        params.push(("uwb".to_string(), "smartPowerEnable".to_string(), v.to_string()));
+        params.push((
+            "uwb".to_string(),
+            "smartPowerEnable".to_string(),
+            v.to_string(),
+        ));
     }
 
     // App params
@@ -126,19 +174,43 @@ pub fn location_to_params(location: &LocationData) -> Vec<(String, String, Strin
     let mut params = Vec::new();
 
     // Origin
-    params.push(("uwb".to_string(), "originLat".to_string(), location.origin.lat.to_string()));
-    params.push(("uwb".to_string(), "originLon".to_string(), location.origin.lon.to_string()));
-    params.push(("uwb".to_string(), "originAlt".to_string(), location.origin.alt.to_string()));
+    params.push((
+        "uwb".to_string(),
+        "originLat".to_string(),
+        location.origin.lat.to_string(),
+    ));
+    params.push((
+        "uwb".to_string(),
+        "originLon".to_string(),
+        location.origin.lon.to_string(),
+    ));
+    params.push((
+        "uwb".to_string(),
+        "originAlt".to_string(),
+        location.origin.alt.to_string(),
+    ));
 
     // Rotation
-    params.push(("uwb".to_string(), "rotationDegrees".to_string(), location.rotation.to_string()));
+    params.push((
+        "uwb".to_string(),
+        "rotationDegrees".to_string(),
+        location.rotation.to_string(),
+    ));
 
     // Anchors
     if !location.anchors.is_empty() {
-        params.push(("uwb".to_string(), "anchorCount".to_string(), location.anchors.len().to_string()));
+        params.push((
+            "uwb".to_string(),
+            "anchorCount".to_string(),
+            location.anchors.len().to_string(),
+        ));
         for (i, anchor) in location.anchors.iter().enumerate() {
             let idx = i + 1;
-            params.push(("uwb".to_string(), format!("devId{}", idx), anchor.id.clone()));
+            params.push((
+                "uwb".to_string(),
+                format!("devId{}", idx),
+                anchor.id.clone(),
+            ));
             params.push(("uwb".to_string(), format!("x{}", idx), anchor.x.to_string()));
             params.push(("uwb".to_string(), format!("y{}", idx), anchor.y.to_string()));
             params.push(("uwb".to_string(), format!("z{}", idx), anchor.z.to_string()));
@@ -176,8 +248,18 @@ mod tests {
                 dev_short_addr: "1".to_string(), // Should be skipped
                 anchor_count: None,
                 anchors: Some(vec![
-                    AnchorConfig { id: "1".to_string(), x: 0.0, y: 0.0, z: 1.5 },
-                    AnchorConfig { id: "2".to_string(), x: 3.0, y: 0.0, z: 1.5 },
+                    AnchorConfig {
+                        id: "1".to_string(),
+                        x: 0.0,
+                        y: 0.0,
+                        z: 1.5,
+                    },
+                    AnchorConfig {
+                        id: "2".to_string(),
+                        x: 3.0,
+                        y: 0.0,
+                        z: 1.5,
+                    },
                 ]),
                 origin_lat: Some(41.4036),
                 origin_lon: Some(2.1744),
@@ -202,13 +284,25 @@ mod tests {
         assert!(!params.iter().any(|(_, n, _)| n == "devShortAddr"));
 
         // Check that anchors are flattened
-        assert!(params.iter().any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "2"));
-        assert!(params.iter().any(|(g, n, v)| g == "uwb" && n == "devId1" && v == "1"));
-        assert!(params.iter().any(|(g, n, v)| g == "uwb" && n == "x1" && v == "0"));
-        assert!(params.iter().any(|(g, n, v)| g == "uwb" && n == "devId2" && v == "2"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "2"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "devId1" && v == "1"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "x1" && v == "0"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "devId2" && v == "2"));
 
         // Check other params
-        assert!(params.iter().any(|(g, n, v)| g == "wifi" && n == "mode" && v == "1"));
-        assert!(params.iter().any(|(g, n, v)| g == "wifi" && n == "ssidST" && v == "TestNetwork"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "wifi" && n == "mode" && v == "1"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "wifi" && n == "ssidST" && v == "TestNetwork"));
     }
 }

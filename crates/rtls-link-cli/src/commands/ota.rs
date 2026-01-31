@@ -58,6 +58,7 @@ async fn run_update(
     json: bool,
     strict: bool,
 ) -> Result<(), CliError> {
+    let concurrency = concurrency.max(1);
     let firmware_path = Path::new(firmware);
 
     if !firmware_path.exists() {
@@ -74,8 +75,6 @@ async fn run_update(
         let options = DiscoveryOptions {
             port: DISCOVERY_PORT,
             duration: Duration::from_secs(3),
-            watch: false,
-            on_device: None,
         };
         let devices = discover_devices(options).await?;
         let devices = filter_devices_by_role(devices, filter_role);
@@ -130,7 +129,8 @@ async fn run_update(
         println!("Uploading firmware to {} device(s)...", ips.len());
 
         let progress = CliProgress;
-        let results = upload_firmware_bulk(&ips, firmware_data, &file_name, concurrency, &progress).await;
+        let results =
+            upload_firmware_bulk(&ips, firmware_data, &file_name, concurrency, &progress).await;
 
         let formatted_results: Vec<(String, bool, String)> = results
             .into_iter()

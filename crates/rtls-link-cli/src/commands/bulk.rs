@@ -12,17 +12,15 @@ use rtls_link_core::device::websocket::BatchSender;
 use rtls_link_core::protocol::commands::Commands;
 
 /// Run bulk command
-pub async fn run_bulk(args: BulkArgs, timeout: u64, json: bool, strict: bool) -> Result<(), CliError> {
+pub async fn run_bulk(
+    args: BulkArgs,
+    timeout: u64,
+    json: bool,
+    strict: bool,
+) -> Result<(), CliError> {
     match args.command {
         BulkCommands::ToggleLed(target) => {
-            run_bulk_command(
-                Commands::toggle_led(),
-                &target,
-                timeout,
-                json,
-                strict,
-            )
-            .await
+            run_bulk_command(Commands::toggle_led(), &target, timeout, json, strict).await
         }
         BulkCommands::Reboot(target) => {
             run_bulk_command(Commands::reboot(), &target, timeout, json, strict).await
@@ -52,11 +50,7 @@ async fn run_bulk_command(
     let formatter = get_formatter(json);
     let sender = BatchSender::new(timeout, target.concurrency);
 
-    println!(
-        "Running '{}' on {} device(s)...",
-        command,
-        ips.len()
-    );
+    println!("Running '{}' on {} device(s)...", command, ips.len());
 
     let results = sender.send_to_all(&ips, command).await;
 
@@ -114,11 +108,7 @@ async fn run_bulk_raw_command(
     let formatter = get_formatter(json);
     let sender = BatchSender::new(timeout, args.concurrency);
 
-    println!(
-        "Running '{}' on {} device(s)...",
-        command,
-        ips.len()
-    );
+    println!("Running '{}' on {} device(s)...", command, ips.len());
 
     let results = sender.send_to_all(&ips, command).await;
 
@@ -160,8 +150,6 @@ async fn get_target_ips(target: &BulkTargetArgs) -> Result<Vec<String>, CliError
         let options = DiscoveryOptions {
             port: DISCOVERY_PORT,
             duration: Duration::from_secs(target.discovery_duration),
-            watch: false,
-            on_device: None,
         };
 
         let devices = discover_devices(options).await?;

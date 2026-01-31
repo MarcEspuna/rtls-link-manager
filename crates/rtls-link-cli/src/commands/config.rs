@@ -8,13 +8,18 @@ use crate::error::{CliError, ConfigError};
 use crate::output::get_formatter;
 use crate::types::{Device, DeviceConfig, DeviceRole};
 
-use rtls_link_core::device::websocket::send_command;
+use rtls_link_core::device::websocket::{send_command, DeviceConnection};
 use rtls_link_core::protocol::commands::Commands;
 use rtls_link_core::protocol::config_params::config_to_params;
 use rtls_link_core::protocol::response::parse_json_response;
 
 /// Run the config command
-pub async fn run_config(args: ConfigArgs, timeout: u64, json: bool, strict: bool) -> Result<(), CliError> {
+pub async fn run_config(
+    args: ConfigArgs,
+    timeout: u64,
+    json: bool,
+    strict: bool,
+) -> Result<(), CliError> {
     let _formatter = get_formatter(json);
     let timeout_duration = Duration::from_millis(timeout);
 
@@ -51,9 +56,13 @@ pub async fn run_config(args: ConfigArgs, timeout: u64, json: bool, strict: bool
             .await
         }
         ConfigCommands::List(args) => run_list(&args.ip, timeout_duration, json).await,
-        ConfigCommands::SaveAs(args) => run_save_as(&args.ip, &args.name, timeout_duration, json).await,
+        ConfigCommands::SaveAs(args) => {
+            run_save_as(&args.ip, &args.name, timeout_duration, json).await
+        }
         ConfigCommands::Load(args) => run_load(&args.ip, &args.name, timeout_duration, json).await,
-        ConfigCommands::Delete(args) => run_delete(&args.ip, &args.name, timeout_duration, json).await,
+        ConfigCommands::Delete(args) => {
+            run_delete(&args.ip, &args.name, timeout_duration, json).await
+        }
     }
 }
 
@@ -102,8 +111,6 @@ async fn run_apply(
         let options = DiscoveryOptions {
             port: DISCOVERY_PORT,
             duration: Duration::from_secs(3),
-            watch: false,
-            on_device: None,
         };
         let devices = discover_devices(options).await?;
         let devices = filter_devices_by_role(devices, filter_role);
@@ -149,12 +156,14 @@ async fn apply_config_to_device(
     params: &[(String, String, String)],
     timeout: Duration,
 ) -> Result<(), CliError> {
+    let mut conn = DeviceConnection::connect(ip, timeout).await?;
+
     for (group, name, value) in params {
         let cmd = Commands::write_param(group, name, value);
-        send_command(ip, &cmd, timeout).await?;
+        conn.send_raw(&cmd).await?;
     }
 
-    send_command(ip, Commands::save_config(), timeout).await?;
+    conn.send_raw(Commands::save_config()).await?;
 
     Ok(())
 }
@@ -247,7 +256,12 @@ async fn run_list(ip: &str, timeout: Duration, json_output: bool) -> Result<(), 
     Ok(())
 }
 
-async fn run_save_as(ip: &str, name: &str, timeout: Duration, json_output: bool) -> Result<(), CliError> {
+async fn run_save_as(
+    ip: &str,
+    name: &str,
+    timeout: Duration,
+    json_output: bool,
+) -> Result<(), CliError> {
     let cmd = Commands::save_config_as(name);
     let response = send_command(ip, &cmd, timeout).await?;
 
@@ -270,7 +284,12 @@ async fn run_save_as(ip: &str, name: &str, timeout: Duration, json_output: bool)
     Ok(())
 }
 
-async fn run_load(ip: &str, name: &str, timeout: Duration, json_output: bool) -> Result<(), CliError> {
+async fn run_load(
+    ip: &str,
+    name: &str,
+    timeout: Duration,
+    json_output: bool,
+) -> Result<(), CliError> {
     let cmd = Commands::load_config_named(name);
     let response = send_command(ip, &cmd, timeout).await?;
 
@@ -293,7 +312,12 @@ async fn run_load(ip: &str, name: &str, timeout: Duration, json_output: bool) ->
     Ok(())
 }
 
-async fn run_delete(ip: &str, name: &str, timeout: Duration, json_output: bool) -> Result<(), CliError> {
+async fn run_delete(
+    ip: &str,
+    name: &str,
+    timeout: Duration,
+    json_output: bool,
+) -> Result<(), CliError> {
     let cmd = Commands::delete_config(name);
     let response = send_command(ip, &cmd, timeout).await?;
 

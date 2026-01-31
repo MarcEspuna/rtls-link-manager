@@ -15,6 +15,7 @@ tokio-tungstenite = "0.21"
 futures-util = "0.3"
 futures = "0.3"
 reqwest = { version = "0.11", default-features = false, features = ["multipart", "stream", "rustls-tls"] }
+bytes = "1"
 socket2 = { version = "0.5", features = ["all"] }
 regex = "1"
 directories = "5"

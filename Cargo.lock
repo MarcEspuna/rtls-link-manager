@@ -3118,6 +3118,7 @@ dependencies = [
 name = "rtls-link-core"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "chrono",
  "directories",
  "futures",

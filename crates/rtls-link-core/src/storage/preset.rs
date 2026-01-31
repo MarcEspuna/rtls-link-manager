@@ -36,7 +36,9 @@ impl PresetStorage {
 
     fn validate_name(&self, name: &str) -> Result<(), StorageError> {
         if name.is_empty() {
-            return Err(StorageError::InvalidPresetName("Name cannot be empty".to_string()));
+            return Err(StorageError::InvalidPresetName(
+                "Name cannot be empty".to_string(),
+            ));
         }
 
         if name.len() > MAX_NAME_LENGTH {
@@ -63,7 +65,9 @@ impl PresetStorage {
     /// List all saved presets.
     pub async fn list(&self) -> Result<Vec<PresetInfo>, StorageError> {
         let mut presets = Vec::new();
-        let mut entries = fs::read_dir(&self.preset_dir).await.map_err(StorageError::Io)?;
+        let mut entries = fs::read_dir(&self.preset_dir)
+            .await
+            .map_err(StorageError::Io)?;
 
         while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
@@ -234,9 +238,12 @@ mod tests {
                     alt: 100.0,
                 },
                 rotation: 0.0,
-                anchors: vec![
-                    AnchorConfig { id: "0".to_string(), x: 0.0, y: 0.0, z: 1.5 },
-                ],
+                anchors: vec![AnchorConfig {
+                    id: "0".to_string(),
+                    x: 0.0,
+                    y: 0.0,
+                    z: 1.5,
+                }],
             }),
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),

@@ -35,29 +35,17 @@ async fn main() {
 
 async fn run(cli: Cli) -> Result<(), CliError> {
     match cli.command {
-        Commands::Discover(args) => {
-            commands::run_discover(args, cli.json).await
-        }
-        Commands::Status(args) => {
-            commands::run_status(args, cli.timeout, cli.json).await
-        }
+        Commands::Discover(args) => commands::run_discover(args, cli.json).await,
+        Commands::Status(args) => commands::run_status(args, cli.timeout, cli.json).await,
         Commands::Config(args) => {
             commands::run_config(args, cli.timeout, cli.json, cli.strict).await
         }
         Commands::Preset(args) => {
             commands::run_preset(args, cli.timeout, cli.json, cli.strict).await
         }
-        Commands::Ota(args) => {
-            commands::run_ota(args, cli.json, cli.strict).await
-        }
-        Commands::Logs(args) => {
-            commands::run_logs(args, cli.json).await
-        }
-        Commands::Cmd(args) => {
-            commands::run_cmd(args, cli.timeout, cli.json).await
-        }
-        Commands::Bulk(args) => {
-            commands::run_bulk(args, cli.timeout, cli.json, cli.strict).await
-        }
+        Commands::Ota(args) => commands::run_ota(args, cli.json, cli.strict).await,
+        Commands::Logs(args) => commands::run_logs(args, cli.json).await,
+        Commands::Cmd(args) => commands::run_cmd(args, cli.timeout, cli.json).await,
+        Commands::Bulk(args) => commands::run_bulk(args, cli.timeout, cli.json, cli.strict).await,
     }
 }

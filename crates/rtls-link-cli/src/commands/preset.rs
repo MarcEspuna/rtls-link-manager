@@ -12,7 +12,7 @@ use crate::types::{
     Device, DeviceConfig, DeviceRole, GpsOrigin, LocationData, Preset, PresetInfo, PresetType,
 };
 
-use rtls_link_core::device::websocket::send_command;
+use rtls_link_core::device::websocket::{send_command, DeviceConnection};
 use rtls_link_core::error::StorageError;
 use rtls_link_core::protocol::commands::Commands;
 use rtls_link_core::protocol::config_params::{config_to_params, location_to_params};
@@ -27,7 +27,12 @@ fn create_preset_storage() -> Result<PresetStorage, CliError> {
 }
 
 /// Run the preset command
-pub async fn run_preset(args: PresetArgs, timeout: u64, json: bool, strict: bool) -> Result<(), CliError> {
+pub async fn run_preset(
+    args: PresetArgs,
+    timeout: u64,
+    json: bool,
+    strict: bool,
+) -> Result<(), CliError> {
     let _formatter = get_formatter(json);
     let timeout_duration = Duration::from_millis(timeout);
 
@@ -94,10 +99,15 @@ async fn run_list(json: bool) -> Result<(), CliError> {
 
 async fn run_show(name: &str, json: bool) -> Result<(), CliError> {
     let storage = create_preset_storage()?;
-    let preset: Preset = storage.get(name).await.map_err(CliError::from)?
-        .ok_or_else(|| CliError::Core(rtls_link_core::error::CoreError::Storage(
-            StorageError::PresetNotFound(name.to_string()),
-        )))?;
+    let preset: Preset = storage
+        .get(name)
+        .await
+        .map_err(CliError::from)?
+        .ok_or_else(|| {
+            CliError::Core(rtls_link_core::error::CoreError::Storage(
+                StorageError::PresetNotFound(name.to_string()),
+            ))
+        })?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&preset).unwrap());
@@ -160,7 +170,8 @@ async fn run_save(
     } else if let Some(file) = from_file {
         let content = std::fs::read_to_string(file)
             .map_err(|e| CliError::Other(format!("Failed to read file: {}", e)))?;
-        serde_json::from_str(&content).map_err(|e| CliError::Other(format!("Failed to parse config: {}", e)))?
+        serde_json::from_str(&content)
+            .map_err(|e| CliError::Other(format!("Failed to parse config: {}", e)))?
     } else {
         return Err(CliError::InvalidArgument(
             "Must specify --from-device or --from-file".to_string(),
@@ -258,26 +269,26 @@ async fn run_upload(
     strict: bool,
 ) -> Result<(), CliError> {
     let storage = create_preset_storage()?;
-    let preset: Preset = storage.get(name).await.map_err(CliError::from)?
-        .ok_or_else(|| CliError::Core(rtls_link_core::error::CoreError::Storage(
-            StorageError::PresetNotFound(name.to_string()),
-        )))?;
+    let preset: Preset = storage
+        .get(name)
+        .await
+        .map_err(CliError::from)?
+        .ok_or_else(|| {
+            CliError::Core(rtls_link_core::error::CoreError::Storage(
+                StorageError::PresetNotFound(name.to_string()),
+            ))
+        })?;
 
     let ips = if target.to_lowercase() == "all" {
         let options = DiscoveryOptions {
             port: DISCOVERY_PORT,
             duration: Duration::from_secs(3),
-            watch: false,
-            on_device: None,
         };
         let devices = discover_devices(options).await?;
         let devices = filter_devices_by_role(devices, filter_role);
 
         let devices = if preset.preset_type == PresetType::Locations {
-            devices
-                .into_iter()
-                .filter(|d| d.role.is_tag())
-                .collect()
+            devices.into_iter().filter(|d| d.role.is_tag()).collect()
         } else {
             devices
         };
@@ -319,7 +330,11 @@ async fn run_upload(
     Ok(())
 }
 
-async fn upload_preset_to_device(ip: &str, preset: &Preset, timeout: Duration) -> Result<(), CliError> {
+async fn upload_preset_to_device(
+    ip: &str,
+    preset: &Preset,
+    timeout: Duration,
+) -> Result<(), CliError> {
     let params = match preset.preset_type {
         PresetType::Full => {
             if let Some(ref config) = preset.config {
@@ -337,16 +352,18 @@ async fn upload_preset_to_device(ip: &str, preset: &Preset, timeout: Duration) -
         }
     };
 
+    let mut conn = DeviceConnection::connect(ip, timeout).await?;
+
     for (group, name, value) in &params {
         let cmd = Commands::write_param(group, name, value);
-        send_command(ip, &cmd, timeout).await?;
+        conn.send_raw(&cmd).await?;
     }
 
     if preset.preset_type == PresetType::Full {
         let cmd = Commands::save_config_as(&preset.name);
-        send_command(ip, &cmd, timeout).await?;
+        conn.send_raw(&cmd).await?;
     } else {
-        send_command(ip, Commands::save_config(), timeout).await?;
+        conn.send_raw(Commands::save_config()).await?;
     }
 
     Ok(())

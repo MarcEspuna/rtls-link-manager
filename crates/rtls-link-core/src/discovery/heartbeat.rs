@@ -132,12 +132,18 @@ mod tests {
             log_udp_enabled: None,
         };
 
-        devices.insert("192.168.1.1".to_string(), (fresh_device.clone(), Instant::now()));
+        devices.insert(
+            "192.168.1.1".to_string(),
+            (fresh_device.clone(), Instant::now()),
+        );
 
         let mut stale = fresh_device;
         stale.ip = "192.168.1.2".to_string();
         stale.id = "stale".to_string();
-        devices.insert("192.168.1.2".to_string(), (stale, Instant::now() - Duration::from_secs(6)));
+        devices.insert(
+            "192.168.1.2".to_string(),
+            (stale, Instant::now() - Duration::from_secs(6)),
+        );
 
         assert_eq!(devices.len(), 2);
         prune_stale_devices(&mut devices);

@@ -85,11 +85,8 @@ impl DiscoveryService {
             let after_prune = self.devices.len();
 
             if before_prune != after_prune || matches!(recv_result, Ok(Ok(_))) {
-                let mut device_list: Vec<Device> = self
-                    .devices
-                    .values()
-                    .map(|(dev, _)| dev.clone())
-                    .collect();
+                let mut device_list: Vec<Device> =
+                    self.devices.values().map(|(dev, _)| dev.clone()).collect();
                 device_list.sort_by(|a, b| a.ip.cmp(&b.ip));
                 on_update(&device_list);
             }

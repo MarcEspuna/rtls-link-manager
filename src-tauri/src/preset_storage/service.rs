@@ -23,8 +23,7 @@ impl PresetStorageService {
 
         println!("Preset storage directory: {:?}", preset_dir);
 
-        let inner = CorePresetStorage::new(preset_dir)
-            .map_err(|e| AppError::Io(e.to_string()))?;
+        let inner = CorePresetStorage::new(preset_dir).map_err(|e| AppError::Io(e.to_string()))?;
 
         Ok(Self { inner })
     }
@@ -41,13 +40,19 @@ impl PresetStorageService {
 
     /// Save a preset.
     pub async fn save(&self, preset: Preset) -> Result<bool, AppError> {
-        self.inner.save(&preset).await.map_err(|e| AppError::from(e))?;
+        self.inner
+            .save(&preset)
+            .await
+            .map_err(|e| AppError::from(e))?;
         Ok(true)
     }
 
     /// Delete a preset.
     pub async fn delete(&self, name: &str) -> Result<bool, AppError> {
-        self.inner.delete(name).await.map_err(|e| AppError::from(e))?;
+        self.inner
+            .delete(name)
+            .await
+            .map_err(|e| AppError::from(e))?;
         Ok(true)
     }
 }
@@ -180,8 +185,14 @@ mod tests {
     async fn test_list_presets() {
         let (service, _temp_dir) = create_test_service();
 
-        service.save(&create_test_full_preset("alpha-full")).await.unwrap();
-        service.save(&create_test_location_preset("beta-loc")).await.unwrap();
+        service
+            .save(&create_test_full_preset("alpha-full"))
+            .await
+            .unwrap();
+        service
+            .save(&create_test_location_preset("beta-loc"))
+            .await
+            .unwrap();
 
         let presets = service.list().await.unwrap();
         assert_eq!(presets.len(), 2);

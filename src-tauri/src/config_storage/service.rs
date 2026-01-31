@@ -23,8 +23,7 @@ impl ConfigStorageService {
 
         println!("Config storage directory: {:?}", config_dir);
 
-        let inner = CoreConfigStorage::new(config_dir)
-            .map_err(|e| AppError::Io(e.to_string()))?;
+        let inner = CoreConfigStorage::new(config_dir).map_err(|e| AppError::Io(e.to_string()))?;
 
         Ok(Self { inner })
     }
@@ -41,13 +40,19 @@ impl ConfigStorageService {
 
     /// Save a configuration.
     pub async fn save(&self, name: &str, config: DeviceConfig) -> Result<bool, AppError> {
-        self.inner.save(name, &config).await.map_err(|e| AppError::from(e))?;
+        self.inner
+            .save(name, &config)
+            .await
+            .map_err(|e| AppError::from(e))?;
         Ok(true)
     }
 
     /// Delete a configuration.
     pub async fn delete(&self, name: &str) -> Result<bool, AppError> {
-        self.inner.delete(name).await.map_err(|e| AppError::from(e))?;
+        self.inner
+            .delete(name)
+            .await
+            .map_err(|e| AppError::from(e))?;
         Ok(true)
     }
 }
@@ -151,11 +156,13 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_validate_name() {
+    #[tokio::test]
+    async fn test_validate_name() {
         let (service, _tmp) = create_test_service();
+        let config = make_config();
 
-        // Valid names via save
-        // Invalid names checked through core
+        assert!(service.save("valid-name", &config).await.is_ok());
+        assert!(service.save("", &config).await.is_err());
+        assert!(service.save("../etc", &config).await.is_err());
     }
 }

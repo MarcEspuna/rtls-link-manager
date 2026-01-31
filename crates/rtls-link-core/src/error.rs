@@ -182,6 +182,6 @@ mod tests {
     fn test_core_error_to_app_error() {
         let core_err = CoreError::Storage(StorageError::InvalidName("bad name".to_string()));
         let app_err: AppError = core_err.into();
-        matches!(app_err, AppError::InvalidName(_));
+        assert!(matches!(app_err, AppError::InvalidName(_)));
     }
 }

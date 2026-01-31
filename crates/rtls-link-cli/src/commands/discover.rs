@@ -18,8 +18,6 @@ pub async fn run_discover(args: DiscoverArgs, json: bool) -> Result<(), CliError
     let options = DiscoveryOptions {
         port: DISCOVERY_PORT,
         duration: Duration::from_secs(args.duration),
-        watch: args.watch,
-        on_device: None,
     };
 
     if args.watch {
@@ -34,7 +32,10 @@ async fn run_oneshot_mode(
     filter_role: Option<RoleFilter>,
     formatter: &dyn OutputFormatter,
 ) -> Result<(), CliError> {
-    println!("Discovering devices for {} seconds...", options.duration.as_secs());
+    println!(
+        "Discovering devices for {} seconds...",
+        options.duration.as_secs()
+    );
 
     let devices = discover_devices(options).await?;
 

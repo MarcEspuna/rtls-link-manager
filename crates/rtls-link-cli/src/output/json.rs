@@ -39,32 +39,28 @@ impl OutputFormatter for JsonOutput {
 
         if let Some(health) = health {
             if let Value::Object(ref mut map) = output {
-                map.insert("health".to_string(), json!({
-                    "level": health.level.as_str(),
-                    "issues": health.issues
-                }));
+                map.insert(
+                    "health".to_string(),
+                    json!({
+                        "level": health.level.as_str(),
+                        "issues": health.issues
+                    }),
+                );
             }
         }
 
         Self::to_json(&output)
     }
 
-    fn format_message(&self, message: &str) -> String {
-        Self::to_json(&json!({
-            "message": message
-        }))
-    }
-
-    fn format_error(&self, error: &str) -> String {
-        Self::to_json(&json!({
-            "error": error
-        }))
-    }
-
-    fn format_command_result(&self, ip: &str, command: &str, result: &str, success: bool) -> String {
+    fn format_command_result(
+        &self,
+        ip: &str,
+        command: &str,
+        result: &str,
+        success: bool,
+    ) -> String {
         // Try to parse result as JSON
-        let result_value: Value = serde_json::from_str(result)
-            .unwrap_or_else(|_| json!(result));
+        let result_value: Value = serde_json::from_str(result).unwrap_or_else(|_| json!(result));
 
         Self::to_json(&json!({
             "ip": ip,
@@ -79,8 +75,8 @@ impl OutputFormatter for JsonOutput {
             .iter()
             .map(|(ip, success, message)| {
                 // Try to parse message as JSON
-                let message_value: Value = serde_json::from_str(message)
-                    .unwrap_or_else(|_| json!(message));
+                let message_value: Value =
+                    serde_json::from_str(message).unwrap_or_else(|_| json!(message));
 
                 json!({
                     "ip": ip,

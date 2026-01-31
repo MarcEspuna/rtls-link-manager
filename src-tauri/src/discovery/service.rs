@@ -4,6 +4,7 @@
 
 use crate::types::Device;
 use rtls_link_core::discovery::heartbeat::{parse_heartbeat, prune_stale_devices};
+use rtls_link_core::discovery::service::{create_reusable_socket, DISCOVERY_PORT};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -11,9 +12,6 @@ use tauri::{AppHandle, Emitter};
 use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
 use tokio::time::timeout;
-
-/// UDP port for device discovery
-const DISCOVERY_PORT: u16 = 3333;
 
 /// Timeout for UDP receive - ensures pruning runs even without incoming packets
 const RECEIVE_TIMEOUT: Duration = Duration::from_secs(2);
@@ -27,7 +25,8 @@ pub struct DiscoveryService {
 impl DiscoveryService {
     /// Create a new discovery service bound to UDP port 3333.
     pub async fn new() -> Result<Self, std::io::Error> {
-        let socket = UdpSocket::bind(("0.0.0.0", DISCOVERY_PORT)).await?;
+        let std_socket = create_reusable_socket(DISCOVERY_PORT)?;
+        let socket = UdpSocket::from_std(std_socket)?;
         println!("UDP discovery listening on port {}", DISCOVERY_PORT);
 
         Ok(Self {

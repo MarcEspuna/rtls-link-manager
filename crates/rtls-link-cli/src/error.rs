@@ -12,7 +12,6 @@ pub use rtls_link_core::error::{ConfigError, DeviceError, StorageError};
 pub mod exit_codes {
     pub const SUCCESS: i32 = 0;
     pub const GENERAL_ERROR: i32 = 1;
-    pub const NETWORK_ERROR: i32 = 2;
     pub const DEVICE_ERROR: i32 = 3;
     pub const INVALID_ARGS: i32 = 4;
     pub const PARTIAL_FAILURE: i32 = 5;
@@ -36,9 +35,6 @@ pub enum CliError {
     #[error("No devices found")]
     NoDevicesFound,
 
-    #[error("Timeout: {0}")]
-    Timeout(String),
-
     #[error("{0}")]
     Other(String),
 }
@@ -58,7 +54,6 @@ impl CliError {
             CliError::InvalidArgument(_) => exit_codes::INVALID_ARGS,
             CliError::PartialFailure { .. } => exit_codes::PARTIAL_FAILURE,
             CliError::NoDevicesFound => exit_codes::GENERAL_ERROR,
-            CliError::Timeout(_) => exit_codes::NETWORK_ERROR,
             CliError::Other(_) => exit_codes::GENERAL_ERROR,
         }
     }
@@ -95,11 +90,7 @@ impl Clone for CliError {
                 failed: *failed,
             },
             CliError::NoDevicesFound => CliError::NoDevicesFound,
-            CliError::Timeout(s) => CliError::Timeout(s.clone()),
             CliError::Other(s) => CliError::Other(s.clone()),
         }
     }
 }
-
-/// Result type for CLI operations
-pub type Result<T> = std::result::Result<T, CliError>;

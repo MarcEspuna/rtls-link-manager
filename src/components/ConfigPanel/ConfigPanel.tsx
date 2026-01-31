@@ -22,16 +22,6 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
   const [anchorBusy, setAnchorBusy] = useState(false);
   const [anchorError, setAnchorError] = useState<string | null>(null);
 
-  const findCommandError = (responses: string[] | null): string | null => {
-    if (!responses) return 'No response from device';
-    for (const response of responses) {
-      if (/error|fail|invalid|not found/i.test(response)) {
-        return response;
-      }
-    }
-    return null;
-  };
-
   useEffect(() => {
     loadConfig();
     loadSavedConfigs();
@@ -79,11 +69,7 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
       const anchorCommands = getAnchorWriteCommands(config.uwb.anchors || [])
         .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
       const batch = [...anchorCommands, Commands.saveConfig()];
-      const result = await sendCommands(batch);
-      const errorMessage = findCommandError(result);
-      if (errorMessage) {
-        throw new Error(errorMessage);
-      }
+      await sendCommands(batch);
       alert('Configuration saved to device');
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to save configuration');
@@ -98,11 +84,7 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
           const anchorCommands = getAnchorWriteCommands(config.uwb.anchors || [])
             .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
           const batch = [...anchorCommands, Commands.saveConfigAs(name)];
-          const result = await sendCommands(batch);
-          const errorMessage = findCommandError(result);
-          if (errorMessage) {
-            throw new Error(errorMessage);
-          }
+          await sendCommands(batch);
         } else {
           await sendCommand(Commands.saveConfigAs(name));
         }
@@ -198,11 +180,7 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
                 await sendCommand(Commands.writeParam(group, name, value));
               }}
               onApplyBatch={async (commands) => {
-                const result = await sendCommands(commands);
-                const errorMessage = findCommandError(result);
-                if (errorMessage) {
-                  throw new Error(errorMessage);
-                }
+                await sendCommands(commands);
               }}
               onAnchorsBusyChange={setAnchorBusy}
               onAnchorsError={setAnchorError}

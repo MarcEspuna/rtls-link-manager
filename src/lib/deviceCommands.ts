@@ -7,7 +7,6 @@
  */
 
 import { Device } from '@shared/types';
-import { isJsonCommand } from '@shared/commands';
 import {
   sendDeviceCommand as tauriSendCommand,
   sendDeviceCommands as tauriSendCommands,
@@ -35,46 +34,22 @@ export interface BulkCommandResult {
 }
 
 /**
- * Check if a command response indicates an error.
- */
-export function checkCommandResponse(command: string, response: string): void {
-  if (isJsonCommand(command)) {
-    try {
-      const jsonStart = response.indexOf('{');
-      if (jsonStart !== -1) {
-        const json = JSON.parse(response.substring(jsonStart));
-        if (json.success === false || json.error) {
-          throw new Error(json.error || 'Command failed');
-        }
-      }
-    } catch (e) {
-      if (e instanceof SyntaxError) {
-        // Not valid JSON, continue to text check
-      } else {
-        throw e;
-      }
-    }
-  }
-  if (/error|fail|invalid/i.test(response) && !/success/i.test(response)) {
-    throw new Error(response);
-  }
-}
-
-/**
  * Send a single command to a device and get the response.
  */
-export async function sendDeviceCommand(
+export async function sendDeviceCommand<T = string>(
   deviceIp: string,
   command: string,
   timeout = DEFAULT_COMMAND_TIMEOUT_MS
-): Promise<string> {
-  return tauriSendCommand(deviceIp, command, timeout);
+): Promise<T> {
+  const response = await tauriSendCommand(deviceIp, command, timeout);
+  return (response.json ?? response.raw) as T;
 }
 
 /**
  * Send multiple commands to a device sequentially.
  *
- * The Rust backend sends commands sequentially over a single WebSocket connection.
+ * The Rust backend sends commands sequentially. (Current implementation opens a
+ * new WebSocket connection per command.)
  * Response validation and progress callbacks are handled on the frontend.
  */
 export async function sendDeviceCommands(
@@ -88,20 +63,7 @@ export async function sendDeviceCommands(
   const { onProgress, perCommandTimeout = DEFAULT_WRITE_TIMEOUT_MS } = options ?? {};
 
   const responses = await tauriSendCommands(deviceIp, commands, perCommandTimeout);
-
-  // Validate each response and report progress
   for (let i = 0; i < responses.length; i++) {
-    const response = responses[i];
-    const command = commands[i];
-
-    try {
-      checkCommandResponse(command, response);
-    } catch (e) {
-      throw new Error(
-        `Command ${i + 1} failed: ${e instanceof Error ? e.message : response}`
-      );
-    }
-
     onProgress?.(i + 1, commands.length);
   }
 }
@@ -127,8 +89,7 @@ export async function executeBulkCommand(
     const batchResults = await Promise.all(
       batch.map(async (device): Promise<BulkCommandResult> => {
         try {
-          const response = await sendDeviceCommand(device.ip, command, timeout);
-          checkCommandResponse(command, response);
+          await sendDeviceCommand(device.ip, command, timeout);
           return { device, success: true };
         } catch (e) {
           return {

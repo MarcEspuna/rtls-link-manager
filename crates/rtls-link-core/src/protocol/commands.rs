@@ -44,7 +44,10 @@ impl Commands {
     /// Values are properly escaped for the protocol
     pub fn write_param(group: &str, name: &str, value: &str) -> String {
         let safe_value = value.replace('\\', "\\\\").replace('"', "\\\"");
-        format!("write -group {} -name {} -data \"{}\"", group, name, safe_value)
+        format!(
+            "write -group {} -name {} -data \"{}\"",
+            group, name, safe_value
+        )
     }
 
     // ==================== Config commands ====================

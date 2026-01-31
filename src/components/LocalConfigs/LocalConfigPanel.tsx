@@ -7,7 +7,6 @@ import { listConfigs, getConfig, saveConfig, deleteConfig } from '../../lib/taur
 import {
   sendDeviceCommand as sendCommand,
   sendDeviceCommands as sendCommands,
-  checkCommandResponse,
 } from '../../lib/deviceCommands';
 import { ProgressBar } from '../common/ProgressBar';
 import styles from './LocalConfigPanel.module.css';
@@ -200,12 +199,7 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
 
     try {
       const device = selectedDevices[0];
-      const response = await sendCommand(device.ip, Commands.backupConfig());
-
-      // Parse JSON from response
-      const jsonStart = response.indexOf('{');
-      if (jsonStart === -1) throw new Error('Invalid response');
-      const rawConfig = JSON.parse(response.substring(jsonStart));
+      const rawConfig = await sendCommand<any>(device.ip, Commands.backupConfig());
       const config = transformConfigResult(rawConfig);
 
       // Save to local storage

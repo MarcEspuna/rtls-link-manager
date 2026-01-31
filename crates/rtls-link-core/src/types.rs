@@ -535,9 +535,24 @@ mod tests {
                 dev_short_addr: "1".to_string(),
                 anchor_count: Some(3),
                 anchors: Some(vec![
-                    AnchorConfig { id: "1".to_string(), x: 0.0, y: 0.0, z: 1.5 },
-                    AnchorConfig { id: "2".to_string(), x: 3.0, y: 0.0, z: 1.5 },
-                    AnchorConfig { id: "3".to_string(), x: 1.5, y: 2.6, z: 1.5 },
+                    AnchorConfig {
+                        id: "1".to_string(),
+                        x: 0.0,
+                        y: 0.0,
+                        z: 1.5,
+                    },
+                    AnchorConfig {
+                        id: "2".to_string(),
+                        x: 3.0,
+                        y: 0.0,
+                        z: 1.5,
+                    },
+                    AnchorConfig {
+                        id: "3".to_string(),
+                        x: 1.5,
+                        y: 2.6,
+                        z: 1.5,
+                    },
                 ]),
                 origin_lat: Some(41.4036),
                 origin_lon: Some(2.1744),
