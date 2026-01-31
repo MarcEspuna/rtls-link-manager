@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default capabilities for the RTLS Link Manager","local":true,"windows":["*"],"permissions":["core:default","core:event:default","core:event:allow-listen","core:event:allow-emit","shell:allow-open"]}}
+{"default":{"identifier":"default","description":"Default capabilities for the RTLS Link Manager","local":true,"windows":["*"],"permissions":["core:default","core:event:default","core:event:allow-listen","core:event:allow-emit","shell:allow-open","dialog:allow-open"]}}

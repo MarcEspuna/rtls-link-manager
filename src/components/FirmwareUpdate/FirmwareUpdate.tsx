@@ -1,6 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Device } from '@shared/types';
-import { uploadFirmware, uploadFirmwareBulk, FirmwareUploadResult } from '../../lib/deviceCommands';
+import {
+  uploadFirmware,
+  uploadFirmwareBulk,
+  selectFirmwareFile,
+  FirmwareUploadResult,
+} from '../../lib/deviceCommands';
 import { ProgressBar } from '../common/ProgressBar';
 import styles from './FirmwareUpdate.module.css';
 
@@ -20,27 +25,25 @@ interface DeviceUploadStatus {
 }
 
 export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdateProps) {
-  const [firmwareFile, setFirmwareFile] = useState<File | null>(null);
+  const [firmwarePath, setFirmwarePath] = useState<string | null>(null);
+  const [firmwareName, setFirmwareName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);  // For single device mode
   const [deviceStatuses, setDeviceStatuses] = useState<Map<string, DeviceUploadStatus>>(new Map());
   const [results, setResults] = useState<FirmwareUploadResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [updatedVersion, setUpdatedVersion] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isBulkMode = !!devices && devices.length > 0;
   const targetDevices = isBulkMode ? devices : (device ? [device] : []);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.name.endsWith('.bin')) {
-        setError('Please select a .bin firmware file');
-        return;
-      }
-      setFirmwareFile(file);
+  const handleSelectFile = async () => {
+    const path = await selectFirmwareFile();
+    if (path) {
+      setFirmwarePath(path);
+      // Extract filename from path
+      const name = path.split(/[/\\]/).pop() || path;
+      setFirmwareName(name);
       setError(null);
       setSuccess(false);
       setResults([]);
@@ -48,14 +51,13 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
   };
 
   const handleUpload = async () => {
-    if (!firmwareFile || targetDevices.length === 0) return;
+    if (!firmwarePath || targetDevices.length === 0) return;
 
     setUploading(true);
     setError(null);
     setSuccess(false);
     setResults([]);
     setUploadProgress(0);
-    setUpdatedVersion(null);
 
     // Initialize device statuses for bulk mode
     if (isBulkMode) {
@@ -71,10 +73,8 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
     }
 
     try {
-      const firmwareData = await firmwareFile.arrayBuffer();
-
       if (isBulkMode) {
-        const uploadResults = await uploadFirmwareBulk(targetDevices, firmwareData, {
+        const uploadResults = await uploadFirmwareBulk(targetDevices, firmwarePath, {
           onDeviceProgress: (dev, percent) => {
             setDeviceStatuses(prev => {
               const next = new Map(prev);
@@ -107,23 +107,15 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
         const allSuccess = uploadResults.every(r => r.success);
         if (allSuccess) {
           setSuccess(true);
-          // Get version from first successful result
-          const firstVersion = uploadResults.find(r => r.version)?.version;
-          if (firstVersion) {
-            setUpdatedVersion(firstVersion);
-          }
         } else {
           const failCount = uploadResults.filter(r => !r.success).length;
           setError(`${failCount} of ${uploadResults.length} devices failed to update`);
         }
       } else {
-        const response = await uploadFirmware(targetDevices[0].ip, firmwareData, {
+        await uploadFirmware(targetDevices[0].ip, firmwarePath, {
           onProgress: setUploadProgress,
         });
         setSuccess(true);
-        if (response.version) {
-          setUpdatedVersion(response.version);
-        }
       }
 
       onComplete?.();
@@ -135,19 +127,6 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file?.name.endsWith('.bin')) {
-      setFirmwareFile(file);
-      setError(null);
-      setSuccess(false);
-      setResults([]);
-    } else {
-      setError('Please drop a .bin firmware file');
-    }
-  };
-
   return (
     <div className={styles.container}>
       <h4 className={styles.title}>
@@ -156,29 +135,17 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
       </h4>
 
       <div
-        className={`${styles.dropZone} ${firmwareFile ? styles.hasFile : ''}`}
-        onClick={() => fileInputRef.current?.click()}
-        onDrop={handleDrop}
-        onDragOver={(e) => e.preventDefault()}
+        className={`${styles.dropZone} ${firmwarePath ? styles.hasFile : ''}`}
+        onClick={handleSelectFile}
       >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".bin"
-          onChange={handleFileSelect}
-          className={styles.fileInput}
-        />
-        {firmwareFile ? (
+        {firmwarePath ? (
           <div className={styles.fileInfo}>
-            <span className={styles.fileName}>{firmwareFile.name}</span>
-            <span className={styles.fileSize}>
-              {(firmwareFile.size / 1024).toFixed(1)} KB
-            </span>
+            <span className={styles.fileName}>{firmwareName}</span>
           </div>
         ) : (
           <div className={styles.placeholder}>
             <span className={styles.icon}>+</span>
-            <span>Drop firmware.bin here or click to select</span>
+            <span>Click to select firmware.bin</span>
           </div>
         )}
       </div>
@@ -186,7 +153,7 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
       <button
         className={styles.uploadBtn}
         onClick={handleUpload}
-        disabled={!firmwareFile || uploading || targetDevices.length === 0}
+        disabled={!firmwarePath || uploading || targetDevices.length === 0}
       >
         {uploading ? 'Uploading...' : 'Upload Firmware'}
       </button>
@@ -229,10 +196,7 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
       {error && <div className={styles.error}>{error}</div>}
       {success && (
         <div className={styles.success}>
-          {updatedVersion
-            ? `Updated to version ${updatedVersion}. Device${isBulkMode ? 's are' : ' is'} rebooting...`
-            : `Firmware updated successfully. Device${isBulkMode ? 's are' : ' is'} rebooting...`
-          }
+          Firmware updated successfully. Device{isBulkMode ? 's are' : ' is'} rebooting...
         </div>
       )}
 
@@ -246,7 +210,6 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
               <span>{r.success ? 'OK' : 'FAIL'}</span>
               <span>{r.device.id}</span>
               <span className={styles.deviceIp}>{r.device.ip}</span>
-              {r.success && r.version && <span className={styles.versionInfo}>v{r.version}</span>}
               {r.error && <span className={styles.errorMsg}>{r.error}</span>}
             </div>
           ))}

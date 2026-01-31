@@ -26,8 +26,12 @@ Thumbs.db
 *.tsbuildinfo
 
 # Rust / Tauri
+target/
 src-tauri/target/
 src-tauri/Cargo.lock
 
 # Old server directory (deprecated)
 server/
+
+# Internal docs
+docs/REVIEW_GUIDE.md

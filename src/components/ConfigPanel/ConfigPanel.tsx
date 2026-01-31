@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Device, DeviceConfig } from '@shared/types';
 import { Commands } from '@shared/commands';
 import { flatToAnchors, getAnchorWriteCommands, normalizeUwbShortAddr } from '@shared/anchors';
-import { useDeviceCommand } from '../../hooks/useDeviceWebSocket';
+import { useDeviceCommand } from '../../hooks/useDeviceCommand';
 import { ConfigEditor } from './ConfigEditor';
 import { FirmwareUpdate } from '../FirmwareUpdate';
 import { LogTerminal } from '../ExpertMode/LogTerminal';
@@ -15,7 +15,7 @@ interface ConfigPanelProps {
 }
 
 export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPanelProps) {
-  const { sendCommand, sendCommands, loading, close } = useDeviceCommand(device.ip, { mode: 'persistent' });
+  const { sendCommand, sendCommands, loading, close } = useDeviceCommand(device.ip);
   const [config, setConfig] = useState<DeviceConfig | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
   const [activeConfig, setActiveConfig] = useState<string | null>(null);
@@ -23,16 +23,6 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
   const [anchorBusy, setAnchorBusy] = useState(false);
   const [anchorError, setAnchorError] = useState<string | null>(null);
   const [showLogTerminal, setShowLogTerminal] = useState(false);
-
-  const findCommandError = (responses: string[] | null): string | null => {
-    if (!responses) return 'No response from device';
-    for (const response of responses) {
-      if (/error|fail|invalid|not found/i.test(response)) {
-        return response;
-      }
-    }
-    return null;
-  };
 
   useEffect(() => {
     loadConfig();
@@ -81,11 +71,7 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
       const anchorCommands = getAnchorWriteCommands(config.uwb.anchors || [])
         .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
       const batch = [...anchorCommands, Commands.saveConfig()];
-      const result = await sendCommands(batch);
-      const errorMessage = findCommandError(result);
-      if (errorMessage) {
-        throw new Error(errorMessage);
-      }
+      await sendCommands(batch);
       alert('Configuration saved to device');
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed to save configuration');
@@ -100,11 +86,7 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
           const anchorCommands = getAnchorWriteCommands(config.uwb.anchors || [])
             .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
           const batch = [...anchorCommands, Commands.saveConfigAs(name)];
-          const result = await sendCommands(batch);
-          const errorMessage = findCommandError(result);
-          if (errorMessage) {
-            throw new Error(errorMessage);
-          }
+          await sendCommands(batch);
         } else {
           await sendCommand(Commands.saveConfigAs(name));
         }
@@ -201,11 +183,7 @@ export function ConfigPanel({ device, onClose, isExpertMode = false }: ConfigPan
                 await sendCommand(Commands.writeParam(group, name, value));
               }}
               onApplyBatch={async (commands) => {
-                const result = await sendCommands(commands);
-                const errorMessage = findCommandError(result);
-                if (errorMessage) {
-                  throw new Error(errorMessage);
-                }
+                await sendCommands(commands);
               }}
               onAnchorsBusyChange={setAnchorBusy}
               onAnchorsError={setAnchorError}

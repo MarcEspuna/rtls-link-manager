@@ -25,6 +25,7 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
 
@@ -90,6 +91,11 @@ pub fn run() {
             commands::presets::get_preset,
             commands::presets::save_preset,
             commands::presets::delete_preset,
+            commands::device_comm::send_device_command,
+            commands::device_comm::send_device_commands,
+            commands::device_comm::upload_firmware_from_file,
+            commands::device_comm::upload_firmware_to_devices,
+            commands::device_comm::get_firmware_info,
             commands::logging::start_log_stream,
             commands::logging::stop_log_stream,
             commands::logging::get_active_log_streams,

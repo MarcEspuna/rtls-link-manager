@@ -1,6 +1,7 @@
 //! Configuration-related Tauri commands.
 
 use crate::config_storage::ConfigStorageService;
+use crate::error::AppError;
 use crate::types::{DeviceConfig, LocalConfig, LocalConfigInfo};
 use std::sync::Arc;
 use tauri::State;
@@ -9,8 +10,8 @@ use tauri::State;
 #[tauri::command]
 pub async fn list_configs(
     config_service: State<'_, Arc<ConfigStorageService>>,
-) -> Result<Vec<LocalConfigInfo>, String> {
-    config_service.list().await.map_err(|e| e.to_string())
+) -> Result<Vec<LocalConfigInfo>, AppError> {
+    config_service.list().await
 }
 
 /// Get a specific configuration by name.
@@ -18,8 +19,8 @@ pub async fn list_configs(
 pub async fn get_config(
     name: String,
     config_service: State<'_, Arc<ConfigStorageService>>,
-) -> Result<Option<LocalConfig>, String> {
-    config_service.read(&name).await.map_err(|e| e.to_string())
+) -> Result<Option<LocalConfig>, AppError> {
+    config_service.read(&name).await
 }
 
 /// Save a configuration.
@@ -28,11 +29,8 @@ pub async fn save_config(
     name: String,
     config: DeviceConfig,
     config_service: State<'_, Arc<ConfigStorageService>>,
-) -> Result<bool, String> {
-    config_service
-        .save(&name, config)
-        .await
-        .map_err(|e| e.to_string())
+) -> Result<bool, AppError> {
+    config_service.save(&name, config).await
 }
 
 /// Delete a configuration.
@@ -40,11 +38,8 @@ pub async fn save_config(
 pub async fn delete_config(
     name: String,
     config_service: State<'_, Arc<ConfigStorageService>>,
-) -> Result<bool, String> {
-    config_service
-        .delete(&name)
-        .await
-        .map_err(|e| e.to_string())
+) -> Result<bool, AppError> {
+    config_service.delete(&name).await
 }
 
 #[cfg(test)]

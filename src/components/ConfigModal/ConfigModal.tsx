@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Device, DeviceConfig } from '@shared/types';
 import { Commands } from '@shared/commands';
 import { flatToAnchors, getAnchorWriteCommands, normalizeUwbShortAddr } from '@shared/anchors';
-import { useDeviceCommand } from '../../hooks/useDeviceWebSocket';
+import { useDeviceCommand } from '../../hooks/useDeviceCommand';
 import { GeneralSection } from './sections/GeneralSection';
 import { UWBSection } from './sections/UWBSection';
 import { AnchorListSection } from './sections/AnchorListSection';

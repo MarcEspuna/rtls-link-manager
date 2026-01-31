@@ -1,346 +1,278 @@
-# RTLS-Link Manager
+# RTLS-Link Manager - AI Agent Guide
 
-This repo is a Tauri (Rust) + React (TypeScript) desktop app for discovering, configuring, and monitoring RTLS-Link UWB devices (ESP32S3 + DW1000). The app is “hybrid” in an important way:
+## Project Overview
 
-- **Discovery + host-local storage + log ingestion** run in the **Tauri/Rust backend**.
-- **Most device control/configuration traffic** is **directly from the React frontend to the device** over the LAN (WebSocket + HTTP).
+This is a Rust workspace with three crates for managing RTLS-Link UWB devices:
 
-The goal of this document is to give an agent (or new human) a precise mental model of how the code is organized, which layer owns what, and the main end-to-end flows.
+- **`rtls-link-core`** (`crates/rtls-link-core/`) - Shared library with all device communication (WebSocket), discovery (UDP), OTA, and storage logic.
+- **`rtls-link-cli`** (`crates/rtls-link-cli/`) - CLI tool built on top of the core library.
+- **`src-tauri/`** - Tauri desktop app backend that also uses the core library.
+- **`src/`** - React frontend for the Tauri app.
 
-## System Overview
+## Building
 
-At runtime there are 3 actors:
+```bash
+# Build the CLI tool (release for best performance)
+cargo build --release -p rtls-link-cli
 
-1. **RTLS-Link devices** on the LAN
-2. **RTLS-Link Manager backend** (Rust/Tauri)
-3. **RTLS-Link Manager UI** (React)
+# Run tests
+cargo test -p rtls-link-core
 
-Key protocols/ports:
-
-- **UDP discovery**: device → manager on `3333` (heartbeats)
-- **WebSocket control**: UI → device at `ws://<device-ip>/ws` (text commands, some return JSON)
-- **HTTP firmware upload**: UI → device at `http://<device-ip>/update` (OTA `.bin`)
-- **UDP log streaming**: device → manager on `3334` (JSON log packets)
-
-## Repository Layout (What Lives Where)
-
-### Frontend (React + TS): `src/`
-
-- `src/main.tsx`: React entrypoint.
-- `src/App.tsx`: top-level UI state:
-  - fetches initial device list via Tauri IPC (`getDevices`)
-  - subscribes to discovery updates via Tauri events (`devices-updated`)
-  - splits devices into Anchor/Tag tabs
-  - opens `ConfigPanel` modal for a selected device
-- `src/components/`
-  - `Layout/`: app chrome (header, sidebar tab switcher).
-  - `Anchors/`, `Tags/`: list views + per-device cards.
-  - `ConfigPanel/`: per-device configuration editor (reads/writes device config over WebSocket).
-  - `Controls/BulkActions.tsx`: multi-device “Toggle LEDs / Start / Reboot / Firmware update”.
-  - `FirmwareUpdate/`: OTA upload UI (single or bulk).
-  - `Presets/PresetsPanel.tsx`: host-local presets (stored via Tauri backend), upload presets to devices.
-  - `ExpertMode/LogTerminal.tsx`: live UDP log viewer (via Tauri event `device-log`).
-- `src/hooks/`
-  - `useDeviceWebSocket.ts`: reusable device WebSocket command runner:
-    - `mode: 'single'` opens a fresh socket per command
-    - `mode: 'persistent'` keeps a socket + queues commands sequentially (used by `ConfigPanel`)
-    - JSON responses are parsed by finding the first `{` because devices may prepend text
-  - `useSettings.ts`: UI-only settings persisted to `localStorage` (expert mode + active tab)
-- `src/lib/`
-  - `tauri-api.ts`: typed wrappers around Tauri `invoke()` + event listeners.
-  - `deviceCommands.ts`: stateless helpers for WebSocket commands, bulk concurrency, and firmware upload.
-  - `healthStatus.ts`: derives device health from heartbeat telemetry (used by cards).
-
-### Shared TS Types/Protocol Helpers: `shared/`
-
-This folder is aliased as `@shared` in `vite.config.ts`, so UI code imports `@shared/types`, `@shared/commands`, etc.
-
-- `shared/types.ts`: canonical TS types used throughout the UI (Device, DeviceConfig, Preset, etc.).
-- `shared/commands.ts`: builds the **text command protocol** sent to `ws://<ip>/ws`.
-  - `JSON_COMMANDS` controls which commands are expected to respond with JSON.
-- `shared/configParams.ts`: converts a `DeviceConfig` into `[group, name, value]` tuples for bulk writes.
-  - Important invariant: **`devShortAddr` is intentionally skipped** to avoid clobbering per-device identity during bulk uploads.
-- `shared/anchors.ts`: transforms between firmware’s *flat* anchor fields (`devId1`, `x1`, …) and the UI’s `anchors: AnchorConfig[]`.
-
-### Backend (Rust/Tauri): `src-tauri/`
-
-- `src-tauri/src/main.rs`: calls `rtls_link_manager_lib::run()`.
-- `src-tauri/src/lib.rs`: the real entrypoint:
-  - creates services
-  - spawns background tasks (discovery + log receiver)
-  - registers Tauri commands
-- `src-tauri/src/state.rs`: `AppState` shared via `tauri::State`:
-  - `devices`: map of discovered devices (keyed by IP)
-  - `log_streams`: active log stream state + per-device buffers
-- `src-tauri/src/types.rs`: Rust types used for IPC payloads and storage.
-  - They are intended to track `shared/types.ts`, but in practice can be a **subset**.
-  - When the frontend sends extra fields, serde will ignore unknown fields unless explicitly denied, so those fields may not persist in host-local storage until Rust types are updated.
-- `src-tauri/src/discovery/`: UDP discovery service (heartbeats → `devices-updated` event).
-- `src-tauri/src/logging/`: UDP log receiver (log packets → optional `device-log` events).
-- `src-tauri/src/config_storage/`: host-local config storage (JSON files under app data dir).
-- `src-tauri/src/preset_storage/`: host-local preset storage (JSON files under app data dir).
-- `src-tauri/src/commands/`: Tauri IPC command handlers (invoked from TS via `invoke()`).
-
-## Runtime Data Flows (End-to-End)
-
-### 1) Device Discovery (UDP → Tauri event → React state)
-
-Backend:
-
-- `DiscoveryService` binds `0.0.0.0:3333` and parses heartbeat packets as JSON:
-  - `src-tauri/src/discovery/service.rs` (`parse_heartbeat`)
-- Devices are tracked in an in-memory map with a **TTL** (currently 5s).
-- After receiving a heartbeat or pruning stale entries, backend emits:
-  - event: `devices-updated`
-  - payload: `Vec<Device>` sorted by IP
-
-Frontend:
-
-- `src/App.tsx` does:
-  - `getDevices()` once (initial state)
-  - `onDevicesUpdated(...)` subscription (push updates, no polling)
-- UI filters devices by role:
-  - anchors: `role === 'anchor' | 'anchor_tdoa'`
-  - tags: `role === 'tag' | 'tag_tdoa'`
-
-Important nuance:
-
-- “Offline” devices are generally represented by **disappearing** from the list (TTL prune), not by a persistent entry with `online=false`.
-
-### 2) Per-Device Commands (WebSocket from UI directly to device)
-
-This is *not* done via Tauri IPC. The browser webview opens network sockets directly.
-
-- Transport: `ws://<device-ip>/ws`
-- Protocol: plaintext commands (built in `shared/commands.ts`)
-- Two main calling styles:
-  - `useDeviceCommand(..., { mode: 'single' })`: one socket per command (cards, simple actions)
-  - `useDeviceCommand(..., { mode: 'persistent' })`: one socket + queued commands (config editor)
-
-JSON responses:
-
-- Some commands respond with JSON (e.g. `backup-config`, `toggle-led2`).
-- Both `useDeviceWebSocket.ts` and other code often parse by finding the first `{` and `JSON.parse()` from there to tolerate prefix text.
-
-### 3) Device Configuration Editing (ConfigPanel)
-
-Entry:
-
-- `AnchorCard` / `TagCard` → “Config” → `src/components/ConfigPanel/ConfigPanel.tsx`
-
-Flow:
-
-1. `backup-config` is sent to the device.
-2. The response includes config groups like `wifi`, `uwb`, `app`.
-3. Firmware represents anchors *flat* (`devId1`, `x1`, `y1`, `z1`, …), so the UI normalizes:
-   - `flatToAnchors(...)` → `anchors: AnchorConfig[]`
-4. Editing:
-   - Most fields write a single param via `write -group <g> -name <n> -data "<v>"` on blur/change.
-   - Anchor edits are applied as a batch (`getAnchorWriteCommands` → many writes + `anchorCount`).
-5. Saving:
-   - “Save” writes anchors then calls `save-config`
-   - “Save As…” writes anchors then calls `save-config-as -name <name>`
-
-Also in `ConfigPanel`:
-
-- “Saved Configurations” list comes from the device itself (`list-configs`, `read-config-named`, `load-config-named`).
-- Firmware update UI is embedded per-device (`FirmwareUpdate`).
-- Expert Mode unlocks additional WiFi/logging/UWB radio fields and the log terminal.
-
-### 4) Bulk Actions (Multi-device control)
-
-- UI: `src/components/Controls/BulkActions.tsx`
-- Implementation: `src/lib/deviceCommands.ts`
-- Pattern:
-  - operate on a list of selected devices
-  - run with a concurrency limit (default ~3–5 depending on function)
-  - collect per-device success/error results
-
-### 5) Presets (Host-local storage + upload to devices)
-
-Presets are stored **on the manager machine**, not on the devices.
-
-- UI: `src/components/Presets/PresetsPanel.tsx`
-- Backend storage: `src-tauri/src/preset_storage/service.rs` → app data dir `presets/`
-- Types: `shared/types.ts` (`Preset` / `PresetInfo`, `PresetType`)
-
-Preset kinds:
-
-- `type: 'full'`: includes a full `DeviceConfig`
-- `type: 'locations'`: includes anchors + origin + rotation only
-
-Key flows:
-
-- “Save from Device”:
-  - reads `backup-config` from the first selected device
-  - normalizes anchors
-  - saves a `Preset` via Tauri `save_preset`
-- “Upload to Selected”:
-  - full presets: write all params (via `configToParams`) + `save-config-as -name <preset>`
-  - location presets: only write origin/rotation/anchors + `save-config`
-  - location presets are uploaded to **tags only** (`isTagRole`)
-
-### 6) Firmware Update (HTTP upload)
-
-- UI: `src/components/FirmwareUpdate/FirmwareUpdate.tsx`
-- Transport: `http://<device-ip>/update` (POST multipart form with `firmware.bin`)
-- Implementation: `uploadFirmware` / `uploadFirmwareBulk` in `src/lib/deviceCommands.ts`
-
-### 7) Log Streaming (UDP ingestion in backend + UI terminal)
-
-Device → manager:
-
-- UDP JSON packets to `0.0.0.0:3334`
-- Parsed in `src-tauri/src/logging/service.rs`
-
-Backend behavior:
-
-- Logs are **always buffered per device** in memory (ring buffer).
-- Logs are only **emitted to the frontend** as `device-log` events if that device is marked “active”.
-
-Frontend behavior:
-
-- `src/components/ExpertMode/LogTerminal.tsx`:
-  - `invoke('start_log_stream', { deviceIp })` on mount
-  - listens for `device-log` events and filters by `deviceIp`
-  - `invoke('stop_log_stream', { deviceIp })` on unmount
-
-Note:
-
-- There is currently no IPC command that returns the buffered history; the UI receives logs in real time while streaming.
-
-## Tauri IPC Contract (Commands + Events)
-
-### Commands (Rust → `invoke(...)`)
-
-Registered in `src-tauri/src/lib.rs` via `tauri::generate_handler![...]`:
-
-- Devices:
-  - `get_devices`, `get_device`, `clear_devices`
-- Host-local configs:
-  - `list_configs`, `get_config`, `save_config`, `delete_config`
-- Host-local presets:
-  - `list_presets`, `get_preset`, `save_preset`, `delete_preset`
-- Logging control:
-  - `start_log_stream`, `stop_log_stream`, `get_active_log_streams`
-
-Frontend wrappers live in `src/lib/tauri-api.ts` (except logging, which `LogTerminal` invokes directly).
-
-### Events (Rust → `listen(...)`)
-
-- `devices-updated`: emitted by discovery service with `Device[]`
-- `device-log`: emitted by log receiver with `LogMessage`
-
-## Agentic “Change Recipes” (Where to Edit What)
-
-### Add a new field to the heartbeat/device model
-
-1. Update parsing in `src-tauri/src/discovery/service.rs` (`parse_heartbeat`).
-2. Update Rust struct in `src-tauri/src/types.rs` (`Device`) with correct serde casing.
-3. Update TS type in `shared/types.ts` (`Device`).
-4. Update any UI that displays/derives health from it:
-   - `src/lib/healthStatus.ts`, `TagCard.tsx`, etc.
-
-Type note:
-
-- `lastSeen` is currently typed as `Date` in `shared/types.ts`, but Tauri payloads arrive as JSON (ISO strings). If you start using `lastSeen` in the UI, you may want to change the TS type to `string` or add an explicit parse step.
-
-### Add a new on-device WebSocket command
-
-1. Add builder in `shared/commands.ts`.
-2. If the response is JSON, add the command prefix to `JSON_COMMANDS`.
-3. Use it via:
-   - `useDeviceCommand(...).sendCommand(...)` for UI actions, or
-   - `src/lib/deviceCommands.ts` for bulk/concurrency patterns.
-
-### Add a new Tauri IPC command (host-side feature)
-
-1. Implement in `src-tauri/src/commands/<area>.rs`.
-2. Export module in `src-tauri/src/commands/mod.rs` if needed.
-3. Register in `src-tauri/src/lib.rs` `invoke_handler`.
-4. Add a typed wrapper in `src/lib/tauri-api.ts` and call it from React.
-
-### Add a new UI tab/panel
-
-1. Extend `TabType` in `src/components/Layout/Sidebar.tsx`.
-2. Add the tab button entry in `src/components/Layout/Sidebar.tsx` (`tabs` array).
-3. Update defaults/persistence as needed in `src/hooks/useSettings.ts` (`activeTab`).
-4. Render the panel in `src/App.tsx` (`renderContent()` switch).
-
-### Add a new host-local stored object
-
-Follow the existing pattern:
-
-- Service: `src-tauri/src/*_storage/service.rs` (directory, name validation, JSON read/write).
-- Commands: `src-tauri/src/commands/*.rs`.
-- Frontend wrappers: `src/lib/tauri-api.ts`.
-
-Persistence note:
-
-- Host-local storage is implemented in Rust and uses Rust structs for serde; if you need a new field to round-trip (save + read) through `save_config`/`save_preset`, that field must exist in the corresponding Rust type in `src-tauri/src/types.rs`.
-- Example: `shared/types.ts` includes WiFi logging fields (`logUdpPort`, `logSerialEnabled`, `logUdpEnabled`), but `src-tauri/src/types.rs` `WifiConfig` currently does not, so those fields will be dropped when saving host-local configs/presets until Rust is updated.
-
-### Expose log history to the UI (optional enhancement)
-
-The backend already buffers logs per device (`LogStreamState::log_buffers`). To let the UI fetch history when opening the log terminal:
-
-1. Add a Tauri command in `src-tauri/src/commands/logging.rs` that returns `state.log_streams.read().await.get_logs(&device_ip)`.
-2. Register it in `src-tauri/src/lib.rs` `invoke_handler`.
-3. Call it from `src/components/ExpertMode/LogTerminal.tsx` before starting live streaming.
-
-## Common Pitfalls & Patterns
-
-### CSS Variable Naming Convention
-
-**IMPORTANT:** All CSS variables are defined in `src/index.css`. Use these exact names:
-
-| Category | Variables |
-|----------|-----------|
-| Backgrounds | `--bg-primary`, `--bg-secondary`, `--bg-tertiary`, `--bg-elevated` |
-| Borders | `--border-color`, `--border-color-light` |
-| Text | `--text-primary`, `--text-secondary`, `--text-muted` |
-| Accents | `--accent-primary`, `--accent-primary-hover`, `--accent-primary-muted` |
-| Status | `--accent-success`, `--accent-danger`, `--accent-warning`, `--accent-degraded` (each has `-muted` variant) |
-| Shadows | `--shadow-sm`, `--shadow-md`, `--shadow-lg` |
-
-**Do NOT use** generic names like `--surface`, `--primary`, `--border`, `--error`, `--success` — these don't exist and will render as transparent/default.
-
-### Passing Device Data to Modals/Panels
-
-**Problem:** If you store a full `Device` object in React state when opening a modal, that object becomes stale when new discovery packets arrive with updated telemetry (e.g., `dynamicAnchors`, rate statistics).
-
-**Solution:** Store only the device IP, then derive the current device from the live `devices` list:
-
-```tsx
-// BAD - device becomes stale
-const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-// ...
-<Modal device={selectedDevice} />
-
-// GOOD - device updates when devices list updates
-const [selectedDeviceIp, setSelectedDeviceIp] = useState<string | null>(null);
-const selectedDevice = useMemo(() =>
-  devices.find(d => d.ip === selectedDeviceIp) ?? null,
-  [devices, selectedDeviceIp]
-);
-// ...
-<Modal device={selectedDevice} />
+# Binary location after build
+./target/release/rtls-link-cli
 ```
 
-This pattern ensures modals receive live telemetry updates from the discovery service.
+## CLI Quick Reference
 
-## Development & Tests
+All commands support `--json` for machine-readable output and `--timeout <ms>` (default 5000).
 
-- Dev (Tauri + Vite): `npm run dev`
-- Build: `npm run build`
-- Frontend/unit tests (Vitest): `npm test`
-- Rust tests: `cd src-tauri && cargo test`
+### Device Discovery
 
-## Notes on “Extra”/Unused UI
+Devices broadcast UDP heartbeats on port 3333. Discovery listens for these.
 
-There are components that are not currently wired into the main tab UI:
+```bash
+# Discover for 5 seconds (default), table output
+rtls-link-cli discover
 
-- `src/components/LocalConfigs/LocalConfigPanel.tsx`: UI for host-local configs stored via `ConfigStorageService`.
-- `src/components/DeviceGrid/*`: older generic device grid/cards (current UI uses `AnchorsPanel`/`TagsPanel` instead).
+# Discover for N seconds
+rtls-link-cli discover -d 3
 
-Treat these as reference implementations unless/until they’re reconnected to `App.tsx`.
+# JSON output (best for scripting)
+rtls-link-cli discover --json
+
+# Filter by role
+rtls-link-cli discover --filter-role anchor-tdoa
+rtls-link-cli discover --filter-role tag-tdoa
+
+# Continuous watch mode
+rtls-link-cli discover --watch
+```
+
+### Device Status
+
+```bash
+# Single device
+rtls-link-cli status 192.168.0.101
+
+# All devices (runs discovery first)
+rtls-link-cli status all
+```
+
+### Configuration - Reading Parameters
+
+Parameters are organized in groups: `wifi`, `uwb`, `app`. You must specify both `--group` and `--name`.
+
+```bash
+# Read a single parameter
+rtls-link-cli config read <IP> --group uwb --name mode
+rtls-link-cli config read <IP> -g wifi -n ssidST
+rtls-link-cli config read <IP> -g app -n led2State
+```
+
+**Common parameter names by group:**
+
+| Group | Parameter Names |
+|-------|----------------|
+| wifi  | `mode`, `ssidAP`, `pswdAP`, `ssidST`, `pswdST`, `gcsIp`, `udpPort`, `enableWebServer`, `enableDiscovery`, `discoveryPort`, `logUdpPort`, `logSerialEnabled`, `logUdpEnabled` |
+| uwb   | `mode`, `devShortAddr`, `anchorCount`, `devId1`..`devIdN`, `x1`..`xN`, `y1`..`yN`, `z1`..`zN`, `originLat`, `originLon`, `originAlt`, `mavlinkTargetSystemId`, `rotationDegrees`, `zCalcMode`, `channel`, `dwMode`, `txPowerLevel`, `smartPowerEnable` |
+| app   | `led2Pin`, `led2State` |
+
+**IMPORTANT:** Parameter names are camelCase as listed above, NOT snake_case. For example, use `ssidST` not `ssid_st`.
+
+### Configuration - Writing Parameters
+
+```bash
+# Write a parameter (runtime only)
+rtls-link-cli config write <IP> -g app -n led2State -d 1
+
+# Write and save to flash (persists across reboots)
+rtls-link-cli config write <IP> -g app -n led2State -d 1 --save
+```
+
+### Configuration - Backup and Apply
+
+```bash
+# Backup full device config to a JSON file
+rtls-link-cli config backup <IP> --output config.json
+
+# Apply a config file to a device
+rtls-link-cli config apply <IP> config.json
+
+# Apply to all devices
+rtls-link-cli config apply all config.json
+
+# Apply to specific role
+rtls-link-cli config apply all config.json --filter-role anchor-tdoa
+```
+
+### Configuration - Named Slots on Device
+
+Devices support named config slots stored in flash:
+
+```bash
+# List saved configs on device
+rtls-link-cli config list <IP>
+
+# Save current config to a named slot
+rtls-link-cli config save-as <IP> my-config
+
+# Load a named config
+rtls-link-cli config load <IP> my-config
+
+# Delete a named config
+rtls-link-cli config delete <IP> my-config
+```
+
+### Raw Commands
+
+For sending arbitrary protocol commands to a device:
+
+```bash
+# Send a raw command
+rtls-link-cli cmd <IP> "readall all"
+rtls-link-cli cmd <IP> "readall wifi"
+rtls-link-cli cmd <IP> "readall uwb"
+
+# JSON commands (use --json for parsed output)
+rtls-link-cli cmd <IP> "backup-config" --json
+rtls-link-cli cmd <IP> "firmware-info" --json
+rtls-link-cli cmd <IP> "list-configs" --json
+
+# Other commands
+rtls-link-cli cmd <IP> "save-config"      # save current config to flash
+rtls-link-cli cmd <IP> "load-config"      # load config from flash
+rtls-link-cli cmd <IP> "reboot"
+rtls-link-cli cmd <IP> "start"            # start positioning
+```
+
+**IMPORTANT:** The raw command protocol is NOT the same as the CLI subcommands. The raw protocol uses these exact strings:
+- `readall all` (NOT `read_all` or `read-all`)
+- `read -group <g> -name <n>`
+- `write -group <g> -name <n> -data "<value>"`
+- `backup-config`, `save-config`, `load-config`
+- `firmware-info` (NOT `version` - there is no `version` command on the device)
+- `list-configs`, `save-config-as -name <n>`, `load-config-named -name <n>`
+
+### Bulk Operations
+
+```bash
+# Send command to all discovered devices
+rtls-link-cli bulk cmd "firmware-info" --json
+
+# Filter by role
+rtls-link-cli bulk cmd "readall uwb" --filter-role anchor-tdoa
+
+# Target specific IPs
+rtls-link-cli bulk cmd "firmware-info" --ips "192.168.0.101,192.168.0.102"
+
+# Bulk reboot / start
+rtls-link-cli bulk reboot
+rtls-link-cli bulk start --filter-role tag-tdoa
+```
+
+### OTA Firmware Updates
+
+Devices accept firmware binaries via HTTP multipart upload. Use the correct binary for each board type:
+- **Anchors** (board: `MAKERFABS_ESP32`): use the `esp32_application` PlatformIO target binary
+- **Tags** (board: `ESP32S3_UWB`): use the `esp32s3_application` PlatformIO target binary
+
+```bash
+# Single device
+rtls-link-cli ota update <IP> /path/to/firmware.bin
+
+# Multiple specific devices
+rtls-link-cli ota update "192.168.0.101,192.168.0.102" /path/to/firmware.bin
+
+# All devices of a specific role
+rtls-link-cli ota update all /path/to/firmware.bin --filter-role anchor-tdoa
+
+# Control concurrency
+rtls-link-cli ota update all /path/to/firmware.bin --concurrency 2
+```
+
+After OTA, devices reboot automatically. Allow ~10 seconds for them to come back online before sending commands.
+
+To verify firmware after OTA:
+```bash
+rtls-link-cli cmd <IP> "firmware-info" --json
+```
+
+### Log Streaming
+
+Devices can emit logs over UDP (must be enabled via `logUdpEnabled` parameter).
+
+```bash
+# Listen on default port 3334
+rtls-link-cli logs
+
+# Filter by level
+rtls-link-cli logs -l debug
+rtls-link-cli logs -l error
+
+# Filter by tag pattern
+rtls-link-cli logs -t "uwb*"
+
+# NDJSON output for piping
+rtls-link-cli logs --ndjson
+```
+
+### Presets (Local Storage)
+
+Presets are stored locally on the machine running the CLI (not on the device).
+
+```bash
+# Save a preset from a device
+rtls-link-cli preset save my-preset --from-device 192.168.0.101
+
+# Save from a config file
+rtls-link-cli preset save my-preset --from-file config.json
+
+# Location-only preset
+rtls-link-cli preset save my-location --from-device 192.168.0.101 --preset-type locations
+
+# List / show / delete
+rtls-link-cli preset list
+rtls-link-cli preset show my-preset
+rtls-link-cli preset delete my-preset
+
+# Upload preset to devices
+rtls-link-cli preset upload my-preset 192.168.0.101
+rtls-link-cli preset upload my-preset all --filter-role anchor-tdoa
+```
+
+## Device Protocol Notes
+
+- Devices communicate over **WebSocket** at `ws://<device-ip>/ws`
+- Device discovery uses **UDP** broadcast on port **3333**
+- Device logs stream over **UDP** on port **3334** (configurable)
+- OTA uploads use **HTTP POST** multipart to `http://<device-ip>/update`
+- UWB mode values: `3` = anchor_tdoa, `4` = tag_tdoa (see device firmware for full mapping)
+- Device roles reported in heartbeats: `anchor`, `tag`, `anchor_tdoa`, `tag_tdoa`, `calibration`
+
+## Architecture
+
+```
+Frontend (React) --> Tauri IPC --> src-tauri --> rtls-link-core
+CLI (clap)       ---------------------->        rtls-link-core
+
+rtls-link-core handles:
+  - WebSocket device communication (device/websocket.rs)
+  - OTA firmware upload (device/ota.rs)
+  - UDP discovery (discovery/service.rs, discovery/heartbeat.rs)
+  - Protocol command building (protocol/commands.rs)
+  - Config/preset local storage (storage/)
+  - Shared type definitions (types.rs)
+```
+
+## Common Pitfalls for AI Agents
+
+1. **Parameter names are camelCase** - Use `ssidST`, `devShortAddr`, `logUdpPort` etc., not snake_case.
+2. **Config read requires `--group` and `--name`** flags - Not positional arguments. Example: `config read <IP> -g uwb -n mode`.
+3. **Raw commands differ from CLI subcommands** - The raw protocol command is `readall all` (one word, no hyphen), not `read_all` or `read-all`.
+4. **No `version` command on device** - Use `firmware-info` instead to query device firmware/board info.
+5. **`cmd` only accepts a single command string** - To send multiple commands, use multiple `cmd` invocations or `bulk cmd` for the same command to many devices.
+6. **OTA requires matching binary to board** - ESP32 anchors need `esp32_application` firmware, ESP32-S3 tags need `esp32s3_application` firmware. Mismatched firmware will brick the device.
+7. **Allow reboot time after OTA** - Devices take ~10 seconds to reboot and reconnect to WiFi after firmware upload.
+8. **`--json` flag enables machine-readable output** - Always use it when parsing output programmatically.
+9. **Exit codes matter** - `0` = success, `1` = general error, `2` = CLI usage error, `3` = device/core error. Use `--strict` to fail on any partial failure in bulk operations.
+10. **SO_REUSEPORT allows concurrent listeners** - Both the CLI and the Tauri app can run discovery simultaneously on port 3333.

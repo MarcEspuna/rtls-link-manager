@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Device, DeviceConfig, LocalConfigInfo } from '@shared/types';
-import { Commands, isJsonCommand } from '@shared/commands';
+import { Commands } from '@shared/commands';
 import { configToParams } from '@shared/configParams';
 import { flatToAnchors, normalizeUwbShortAddr } from '@shared/anchors';
 import { listConfigs, getConfig, saveConfig, deleteConfig } from '../../lib/tauri-api';
+import {
+  sendDeviceCommand as sendCommand,
+  sendDeviceCommands as sendCommands,
+} from '../../lib/deviceCommands';
 import { ProgressBar } from '../common/ProgressBar';
 import styles from './LocalConfigPanel.module.css';
 
@@ -21,33 +25,6 @@ const transformConfigResult = (result: any): DeviceConfig => {
   };
 };
 
-// Shared error checking logic for command responses
-const checkCommandResponse = (command: string, response: string): void => {
-  // Parse JSON commands and check for errors
-  if (isJsonCommand(command)) {
-    try {
-      const jsonStart = response.indexOf('{');
-      if (jsonStart !== -1) {
-        const json = JSON.parse(response.substring(jsonStart));
-        if (json.success === false || json.error) {
-          throw new Error(json.error || 'Command failed');
-        }
-      }
-    } catch (e) {
-      if (e instanceof SyntaxError) {
-        // Not valid JSON, continue to text check
-      } else {
-        throw e;
-      }
-    }
-  }
-
-  // Check for error keywords in text responses
-  if (/error|fail|invalid/i.test(response) && !/success/i.test(response)) {
-    throw new Error(response);
-  }
-};
-
 interface LocalConfigPanelProps {
   selectedDevices: Device[];
   allDevices: Device[];
@@ -58,9 +35,6 @@ interface BulkResult {
   success: boolean;
   error?: string;
 }
-
-const COMMAND_TIMEOUT_MS = 5000;
-const WRITE_TIMEOUT_MS = 3000;
 
 export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPanelProps) {
   const [configs, setConfigs] = useState<LocalConfigInfo[]>([]);
@@ -104,108 +78,7 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
     })();
   }, [selectedConfig]);
 
-  // Send command to device with WebSocket
-  const sendDeviceCommand = async (
-    device: Device,
-    command: string,
-    timeout = COMMAND_TIMEOUT_MS
-  ): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`ws://${device.ip}/ws`);
-      const timeoutId = setTimeout(() => {
-        ws.close();
-        reject(new Error('Timeout'));
-      }, timeout);
-
-      ws.onopen = () => ws.send(command);
-
-      ws.onmessage = (event) => {
-        clearTimeout(timeoutId);
-        ws.close();
-        resolve(event.data.toString());
-      };
-
-      ws.onerror = () => {
-        clearTimeout(timeoutId);
-        ws.close();
-        reject(new Error('WebSocket error'));
-      };
-    });
-  };
-
-  // Helper to send multiple commands over a single persistent WebSocket
-  const sendCommandsToDevice = async (
-    deviceIp: string,
-    commands: string[],
-    onProgress?: (current: number, total: number) => void,
-    perCommandTimeout = WRITE_TIMEOUT_MS
-  ): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      const ws = new WebSocket(`ws://${deviceIp}/ws`);
-      let currentIndex = 0;
-      let settled = false;
-      let timeoutId: ReturnType<typeof setTimeout>;
-
-      const cleanup = () => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeoutId);
-          ws.close();
-        }
-      };
-
-      const resetTimeout = () => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          cleanup();
-          reject(new Error(`Timeout on command ${currentIndex + 1}`));
-        }, perCommandTimeout);
-      };
-
-      const sendNext = () => {
-        if (currentIndex >= commands.length) {
-          cleanup();
-          resolve();
-          return;
-        }
-        resetTimeout();
-        ws.send(commands[currentIndex]);
-      };
-
-      ws.onopen = () => sendNext();
-
-      ws.onmessage = (event) => {
-        const response = event.data.toString();
-        const currentCommand = commands[currentIndex];
-
-        try {
-          checkCommandResponse(currentCommand, response);
-        } catch (e) {
-          cleanup();
-          reject(new Error(`Command ${currentIndex + 1} failed: ${e instanceof Error ? e.message : response}`));
-          return;
-        }
-
-        currentIndex++;
-        onProgress?.(currentIndex, commands.length);
-        sendNext();
-      };
-
-      ws.onerror = () => {
-        cleanup();
-        reject(new Error('WebSocket error'));
-      };
-
-      ws.onclose = () => {
-        if (!settled && currentIndex < commands.length) {
-          cleanup();
-          reject(new Error('Connection closed unexpectedly'));
-        }
-      };
-    });
-  };
-
-  // Upload config to a single device using persistent WebSocket
+  // Upload config to a single device
   const uploadConfigToDevice = async (
     device: Device,
     config: DeviceConfig,
@@ -219,7 +92,7 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
     ];
 
     try {
-      await sendCommandsToDevice(device.ip, commands, onProgress);
+      await sendCommands(device.ip, commands, { onProgress });
       return { success: true };
     } catch (e) {
       return { success: false, error: e instanceof Error ? e.message : 'Failed' };
@@ -286,7 +159,7 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
       const batchResults = await Promise.all(
         batch.map(async (device) => {
           try {
-            await sendDeviceCommand(device, Commands.loadConfigNamed(selectedConfig));
+            await sendCommand(device.ip, Commands.loadConfigNamed(selectedConfig));
             return { device, success: true };
           } catch (e) {
             return {
@@ -326,12 +199,7 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
 
     try {
       const device = selectedDevices[0];
-      const response = await sendDeviceCommand(device, Commands.backupConfig());
-
-      // Parse JSON from response
-      const jsonStart = response.indexOf('{');
-      if (jsonStart === -1) throw new Error('Invalid response');
-      const rawConfig = JSON.parse(response.substring(jsonStart));
+      const rawConfig = await sendCommand<any>(device.ip, Commands.backupConfig());
       const config = transformConfigResult(rawConfig);
 
       // Save to local storage
