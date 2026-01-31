@@ -439,7 +439,7 @@ export function ConfigEditor({
               <div className={styles.field}>
                 <label>Anchor Layout</label>
                 <LayoutSelector
-                  value={config.uwb.anchorLayout ?? AnchorLayout.RECTANGULAR_0_ORIGIN}
+                  value={config.uwb.anchorLayout ?? AnchorLayout.RECTANGULAR_A1X_A3Y}
                   onChange={(layout) => {
                     handleChange('uwb', 'anchorLayout', layout);
                     handleApply('uwb', 'anchorLayout', layout);
