@@ -3,7 +3,7 @@ import { Device, isAnchorRole, isTagRole } from '@shared/types';
 import { AppShell } from './components/Layout';
 import { AnchorsPanel } from './components/Anchors';
 import { TagsPanel } from './components/Tags';
-import { ConfigPanel } from './components/ConfigPanel/ConfigPanel';
+import { ConfigModal } from './components/ConfigModal';
 import { PresetsPanel } from './components/Presets';
 import { getDevices, clearDevices, onDevicesUpdated } from './lib/tauri-api';
 import { useSettings } from './hooks/useSettings';
@@ -11,11 +11,17 @@ import './App.css';
 
 function App() {
   const [devices, setDevices] = useState<Device[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [selectedDeviceIp, setSelectedDeviceIp] = useState<string | null>(null);
   const [selectedAnchorIps, setSelectedAnchorIps] = useState<Set<string>>(new Set());
   const [selectedTagIps, setSelectedTagIps] = useState<Set<string>>(new Set());
 
   const { isExpertMode, activeTab, setIsExpertMode, setActiveTab } = useSettings();
+
+  // Derive selected device from devices list to get live updates (e.g., dynamic anchors)
+  const selectedDevice = useMemo(() => {
+    if (!selectedDeviceIp) return null;
+    return devices.find(d => d.ip === selectedDeviceIp) ?? null;
+  }, [devices, selectedDeviceIp]);
 
   // Separate devices into anchors and tags
   const { anchors, tags } = useMemo(() => {
@@ -99,6 +105,10 @@ function App() {
     };
   }, []);
 
+  const handleConfigure = (device: Device) => {
+    setSelectedDeviceIp(device.ip);
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'anchors':
@@ -107,7 +117,7 @@ function App() {
             anchors={anchors}
             selectedIps={selectedAnchorIps}
             onSelectionChange={setSelectedAnchorIps}
-            onConfigure={setSelectedDevice}
+            onConfigure={handleConfigure}
             onClear={handleClearDevices}
           />
         );
@@ -117,7 +127,7 @@ function App() {
             tags={tags}
             selectedIps={selectedTagIps}
             onSelectionChange={setSelectedTagIps}
-            onConfigure={setSelectedDevice}
+            onConfigure={handleConfigure}
             onClear={handleClearDevices}
           />
         );
@@ -147,9 +157,9 @@ function App() {
       </AppShell>
 
       {selectedDevice && (
-        <ConfigPanel
+        <ConfigModal
           device={selectedDevice}
-          onClose={() => setSelectedDevice(null)}
+          onClose={() => setSelectedDeviceIp(null)}
           isExpertMode={isExpertMode}
         />
       )}

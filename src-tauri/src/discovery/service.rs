@@ -3,7 +3,7 @@
 //! This service listens on UDP port 3333 for heartbeat packets from devices
 //! and maintains a list of discovered devices with TTL-based pruning.
 
-use crate::types::{Device, DeviceRole};
+use crate::types::{Device, DeviceRole, DynamicAnchorPosition};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -29,6 +29,20 @@ pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Er
 
     let log_level = json["log_level"].as_u64().map(|v| v as u8);
 
+    // Parse optional dynamic anchor positions
+    let dynamic_anchors = json["dyn_anchors"].as_array().map(|arr| {
+        arr.iter()
+            .filter_map(|v| {
+                Some(DynamicAnchorPosition {
+                    id: v["id"].as_u64()? as u8,
+                    x: v["x"].as_f64()?,
+                    y: v["y"].as_f64()?,
+                    z: v["z"].as_f64()?,
+                })
+            })
+            .collect()
+    });
+
     Ok(Device {
         ip,
         id: json["id"].as_str().unwrap_or("").to_string(),
@@ -51,6 +65,7 @@ pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Er
         log_udp_port: json["log_udp_port"].as_u64().map(|v| v as u16),
         log_serial_enabled: json["log_serial_enabled"].as_bool(),
         log_udp_enabled: json["log_udp_enabled"].as_bool(),
+        dynamic_anchors,
     })
 }
 
@@ -219,6 +234,7 @@ mod tests {
                     log_udp_port: None,
                     log_serial_enabled: None,
                     log_udp_enabled: None,
+                    dynamic_anchors: None,
                 },
                 Instant::now(),
             ),
@@ -250,6 +266,7 @@ mod tests {
                     log_udp_port: None,
                     log_serial_enabled: None,
                     log_udp_enabled: None,
+                    dynamic_anchors: None,
                 },
                 Instant::now() - Duration::from_secs(6),
             ),
@@ -281,5 +298,49 @@ mod tests {
             let device = parse_heartbeat(json.as_bytes(), "1.1.1.1".to_string()).unwrap();
             assert_eq!(device.role, expected_role, "Failed for role: {}", role_str);
         }
+    }
+
+    #[test]
+    fn test_parse_heartbeat_with_dynamic_anchors() {
+        let json = r#"{
+            "id": "tag1",
+            "role": "tag_tdoa",
+            "mac": "AA:BB:CC:DD:EE:FF",
+            "uwb_short": "1",
+            "mav_sysid": 1,
+            "fw": "1.0.0",
+            "dyn_anchors": [
+                {"id": 0, "x": 0.00, "y": 0.00, "z": -2.00},
+                {"id": 1, "x": 5.00, "y": 0.00, "z": -2.00},
+                {"id": 2, "x": 5.00, "y": 3.00, "z": -2.00},
+                {"id": 3, "x": 0.00, "y": 3.00, "z": -2.00}
+            ]
+        }"#;
+
+        let device = parse_heartbeat(json.as_bytes(), "192.168.1.100".to_string()).unwrap();
+
+        assert_eq!(device.role, DeviceRole::TagTdoa);
+        assert!(device.dynamic_anchors.is_some());
+
+        let anchors = device.dynamic_anchors.unwrap();
+        assert_eq!(anchors.len(), 4);
+        assert_eq!(anchors[0].id, 0);
+        assert_eq!(anchors[0].x, 0.0);
+        assert_eq!(anchors[0].y, 0.0);
+        assert_eq!(anchors[0].z, -2.0);
+        assert_eq!(anchors[1].id, 1);
+        assert_eq!(anchors[1].x, 5.0);
+        assert_eq!(anchors[3].id, 3);
+        assert_eq!(anchors[3].y, 3.0);
+    }
+
+    #[test]
+    fn test_parse_heartbeat_without_dynamic_anchors() {
+        let json = r#"{"id": "anchor1", "role": "anchor_tdoa"}"#;
+
+        let device = parse_heartbeat(json.as_bytes(), "10.0.0.1".to_string()).unwrap();
+
+        assert_eq!(device.role, DeviceRole::AnchorTdoa);
+        assert!(device.dynamic_anchors.is_none());
     }
 }

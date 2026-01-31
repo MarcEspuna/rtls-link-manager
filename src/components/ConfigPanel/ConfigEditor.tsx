@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
-import { DeviceConfig, AnchorConfig, Device, logLevelToName } from '@shared/types';
+import { DeviceConfig, AnchorConfig, Device, logLevelToName, AnchorLayout } from '@shared/types';
 import { Commands } from '@shared/commands';
 import { getAnchorWriteCommands } from '@shared/anchors';
 import { AnchorListEditor } from './AnchorListEditor';
+import { LayoutSelector } from '../SystemConfig';
 import styles from './ConfigEditor.module.css';
 
 interface ConfigEditorProps {
@@ -69,6 +70,13 @@ export function ConfigEditor({
       },
     };
     onChange(nextConfig);
+  };
+
+  const handleAnchorLockChange = async (newLockedMask: number) => {
+    // Update local config
+    handleChange('uwb', 'anchorPosLocked', newLockedMask);
+    // Apply to device
+    await handleApply('uwb', 'anchorPosLocked', newLockedMask);
   };
 
   const handleAnchorsApply = async (newAnchors: AnchorConfig[]) => {
@@ -205,6 +213,10 @@ export function ConfigEditor({
           anchors={config.uwb.anchors || []}
           onChange={handleAnchorsChange}
           onApply={handleAnchorsApply}
+          {...(config.uwb.mode === 4 && config.uwb.dynamicAnchorPosEnabled === 1 ? {
+            anchorPosLocked: config.uwb.anchorPosLocked ?? 0,
+            onLockChange: handleAnchorLockChange,
+          } : {})}
         />
         {anchorError && (
           <div className={styles.anchorErrorBanner}>{anchorError}</div>
@@ -398,6 +410,76 @@ export function ConfigEditor({
               <option value={1}>Enabled</option>
             </select>
           </div>
+        </div>
+      )}
+
+      {/* Dynamic Anchor Positioning - TDoA Tag only (Expert Mode) */}
+      {isExpertMode && config.uwb.mode === 4 && (
+        <div className={styles.section}>
+          <h4>Dynamic Anchor Positioning</h4>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+            Calculate anchor positions from inter-anchor TWR measurements instead of using static coordinates.
+          </p>
+          <div className={styles.field}>
+            <label>Dynamic Positioning</label>
+            <select
+              value={config.uwb.dynamicAnchorPosEnabled ?? 0}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('uwb', 'dynamicAnchorPosEnabled', val);
+                handleApply('uwb', 'dynamicAnchorPosEnabled', val);
+              }}
+            >
+              <option value={0}>Disabled (Use Static Positions)</option>
+              <option value={1}>Enabled (Calculate from Distances)</option>
+            </select>
+          </div>
+          {(config.uwb.dynamicAnchorPosEnabled === 1) && (
+            <>
+              <div className={styles.field}>
+                <label>Anchor Layout</label>
+                <LayoutSelector
+                  value={config.uwb.anchorLayout ?? AnchorLayout.RECTANGULAR_0_ORIGIN}
+                  onChange={(layout) => {
+                    handleChange('uwb', 'anchorLayout', layout);
+                    handleApply('uwb', 'anchorLayout', layout);
+                  }}
+                />
+              </div>
+              <div className={styles.field}>
+                <label>Anchor Height (m)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={config.uwb.anchorHeight ?? 0}
+                  onChange={(e) => handleChange('uwb', 'anchorHeight', safeParseFloat(e.target.value, 0))}
+                  onBlur={(e) => {
+                    const val = safeParseFloat(e.target.value, 0);
+                    handleChange('uwb', 'anchorHeight', val);
+                    handleApply('uwb', 'anchorHeight', val);
+                  }}
+                  placeholder="Height above ground (NED: Z = -height)"
+                />
+              </div>
+              <div className={styles.field}>
+                <label>Distance Averaging Samples</label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="500"
+                  value={config.uwb.distanceAvgSamples ?? 50}
+                  onChange={(e) => handleChange('uwb', 'distanceAvgSamples', safeParseInt(e.target.value, 50))}
+                  onBlur={(e) => {
+                    const val = safeParseInt(e.target.value, 50);
+                    handleChange('uwb', 'distanceAvgSamples', val);
+                    handleApply('uwb', 'distanceAvgSamples', val);
+                  }}
+                  placeholder="Samples to average (default: 50)"
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 
