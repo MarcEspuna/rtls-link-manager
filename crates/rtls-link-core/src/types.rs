@@ -251,9 +251,9 @@ pub struct AnchorConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
-    /// LED 2 GPIO pin
+    /// LED 2 GPIO pin (65535 = unset)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub led2_pin: Option<u8>,
+    pub led2_pin: Option<u16>,
     /// LED 2 state (0 or 1)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub led2_state: Option<u8>,
