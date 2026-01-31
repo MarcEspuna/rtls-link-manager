@@ -16,24 +16,24 @@ interface LayoutOption {
 
 const LAYOUT_OPTIONS: LayoutOption[] = [
   {
-    value: AnchorLayout.RECTANGULAR_0_ORIGIN,
-    label: 'A0 at Origin',
-    description: 'Southwest corner',
+    value: AnchorLayout.RECTANGULAR_A1X_A3Y,
+    label: '+X=A1, +Y=A3',
+    description: 'A0 at origin, A1 along +X, A3 along +Y',
   },
   {
-    value: AnchorLayout.RECTANGULAR_1_ORIGIN,
-    label: 'A1 at Origin',
-    description: 'Southeast corner',
+    value: AnchorLayout.RECTANGULAR_A1X_A2Y,
+    label: '+X=A1, +Y=A2',
+    description: 'A0 at origin, A1 along +X, A2 along +Y',
   },
   {
-    value: AnchorLayout.RECTANGULAR_2_ORIGIN,
-    label: 'A2 at Origin',
-    description: 'Northeast corner',
+    value: AnchorLayout.RECTANGULAR_A3X_A1Y,
+    label: '+X=A3, +Y=A1',
+    description: 'A0 at origin, A3 along +X, A1 along +Y',
   },
   {
-    value: AnchorLayout.RECTANGULAR_3_ORIGIN,
-    label: 'A3 at Origin',
-    description: 'Northwest corner',
+    value: AnchorLayout.RECTANGULAR_A2X_A3Y,
+    label: '+X=A2, +Y=A3',
+    description: 'A0 at origin, A2 along +X, A3 along +Y',
   },
 ];
 
