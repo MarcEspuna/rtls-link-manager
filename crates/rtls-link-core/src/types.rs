@@ -69,6 +69,22 @@ pub struct Device {
     /// Whether UDP log streaming is enabled at runtime
     #[serde(skip_serializing_if = "Option::is_none")]
     pub log_udp_enabled: Option<bool>,
+    /// Dynamic anchor positions (calculated from inter-anchor TWR)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dynamic_anchors: Option<Vec<DynamicAnchorPosition>>,
+}
+
+/// Dynamic anchor position from inter-anchor TWR measurements.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DynamicAnchorPosition {
+    /// Anchor ID (0-7)
+    pub id: u8,
+    /// X position in meters
+    pub x: f64,
+    /// Y position in meters
+    pub y: f64,
+    /// Z position in meters
+    pub z: f64,
 }
 
 /// Device operating role/mode.
@@ -472,6 +488,7 @@ mod tests {
             log_udp_port: None,
             log_serial_enabled: None,
             log_udp_enabled: None,
+            dynamic_anchors: None,
         };
 
         let json = serde_json::to_string(&device).unwrap();

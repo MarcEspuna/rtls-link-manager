@@ -3,6 +3,7 @@
 //! This module defines the shared state used across Tauri commands
 //! and background services.
 
+use crate::logging::service::LogStreamState;
 use crate::types::Device;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -13,6 +14,8 @@ pub struct AppState {
     /// Map of IP address -> Device for discovered devices.
     /// Protected by RwLock for concurrent access.
     pub devices: Arc<RwLock<HashMap<String, Device>>>,
+    /// State for active log streams
+    pub log_streams: Arc<RwLock<LogStreamState>>,
 }
 
 impl AppState {
@@ -20,6 +23,7 @@ impl AppState {
     pub fn new() -> Self {
         Self {
             devices: Arc::new(RwLock::new(HashMap::new())),
+            log_streams: Arc::new(RwLock::new(LogStreamState::default())),
         }
     }
 }
@@ -66,6 +70,7 @@ mod tests {
                     log_udp_port: None,
                     log_serial_enabled: None,
                     log_udp_enabled: None,
+                    dynamic_anchors: None,
                 },
             );
         }

@@ -218,3 +218,104 @@
   border-color: var(--border-color-light);
   color: var(--text-primary);
 }
+
+/* Read-only field display */
+.readonlyField {
+  width: 180px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  font-family: monospace;
+}
+
+/* Log terminal button */
+.logTerminalButton {
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--accent-primary);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logTerminalButton:hover {
+  background: var(--accent-primary-hover);
+  box-shadow: 0 2px 8px var(--accent-primary-muted);
+}
+
+/* Anchor List with Lock support */
+.anchorHeaderWithLock {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 1fr 32px 32px;
+  gap: 8px;
+  padding: 0 4px;
+  margin-bottom: 4px;
+}
+
+.anchorHeaderWithLock label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.anchorHeaderWithLock label:first-child {
+  text-align: left;
+}
+
+.anchorRowWithLock {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 1fr 32px 32px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s;
+}
+
+.anchorRowWithLock:hover {
+  border-color: var(--border-color-light);
+}
+
+.lockBtn {
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.lockBtn:hover {
+  background: var(--accent-primary-muted);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.lockBtnLocked {
+  color: var(--accent-warning);
+}
+
+.lockBtnLocked:hover {
+  background: var(--accent-warning-muted);
+  border-color: var(--accent-warning);
+  color: var(--accent-warning);
+}

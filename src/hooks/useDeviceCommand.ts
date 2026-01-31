@@ -3,6 +3,7 @@ import { sendDeviceCommand, sendDeviceCommands } from '../lib/tauri-api';
 
 interface UseDeviceCommandOptions {
   timeout?: number;
+  mode?: 'single' | 'persistent';
 }
 
 /**

@@ -19,6 +19,21 @@ export interface Device {
   avgRateCHz?: number;      // Average update rate in centi-Hz (e.g., 1000 = 10.0 Hz)
   minRateCHz?: number;      // Min rate in last 5s window
   maxRateCHz?: number;      // Max rate in last 5s window
+  // Logging configuration (from heartbeat)
+  logLevel?: number;        // Compiled log level (0=NONE..5=VERBOSE)
+  logUdpPort?: number;      // UDP port for log streaming
+  logSerialEnabled?: boolean; // Runtime: Serial logging enabled
+  logUdpEnabled?: boolean;  // Runtime: UDP log streaming enabled
+  // Dynamic anchor positions (from heartbeat, TDoA tags only)
+  dynamicAnchors?: DynamicAnchorPosition[];
+}
+
+// Dynamic anchor position from inter-anchor TWR measurements
+export interface DynamicAnchorPosition {
+  id: number;
+  x: number;
+  y: number;
+  z: number;
 }
 
 export type DeviceRole =
@@ -28,6 +43,15 @@ export type DeviceRole =
   | 'tag_tdoa'
   | 'calibration'
   | 'unknown';
+
+// Anchor layout configurations for dynamic position calculation
+export enum AnchorLayout {
+  RECTANGULAR_0_ORIGIN = 0,  // A0 at origin (default)
+  RECTANGULAR_1_ORIGIN = 1,  // A1 at origin
+  RECTANGULAR_2_ORIGIN = 2,  // A2 at origin
+  RECTANGULAR_3_ORIGIN = 3,  // A3 at origin
+  CUSTOM = 255,              // Reserved for future custom layouts
+}
 
 // Role helper functions
 export const isAnchorRole = (role: DeviceRole): boolean =>
@@ -53,6 +77,10 @@ export interface WifiConfig {
   enableWebServer?: 0 | 1;
   enableDiscovery?: 0 | 1;
   discoveryPort?: number;
+  // Logging parameters
+  logUdpPort?: number;      // UDP port for log streaming (default: 3334)
+  logSerialEnabled?: 0 | 1; // Runtime: Serial logging enabled
+  logUdpEnabled?: 0 | 1;    // Runtime: UDP log streaming enabled
 }
 
 export interface UwbConfig {
@@ -71,6 +99,12 @@ export interface UwbConfig {
   dwMode?: number;            // DW1000 mode index (0-7), default 0 (SHORTDATA_FAST_ACCURACY)
   txPowerLevel?: number;      // TX power level (0-3), default 3 (high)
   smartPowerEnable?: 0 | 1;   // Smart power (0=disabled, 1=enabled)
+  // Dynamic anchor positioning (TDoA tags only)
+  dynamicAnchorPosEnabled?: 0 | 1;  // 0=static (use configured positions), 1=dynamic
+  anchorLayout?: AnchorLayout;      // Layout for dynamic position calculation
+  anchorHeight?: number;            // Height for Z calculation (NED: Z = -height)
+  anchorPosLocked?: number;         // Bitmask: bit N = anchor N position locked
+  distanceAvgSamples?: number;      // Number of samples to average (default: 50)
 }
 
 export interface AnchorConfig {
@@ -139,5 +173,42 @@ export interface BulkOperationResult {
   deviceId?: string;
   success: boolean;
   error?: string;
+}
+
+// Log message from device (received via UDP)
+export interface LogMessage {
+  deviceIp: string;       // Source device IP
+  ts: number;             // Device timestamp (ms)
+  lvl: string;            // Log level (ERROR, WARN, INFO, DEBUG, VERBOSE)
+  tag: string;            // Module/file tag
+  msg: string;            // Log message content
+  receivedAt: number;     // Local receive timestamp (ms)
+}
+
+// Log level helpers
+export const LOG_LEVEL_NAMES: Record<number, string> = {
+  0: 'NONE',
+  1: 'ERROR',
+  2: 'WARN',
+  3: 'INFO',
+  4: 'DEBUG',
+  5: 'VERBOSE',
+};
+
+export const LOG_LEVEL_SHORT: Record<number, string> = {
+  0: 'OFF',
+  1: 'ERR',
+  2: 'WRN',
+  3: 'INF',
+  4: 'DBG',
+  5: 'VRB',
+};
+
+export function logLevelToName(level: number): string {
+  return LOG_LEVEL_NAMES[level] ?? 'UNKNOWN';
+}
+
+export function logLevelToShort(level: number): string {
+  return LOG_LEVEL_SHORT[level] ?? '?';
 }
 

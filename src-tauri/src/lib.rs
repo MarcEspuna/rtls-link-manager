@@ -1,18 +1,20 @@
 //! RTLS Link Manager - Rust Backend
 //!
 //! This crate provides the Tauri backend for the RTLS Link Manager desktop application.
-//! It handles UDP device discovery, local config storage, and exposes Tauri commands
-//! for the React frontend.
+//! It handles UDP device discovery, local config storage, log streaming, and exposes
+//! Tauri commands for the React frontend.
 
 pub mod commands;
 pub mod config_storage;
 pub mod discovery;
 pub mod error;
+pub mod logging;
 pub mod preset_storage;
 pub mod state;
 pub mod types;
 
 use config_storage::ConfigStorageService;
+use logging::service::{LogReceiverService, LOG_RECEIVER_PORT};
 use preset_storage::PresetStorageService;
 use state::AppState;
 use std::sync::Arc;
@@ -38,6 +40,7 @@ pub fn run() {
             // Setup app state
             let app_state = AppState::new();
             let devices_clone = app_state.devices.clone();
+            let log_streams_clone = app_state.log_streams.clone();
 
             // Spawn discovery service
             let app_handle_clone = app_handle.clone();
@@ -50,6 +53,21 @@ pub fn run() {
                     }
                     Err(e) => {
                         eprintln!("Failed to start discovery service: {}", e);
+                    }
+                }
+            });
+
+            // Spawn log receiver service
+            let app_handle_clone = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                match LogReceiverService::new(LOG_RECEIVER_PORT).await {
+                    Ok(service) => {
+                        if let Err(e) = service.run(log_streams_clone, app_handle_clone).await {
+                            eprintln!("Log receiver service error: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to start log receiver service: {}", e);
                     }
                 }
             });
@@ -78,6 +96,11 @@ pub fn run() {
             commands::device_comm::upload_firmware_from_file,
             commands::device_comm::upload_firmware_to_devices,
             commands::device_comm::get_firmware_info,
+            commands::logging::start_log_stream,
+            commands::logging::stop_log_stream,
+            commands::logging::get_active_log_streams,
+            commands::logging::get_buffered_logs,
+            commands::logging::clear_buffered_logs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -6,4 +6,5 @@
 pub mod configs;
 pub mod device_comm;
 pub mod devices;
+pub mod logging;
 pub mod presets;
