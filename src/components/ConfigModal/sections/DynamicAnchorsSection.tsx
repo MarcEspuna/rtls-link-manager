@@ -70,7 +70,7 @@ export function DynamicAnchorsSection({
             <div className={styles.field}>
               <label>Anchor Layout</label>
               <LayoutSelector
-                value={config.uwb.anchorLayout ?? AnchorLayout.RECTANGULAR_0_ORIGIN}
+                value={config.uwb.anchorLayout ?? AnchorLayout.RECTANGULAR_A1X_A3Y}
                 onChange={(layout) => {
                   onChange('uwb', 'anchorLayout', layout);
                   onApply('uwb', 'anchorLayout', layout);
