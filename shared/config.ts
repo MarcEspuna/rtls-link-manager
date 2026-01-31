@@ -18,6 +18,24 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
     if (config.uwb.anchorCount && config.uwb.anchorCount > 6) {
       errors.push('Maximum 6 anchors supported');
     }
+
+    if (config.uwb.tdoaSlotCount !== undefined) {
+      const v = Number(config.uwb.tdoaSlotCount);
+      if (Number.isNaN(v) || (!Number.isInteger(v))) {
+        errors.push('TDoA slot count must be an integer');
+      } else if (v !== 0 && (v < 2 || v > 8)) {
+        errors.push('TDoA slot count must be 0 (legacy) or 2-8');
+      }
+    }
+
+    if (config.uwb.tdoaSlotDurationUs !== undefined) {
+      const v = Number(config.uwb.tdoaSlotDurationUs);
+      if (Number.isNaN(v) || (!Number.isInteger(v))) {
+        errors.push('TDoA slot duration must be an integer');
+      } else if (v < 0) {
+        errors.push('TDoA slot duration must be >= 0');
+      }
+    }
   }
 
   return { valid: errors.length === 0, errors };

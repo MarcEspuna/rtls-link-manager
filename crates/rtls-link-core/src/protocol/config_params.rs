@@ -152,6 +152,29 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
+    // TDoA TDMA schedule (TDoA anchors only)
+    if let Some(v) = config.uwb.tdoa_slot_count {
+        params.push(("uwb".to_string(), "tdoaSlotCount".to_string(), v.to_string()));
+    }
+    if let Some(v) = config.uwb.tdoa_slot_duration_us {
+        params.push(("uwb".to_string(), "tdoaSlotDurationUs".to_string(), v.to_string()));
+    }
+    // Dynamic anchor positioning (TDoA tags only)
+    if let Some(v) = config.uwb.dynamic_anchor_pos_enabled {
+        params.push(("uwb".to_string(), "dynamicAnchorPosEnabled".to_string(), v.to_string()));
+    }
+    if let Some(v) = config.uwb.anchor_layout {
+        params.push(("uwb".to_string(), "anchorLayout".to_string(), v.to_string()));
+    }
+    if let Some(v) = config.uwb.anchor_height {
+        params.push(("uwb".to_string(), "anchorHeight".to_string(), v.to_string()));
+    }
+    if let Some(v) = config.uwb.anchor_pos_locked {
+        params.push(("uwb".to_string(), "anchorPosLocked".to_string(), v.to_string()));
+    }
+    if let Some(v) = config.uwb.distance_avg_samples {
+        params.push(("uwb".to_string(), "distanceAvgSamples".to_string(), v.to_string()));
+    }
 
     // App params
     if let Some(v) = config.app.led2_pin {
@@ -271,6 +294,13 @@ mod tests {
                 dw_mode: None,
                 tx_power_level: None,
                 smart_power_enable: None,
+                tdoa_slot_count: None,
+                tdoa_slot_duration_us: None,
+                dynamic_anchor_pos_enabled: None,
+                anchor_layout: None,
+                anchor_height: None,
+                anchor_pos_locked: None,
+                distance_avg_samples: None,
             },
             app: AppConfig {
                 led2_pin: Some(2),
