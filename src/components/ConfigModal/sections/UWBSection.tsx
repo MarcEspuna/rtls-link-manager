@@ -140,6 +140,60 @@ export function UWBSection({ config, onChange, onApply, isExpertMode = false }: 
           </div>
         </div>
       )}
+
+      {/* TDMA Schedule - Expert Mode + TDoA Anchor only */}
+      {isExpertMode && config.uwb.mode === 3 && (
+        <div className={styles.section}>
+          <h3>TDoA TDMA Schedule</h3>
+          <p>
+            Configure the number of active TDMA slots and the slot duration to
+            increase update rate when using fewer anchors. Use 0 to keep legacy
+            defaults.
+          </p>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label>Active Slots</label>
+              <select
+                value={config.uwb.tdoaSlotCount ?? 0}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  onChange('uwb', 'tdoaSlotCount', val);
+                  onApply('uwb', 'tdoaSlotCount', val);
+                }}
+              >
+                <option value={0}>Default (8 slots)</option>
+                <option value={2}>2 slots</option>
+                <option value={3}>3 slots</option>
+                <option value={4}>4 slots</option>
+                <option value={5}>5 slots</option>
+                <option value={6}>6 slots</option>
+                <option value={7}>7 slots</option>
+                <option value={8}>8 slots</option>
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label>Slot Duration (us)</label>
+              <input
+                type="number"
+                min={0}
+                step={50}
+                value={config.uwb.tdoaSlotDurationUs ?? 0}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 0 : Number(raw);
+                  onChange('uwb', 'tdoaSlotDurationUs', val);
+                }}
+                onBlur={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 0 : Number(raw);
+                  if (!Number.isFinite(val) || !Number.isInteger(val) || val < 0) return;
+                  onApply('uwb', 'tdoaSlotDurationUs', val);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

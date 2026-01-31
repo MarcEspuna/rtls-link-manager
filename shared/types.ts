@@ -99,6 +99,9 @@ export interface UwbConfig {
   dwMode?: number;            // DW1000 mode index (0-7), default 0 (SHORTDATA_FAST_ACCURACY)
   txPowerLevel?: number;      // TX power level (0-3), default 3 (high)
   smartPowerEnable?: 0 | 1;   // Smart power (0=disabled, 1=enabled)
+  // TDoA TDMA schedule (TDoA anchors only, expert mode)
+  tdoaSlotCount?: number;       // Active TDMA slots per frame (2-8), 0=legacy (8)
+  tdoaSlotDurationUs?: number;  // Slot duration in microseconds, 0=legacy (~2ms)
   // Dynamic anchor positioning (TDoA tags only)
   dynamicAnchorPosEnabled?: 0 | 1;  // 0=static (use configured positions), 1=dynamic
   anchorLayout?: AnchorLayout;      // Layout for dynamic position calculation

@@ -248,6 +248,27 @@ pub struct UwbConfig {
     /// Smart power enable (0=disabled, 1=enabled)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub smart_power_enable: Option<u8>,
+    /// TDoA TDMA active slots per frame (2-8), 0=legacy (8)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_slot_count: Option<u8>,
+    /// TDoA TDMA slot duration in microseconds, 0=legacy (~2ms)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_slot_duration_us: Option<u16>,
+    /// Dynamic anchor positioning enable (0=static, 1=dynamic)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dynamic_anchor_pos_enabled: Option<u8>,
+    /// Anchor layout for dynamic position calculation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_layout: Option<u8>,
+    /// Anchor height for Z calculation (NED: Z = -height)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_height: Option<f64>,
+    /// Bitmask: bit N = anchor N position locked
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_pos_locked: Option<u32>,
+    /// Number of distance samples to average (default: 50)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub distance_avg_samples: Option<u16>,
 }
 
 /// Single anchor configuration.
@@ -581,6 +602,13 @@ mod tests {
                 dw_mode: None,
                 tx_power_level: None,
                 smart_power_enable: None,
+                tdoa_slot_count: None,
+                tdoa_slot_duration_us: None,
+                dynamic_anchor_pos_enabled: None,
+                anchor_layout: None,
+                anchor_height: None,
+                anchor_pos_locked: None,
+                distance_avg_samples: None,
             },
             app: AppConfig {
                 led2_pin: Some(2),

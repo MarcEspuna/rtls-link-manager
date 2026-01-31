@@ -99,6 +99,13 @@ mod tests {
                 dw_mode: None,
                 tx_power_level: None,
                 smart_power_enable: None,
+                tdoa_slot_count: None,
+                tdoa_slot_duration_us: None,
+                dynamic_anchor_pos_enabled: None,
+                anchor_layout: None,
+                anchor_height: None,
+                anchor_pos_locked: None,
+                distance_avg_samples: None,
             },
             app: crate::types::AppConfig {
                 led2_pin: None,

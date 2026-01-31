@@ -33,8 +33,8 @@ const navItems: NavItem[] = [
   { id: 'general', label: 'General' },
   { id: 'uwb', label: 'UWB Mode' },
   { id: 'anchors', label: 'Anchor List' },
-  { id: 'dynamic', label: 'Dynamic Anchors', condition: (config, device) =>
-    config?.uwb.mode === 4 && (config?.uwb.dynamicAnchorPosEnabled === 1 || device.dynamicAnchors !== undefined) },
+  { id: 'dynamic', label: 'Dynamic Anchors', condition: (config) =>
+    config?.uwb.mode === 4 },
   { id: 'wifi', label: 'WiFi', expertOnly: true },
   { id: 'logging', label: 'Logging', expertOnly: true },
   { id: 'advanced', label: 'Advanced', expertOnly: true },
