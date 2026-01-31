@@ -248,6 +248,36 @@ async fn run_list(ip: &str, timeout: Duration, json_output: bool) -> Result<(), 
                     }
                 }
             }
+        } else if let Some(obj) = configs.as_object() {
+            let active = obj
+                .get("activeConfig")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+
+            let list = obj.get("configs").and_then(|v| v.as_array());
+            if let Some(arr) = list {
+                if arr.is_empty() {
+                    println!("No saved configurations on device.");
+                } else {
+                    if !active.is_empty() {
+                        println!("Saved configurations (active: {}):", active);
+                    } else {
+                        println!("Saved configurations:");
+                    }
+
+                    for config in arr {
+                        if let Some(name) = config.as_str() {
+                            println!("  - {}", name);
+                        } else if let Some(name) = config.get("name").and_then(|n| n.as_str()) {
+                            println!("  - {}", name);
+                        }
+                    }
+                }
+            } else {
+                println!("{}", response);
+            }
         } else {
             println!("{}", response);
         }
