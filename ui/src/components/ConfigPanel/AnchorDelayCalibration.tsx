@@ -20,17 +20,52 @@ interface TdoaDistancesResponse {
   error?: string;
 }
 
-class Stats {
-  count = 0;
-  mean = 0;
-  m2 = 0;
+function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = values.slice().sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+class Samples {
+  values: number[] = [];
 
   add(x: number) {
-    this.count += 1;
-    const delta = x - this.mean;
-    this.mean += delta / this.count;
-    const delta2 = x - this.mean;
-    this.m2 += delta * delta2;
+    if (Number.isFinite(x)) {
+      this.values.push(x);
+    }
+  }
+
+  count(): number {
+    return this.values.length;
+  }
+
+  robustMean(): { mean: number; inliers: number } | null {
+    if (this.values.length === 0) return null;
+
+    const med = median(this.values);
+    if (med === null) return null;
+
+    const absDev = this.values.map((v) => Math.abs(v - med));
+    const mad = median(absDev) ?? 0;
+    const sigma = Math.max(mad / 0.6745, 1e-6);
+
+    // Minimum band keeps small MAD from rejecting everything.
+    const threshold = Math.max(3 * sigma, 50);
+
+    let sum = 0;
+    let n = 0;
+    for (const v of this.values) {
+      if (Math.abs(v - med) <= threshold) {
+        sum += v;
+        n += 1;
+      }
+    }
+
+    if (n === 0) {
+      return { mean: med, inliers: 1 };
+    }
+    return { mean: sum / n, inliers: n };
   }
 }
 
@@ -210,7 +245,7 @@ function solveDelaysIrls(measurements: Measurement[], prior: number[], priorSigm
   return x;
 }
 
-function computeError(pairStats: Stats[][], targetsM: number[][], delays: number[]): ErrorReport {
+function computeError(pairSamples: Samples[][], targetsM: number[][], delays: number[]): ErrorReport {
   const pairErrors: ErrorReport['pairErrors'] = [];
   let sumSq = 0;
   let count = 0;
@@ -218,8 +253,8 @@ function computeError(pairStats: Stats[][], targetsM: number[][], delays: number
 
   for (let i = 0; i < 4; i++) {
     for (let j = i + 1; j < 4; j++) {
-      const stats = pairStats[i][j];
-      if (stats.count === 0) continue;
+      const stats = pairSamples[i][j].robustMean();
+      if (!stats) continue;
       const correctedTicks = stats.mean - delays[i] - delays[j];
       const correctedM = correctedTicks * DW1000_TIME_TO_METERS;
       const e = correctedM - targetsM[i][j];
@@ -234,10 +269,64 @@ function computeError(pairStats: Stats[][], targetsM: number[][], delays: number
   return { rmsM: rms, maxAbsM: maxAbs, pairErrors };
 }
 
+function ensureMeasurementGraphOk(measurements: Measurement[]) {
+  const n = 4;
+  const adj: number[][] = Array.from({ length: n }, () => []);
+  measurements.forEach((m) => {
+    adj[m.i].push(m.j);
+    adj[m.j].push(m.i);
+  });
+
+  // Connected check
+  const seen = Array.from({ length: n }, () => false);
+  const stack: number[] = [0];
+  seen[0] = true;
+  while (stack.length) {
+    const u = stack.pop()!;
+    for (const v of adj[u]) {
+      if (!seen[v]) {
+        seen[v] = true;
+        stack.push(v);
+      }
+    }
+  }
+  if (!seen.every(Boolean)) {
+    throw new Error('Insufficient inter-anchor measurements: graph not connected (check UWB sync/TDMA).');
+  }
+
+  // For edge-sum equations (a_i + a_j), connected bipartite graphs have a 1D nullspace.
+  // Require at least one odd cycle (non-bipartite) for a unique solution (i.e., at least one diagonal pair).
+  const color: Array<boolean | null> = Array.from({ length: n }, () => null);
+  const q: number[] = [0];
+  color[0] = false;
+  let isBipartite = true;
+  while (q.length) {
+    const u = q.shift()!;
+    const cu = color[u]!;
+    for (const v of adj[u]) {
+      if (color[v] === null) {
+        color[v] = !cu;
+        q.push(v);
+      } else if (color[v] === cu) {
+        isBipartite = false;
+        break;
+      }
+    }
+    if (!isBipartite) break;
+  }
+  if (isBipartite) {
+    throw new Error('Insufficient inter-anchor measurements: missing at least one diagonal pair.');
+  }
+}
+
 export function AnchorDelayCalibration({ devices }: { devices: Device[] }) {
   const [layout, setLayout] = useState<LayoutId>(0);
   const [x, setX] = useState('5.2');
   const [y, setY] = useState('2.3');
+  const [tolerance, setTolerance] = useState('0.15');
+  const [maxDeltaTicks, setMaxDeltaTicks] = useState('500');
+  const [minSamples, setMinSamples] = useState('30');
+  const [sampleDurationS, setSampleDurationS] = useState('8');
   const [dryRun, setDryRun] = useState(false);
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -288,13 +377,14 @@ export function AnchorDelayCalibration({ devices }: { devices: Device[] }) {
     }
 
     const timeoutMs = 5000;
-    const sampleDurationMs = 8000;
+    const sampleDurationMs = Math.max(1, Math.round((Number.parseFloat(sampleDurationS) || 8) * 1000));
     const sampleIntervalMs = 250;
-    const minSamples = 30;
+    const minSamplesN = Math.max(1, Number.parseInt(minSamples, 10) || 1);
     const maxIters = 3;
-    const toleranceM = 0.05;
+    const toleranceM = Math.max(0.01, Number.parseFloat(tolerance) || 0.15);
     const minImprovementM = 0.005;
     const priorSigmaTicks = 100;
+    const maxDelta = Math.max(1, Number.parseInt(maxDeltaTicks, 10) || 1);
 
     const targetsM = buildRectangularTargets(layout, xM, yM);
     const targetsTicks = targetsM.map((row) => row.map((d) => d / DW1000_TIME_TO_METERS));
@@ -312,7 +402,7 @@ export function AnchorDelayCalibration({ devices }: { devices: Device[] }) {
       let prevRms: number | null = null;
       for (let iter = 0; iter < maxIters; iter++) {
         addLog(`Iteration ${iter + 1}/${maxIters}: sampling inter-anchor distances...`);
-        const pairStats = Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => new Stats()));
+        const pairSamples = Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => new Samples()));
         const lastDelays = new Map<number, number>();
 
         const start = Date.now();
@@ -335,12 +425,12 @@ export function AnchorDelayCalibration({ devices }: { devices: Device[] }) {
               if (typeof dist !== 'number' || dist <= 0) return;
               const i = Math.min(data.anchorId, remoteId);
               const j = Math.max(data.anchorId, remoteId);
-              pairStats[i][j].add(dist);
+              pairSamples[i][j].add(dist);
             });
           });
 
           const done = [0, 1, 2, 3].every((i) =>
-            [i + 1, i + 2, i + 3].filter((j) => j < 4).every((j) => pairStats[i][j].count >= minSamples)
+            [i + 1, i + 2, i + 3].filter((j) => j < 4).every((j) => pairSamples[i][j].count() >= minSamplesN)
           );
           if (done) break;
 
@@ -354,29 +444,53 @@ export function AnchorDelayCalibration({ devices }: { devices: Device[] }) {
         const measurements: Measurement[] = [];
         for (let i = 0; i < 4; i++) {
           for (let j = i + 1; j < 4; j++) {
-            const s = pairStats[i][j];
-            if (s.count === 0) continue;
+            const stats = pairSamples[i][j].robustMean();
+            if (!stats) continue;
             measurements.push({
               i,
               j,
-              b: s.mean - targetsTicks[i][j],
-              weight: s.count,
+              b: stats.mean - targetsTicks[i][j],
+              weight: Math.max(1, stats.inliers),
             });
           }
         }
-        if (measurements.length < 3) {
-          throw new Error('Insufficient inter-anchor measurements. Check UWB sync/TDMA.');
-        }
+        if (measurements.length < 3) throw new Error('Insufficient inter-anchor measurements. Check UWB sync/TDMA.');
+        ensureMeasurementGraphOk(measurements);
 
         const solved = solveDelaysIrls(measurements, prior, priorSigmaTicks);
         const delays = solved.map((v) => Math.round(Math.min(65535, Math.max(0, v))));
-        const error = computeError(pairStats as unknown as Stats[][], targetsM, delays);
+        const before = computeError(pairSamples, targetsM, prior);
+        const after = computeError(pairSamples, targetsM, delays);
+        const anyChange = delays.some((v, idx) => v !== Math.round(prior[idx]));
 
-        setResult({ delays, error });
-        addLog(`  RMS error: ${error.rmsM.toFixed(3)} m (max ${error.maxAbsM.toFixed(3)} m)`);
+        setResult({ delays, error: after });
+        addLog(`  RMS error: ${after.rmsM.toFixed(3)} m (was ${before.rmsM.toFixed(3)} m) (max ${after.maxAbsM.toFixed(3)} m)`);
         addLog(`  Delays: A0=${delays[0]} A1=${delays[1]} A2=${delays[2]} A3=${delays[3]}`);
 
         if (!dryRun) {
+          // Safety: reject huge jumps (transient bad samples can produce nonsense).
+          const deltas = delays.map((v, idx) => v - Math.round(prior[idx]));
+          const tooLarge = deltas
+            .map((d, idx) => ({ idx, d }))
+            .filter((x) => Math.abs(x.d) > maxDelta);
+          if (tooLarge.length) {
+            addLog(`  Refusing to apply: delta exceeds ${maxDelta} ticks: ${tooLarge.map((t) => `A${t.idx}:${t.d >= 0 ? '+' : ''}${t.d}`).join(' ')}`);
+            if (iter + 1 < maxIters) continue;
+            throw new Error('Calibration aborted: unsafe antenna-delay jump suggested.');
+          }
+
+          // Safety: only apply if predicted RMS improves.
+          if (anyChange && Number.isFinite(after.rmsM) && Number.isFinite(before.rmsM) && after.rmsM >= before.rmsM) {
+            addLog(`  Not applying: predicted RMS did not improve (was ${before.rmsM.toFixed(3)} m, would be ${after.rmsM.toFixed(3)} m). Resampling...`);
+            if (iter + 1 < maxIters) continue;
+            throw new Error('Calibration aborted: could not find an improving antenna-delay update.');
+          }
+
+          if (!anyChange) {
+            addLog('  No antenna-delay change suggested; stopping.');
+            break;
+          }
+
           addLog('  Applying delays...');
           for (const ep of endpoints) {
             const value = delays[ep.anchorId];
@@ -391,18 +505,18 @@ export function AnchorDelayCalibration({ devices }: { devices: Device[] }) {
 
         if (dryRun) break;
 
-        if (error.rmsM <= toleranceM) {
+        if (after.rmsM <= toleranceM) {
           addLog(`Converged (RMS <= ${toleranceM} m)`);
           break;
         }
         if (prevRms !== null) {
-          const improvement = prevRms - error.rmsM;
+          const improvement = prevRms - after.rmsM;
           if (improvement < minImprovementM) {
             addLog(`Stopping (improvement ${improvement.toFixed(3)} m < ${minImprovementM} m)`);
             break;
           }
         }
-        prevRms = error.rmsM;
+        prevRms = after.rmsM;
 
         for (let i = 0; i < 4; i++) prior[i] = delays[i];
       }
@@ -437,6 +551,46 @@ export function AnchorDelayCalibration({ devices }: { devices: Device[] }) {
       <div className={styles.field}>
         <label>Y distance (m)</label>
         <input value={y} onChange={(e) => setY(e.target.value)} disabled={running} />
+      </div>
+      <div className={styles.field}>
+        <label>Tolerance (m)</label>
+        <input
+          type="number"
+          step="0.01"
+          value={tolerance}
+          onChange={(e) => setTolerance(e.target.value)}
+          disabled={running}
+        />
+      </div>
+      <div className={styles.field}>
+        <label>Max delta (ticks)</label>
+        <input
+          type="number"
+          step="10"
+          value={maxDeltaTicks}
+          onChange={(e) => setMaxDeltaTicks(e.target.value)}
+          disabled={running}
+        />
+      </div>
+      <div className={styles.field}>
+        <label>Min samples / pair</label>
+        <input
+          type="number"
+          step="1"
+          value={minSamples}
+          onChange={(e) => setMinSamples(e.target.value)}
+          disabled={running}
+        />
+      </div>
+      <div className={styles.field}>
+        <label>Sample duration (s)</label>
+        <input
+          type="number"
+          step="1"
+          value={sampleDurationS}
+          onChange={(e) => setSampleDurationS(e.target.value)}
+          disabled={running}
+        />
       </div>
       <div className={styles.field}>
         <label>Dry run</label>
@@ -494,4 +648,3 @@ export function AnchorDelayCalibration({ devices }: { devices: Device[] }) {
     </div>
   );
 }
-
