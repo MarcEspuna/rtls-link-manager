@@ -159,6 +159,7 @@ function App() {
       {selectedDevice && (
         <ConfigModal
           device={selectedDevice}
+          allDevices={devices}
           onClose={() => setSelectedDeviceIp(null)}
           isExpertMode={isExpertMode}
         />
