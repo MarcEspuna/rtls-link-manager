@@ -12,6 +12,7 @@ The tool provides:
 - Automatic device discovery on the network
 - Real-time device status monitoring
 - Configuration management for WiFi, UWB, and anchor networks
+- Antenna-delay calibration for TDoA anchors (matches inter-anchor distances to an externally measured layout)
 - Bulk operations for multi-device control
 - Local configuration storage
 
@@ -44,6 +45,7 @@ The tool provides:
 - **Auto Device Discovery** - UDP-based discovery automatically finds RTLS-Link devices on the network
 - **Real-time Monitoring** - Live device status with online/offline indicators via event-driven updates
 - **Desktop Application** - Native app experience with no browser required
+- **Antenna Calibration (TDoA Anchors)** - Calibrate per-anchor `uwb.ADelay` using inter-anchor ToF (`tdoa-distances`) and an externally measured X/Y layout
 - **Bulk Operations** - Toggle LEDs, start UWB, or reboot multiple devices at once
 - **Local Config Storage** - Save and manage configurations locally in app data directory
 - **Cross-Platform** - Runs on Windows and Linux
@@ -134,6 +136,13 @@ rtls-link-manager/
 | Calibration | 2 | Calibration mode for anchor setup |
 | TDoA Anchor | 3 | Time Difference of Arrival anchor |
 | TDoA Tag | 4 | Time Difference of Arrival tag |
+
+### Antenna Calibration (TDoA Anchors)
+
+For anchors running in **TDoA Anchor** mode, open **Device Configuration → Antenna Calibration** to:
+- Select the anchor layout (which anchor is X / Y / corner)
+- Enter the externally measured X and Y distances (meters)
+- Run the calibration to solve and apply `uwb.ADelay` live
 
 ### WiFi Configuration
 
