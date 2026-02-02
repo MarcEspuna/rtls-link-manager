@@ -218,3 +218,86 @@
   border-color: var(--border-color-light);
   color: var(--text-primary);
 }
+
+/* Tabs (Anchor section) */
+.tabBar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tabBtn {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tabBtn:hover {
+  border-color: var(--border-color-light);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.tabBtnActive {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-muted);
+  color: var(--text-primary);
+}
+
+/* Anchor calibration */
+.calibrationPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.calibrationActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.calibrationResults {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.calibrationSummary {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.calibrationDelayGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.calibrationDelayCard {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+}
+
+.logBox {
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  max-height: 200px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+}

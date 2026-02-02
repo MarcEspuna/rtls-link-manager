@@ -26,6 +26,9 @@ export const Commands = {
   getLedState: () => 'get-led2-state',
   reboot: () => 'reboot',
   start: () => 'start',
+
+  // Diagnostics / calibration
+  tdoaDistances: () => 'tdoa-distances',
 } as const;
 
 // Commands that return JSON responses
@@ -38,6 +41,7 @@ export const JSON_COMMANDS = [
   'delete-config',
   'toggle-led2',
   'get-led2-state',
+  'tdoa-distances',
 ];
 
 export function isJsonCommand(cmd: string): boolean {

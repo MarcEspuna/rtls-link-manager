@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react';
-import { DeviceConfig, AnchorConfig } from '@shared/types';
+import { Device, DeviceConfig, AnchorConfig } from '@shared/types';
 import { Commands } from '@shared/commands';
 import { getAnchorWriteCommands } from '@shared/anchors';
 import { AnchorListEditor } from './AnchorListEditor';
+import { AnchorDelayCalibration } from './AnchorDelayCalibration';
 import styles from './ConfigEditor.module.css';
 
 interface ConfigEditorProps {
   config: DeviceConfig;
+  devices: Device[];
   onChange: (config: DeviceConfig) => void;
   onApply: (group: string, name: string, value: any) => Promise<void>;
   onApplyBatch?: (commands: string[]) => Promise<void>;
@@ -27,6 +29,7 @@ const safeParseInt = (value: string, fallback: number = 0): number => {
 
 export function ConfigEditor({
   config,
+  devices,
   onChange,
   onApply,
   onApplyBatch,
@@ -35,6 +38,7 @@ export function ConfigEditor({
   anchorError
 }: ConfigEditorProps) {
   const [shortAddrError, setShortAddrError] = useState<string | null>(null);
+  const [anchorTab, setAnchorTab] = useState<'positions' | 'calibration'>('positions');
   const anchorApplyRef = useRef<Promise<void> | null>(null);
   const pendingAnchorsRef = useRef<AnchorConfig[] | null>(null);
 
@@ -193,17 +197,40 @@ export function ConfigEditor({
       {/* Anchor List Section */}
       <div className={styles.section}>
         <h4>Anchor List</h4>
-        <AnchorListEditor
-          anchors={config.uwb.anchors || []}
-          onChange={handleAnchorsChange}
-          onApply={handleAnchorsApply}
-        />
-        {anchorError && (
-          <div className={styles.anchorErrorBanner}>{anchorError}</div>
-        )}
-        <div style={{ marginTop: 8, fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'right' }}>
-          Count: {config.uwb.anchorCount || 0}
+        <div className={styles.tabBar}>
+          <button
+            type="button"
+            className={`${styles.tabBtn} ${anchorTab === 'positions' ? styles.tabBtnActive : ''}`}
+            onClick={() => setAnchorTab('positions')}
+          >
+            Positions
+          </button>
+          <button
+            type="button"
+            className={`${styles.tabBtn} ${anchorTab === 'calibration' ? styles.tabBtnActive : ''}`}
+            onClick={() => setAnchorTab('calibration')}
+          >
+            Antenna Calibration
+          </button>
         </div>
+
+        {anchorTab === 'positions' ? (
+          <>
+            <AnchorListEditor
+              anchors={config.uwb.anchors || []}
+              onChange={handleAnchorsChange}
+              onApply={handleAnchorsApply}
+            />
+            {anchorError && (
+              <div className={styles.anchorErrorBanner}>{anchorError}</div>
+            )}
+            <div style={{ marginTop: 8, fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'right' }}>
+              Count: {config.uwb.anchorCount || 0}
+            </div>
+          </>
+        ) : (
+          <AnchorDelayCalibration devices={devices} />
+        )}
       </div>
 
       {/* Advanced / Geo Section */}

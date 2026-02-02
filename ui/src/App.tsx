@@ -50,6 +50,7 @@ function App() {
         {selectedDevice && (
           <ConfigPanel
             device={selectedDevice}
+            devices={devices}
             onClose={() => setSelectedDevice(null)}
           />
         )}

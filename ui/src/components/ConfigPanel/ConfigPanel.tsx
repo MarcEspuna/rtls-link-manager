@@ -8,10 +8,11 @@ import styles from './ConfigPanel.module.css';
 
 interface ConfigPanelProps {
   device: Device;
+  devices: Device[];
   onClose: () => void;
 }
 
-export function ConfigPanel({ device, onClose }: ConfigPanelProps) {
+export function ConfigPanel({ device, devices, onClose }: ConfigPanelProps) {
   const { sendCommand, sendCommands, loading, close } = useDeviceCommand(device.ip, { mode: 'persistent' });
   const [config, setConfig] = useState<DeviceConfig | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
@@ -191,6 +192,7 @@ export function ConfigPanel({ device, onClose }: ConfigPanelProps) {
           {config ? (
             <ConfigEditor
               config={config}
+              devices={devices}
               onChange={setConfig}
               onApply={async (group, name, value) => {
                 await sendCommand(Commands.writeParam(group, name, value));
