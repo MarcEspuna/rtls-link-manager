@@ -43,6 +43,7 @@ export function AnchorCard({ device, selected, onSelect, onConfigure, isExpertMo
           checked={selected}
           onChange={(e) => onSelect(e.target.checked)}
         />
+        <span className={styles.anchorId}>A{device.uwbShort}</span>
         <HealthBadge health={health} size="sm" />
         <span className={styles.ip}>{device.ip}</span>
         {isExpertMode && device.logLevel !== undefined && (
@@ -54,6 +55,7 @@ export function AnchorCard({ device, selected, onSelect, onConfigure, isExpertMo
       </div>
 
       <div className={styles.info}>
+        <div><span>ID:</span> {device.id}</div>
         <div><span>Role:</span> {device.role}</div>
         <div><span>MAC:</span> {device.mac}</div>
         <div><span>FW:</span> {device.firmware}</div>
