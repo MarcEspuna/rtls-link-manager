@@ -13,6 +13,7 @@ pub const JSON_COMMANDS: &[&str] = &[
     "toggle-led2",
     "get-led2-state",
     "firmware-info",
+    "tdoa-distances",
 ];
 
 /// Check if a command is expected to return JSON
@@ -125,6 +126,13 @@ impl Commands {
     pub fn get_firmware_info() -> &'static str {
         "firmware-info"
     }
+
+    // ==================== Diagnostics / calibration ====================
+
+    /// Get latest inter-anchor ToF ticks (TDoA anchors, returns JSON)
+    pub fn tdoa_distances() -> &'static str {
+        "tdoa-distances"
+    }
 }
 
 #[cfg(test)]
@@ -170,6 +178,7 @@ mod tests {
         assert!(is_json_command("backup-config"));
         assert!(is_json_command("list-configs"));
         assert!(is_json_command("save-config-as -name test"));
+        assert!(is_json_command("tdoa-distances"));
         assert!(!is_json_command("version"));
         assert!(!is_json_command("reboot"));
         assert!(!is_json_command("save-config"));

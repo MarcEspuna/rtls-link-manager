@@ -30,6 +30,9 @@ export const Commands = {
   // System info
   getVersion: () => 'version',
   getFirmwareInfo: () => 'firmware-info',
+
+  // Diagnostics / calibration
+  tdoaDistances: () => 'tdoa-distances',
 } as const;
 
 // Commands that return JSON responses
@@ -43,6 +46,7 @@ export const JSON_COMMANDS = [
   'toggle-led2',
   'get-led2-state',
   'firmware-info',
+  'tdoa-distances',
 ];
 
 export function isJsonCommand(cmd: string): boolean {

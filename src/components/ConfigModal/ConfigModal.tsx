@@ -6,6 +6,7 @@ import { useDeviceCommand } from '../../hooks/useDeviceCommand';
 import { GeneralSection } from './sections/GeneralSection';
 import { UWBSection } from './sections/UWBSection';
 import { AnchorListSection } from './sections/AnchorListSection';
+import { AntennaCalibrationSection } from './sections/AntennaCalibrationSection';
 import { DynamicAnchorsSection } from './sections/DynamicAnchorsSection';
 import { WiFiSection } from './sections/WiFiSection';
 import { LoggingSection } from './sections/LoggingSection';
@@ -14,10 +15,11 @@ import { FirmwareUpdate } from '../FirmwareUpdate';
 import { LogTerminal } from '../ExpertMode/LogTerminal';
 import styles from './ConfigModal.module.css';
 
-type SectionId = 'general' | 'uwb' | 'anchors' | 'dynamic' | 'wifi' | 'logging' | 'advanced' | 'firmware';
+type SectionId = 'general' | 'uwb' | 'anchors' | 'antennaCal' | 'dynamic' | 'wifi' | 'logging' | 'advanced' | 'firmware';
 
 interface ConfigModalProps {
   device: Device;
+  allDevices: Device[];
   onClose: () => void;
   isExpertMode?: boolean;
 }
@@ -33,6 +35,7 @@ const navItems: NavItem[] = [
   { id: 'general', label: 'General' },
   { id: 'uwb', label: 'UWB Mode' },
   { id: 'anchors', label: 'Anchor List' },
+  { id: 'antennaCal', label: 'Antenna Calibration', condition: (config) => config?.uwb.mode === 3 },
   { id: 'dynamic', label: 'Dynamic Anchors', condition: (config) =>
     config?.uwb.mode === 4 },
   { id: 'wifi', label: 'WiFi', expertOnly: true },
@@ -41,7 +44,7 @@ const navItems: NavItem[] = [
   { id: 'firmware', label: 'Firmware' },
 ];
 
-export function ConfigModal({ device, onClose, isExpertMode = false }: ConfigModalProps) {
+export function ConfigModal({ device, allDevices, onClose, isExpertMode = false }: ConfigModalProps) {
   const { sendCommand, sendCommands, loading, close } = useDeviceCommand(device.ip, { mode: 'persistent' });
   const [config, setConfig] = useState<DeviceConfig | null>(null);
   const [savedConfigs, setSavedConfigs] = useState<string[]>([]);
@@ -237,6 +240,12 @@ export function ConfigModal({ device, onClose, isExpertMode = false }: ConfigMod
             onBusyChange={setAnchorBusy}
             onError={setAnchorError}
             anchorError={anchorError}
+          />
+        );
+      case 'antennaCal':
+        return (
+          <AntennaCalibrationSection
+            devices={allDevices}
           />
         );
       case 'dynamic':
