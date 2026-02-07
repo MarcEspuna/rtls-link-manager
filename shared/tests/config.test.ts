@@ -16,4 +16,12 @@ describe('validateConfig', () => {
     });
     expect(result.valid).toBe(false);
   });
+
+  it('validates rangefinder forwarding sensor ID byte range', () => {
+    const result = validateConfig({
+      uwb: { rfForwardSensorId: 300 } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Rangefinder sensor ID must be an integer in 0-255');
+  });
 });

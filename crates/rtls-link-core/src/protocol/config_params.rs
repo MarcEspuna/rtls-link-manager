@@ -136,6 +136,34 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
     if let Some(v) = config.uwb.z_calc_mode {
         params.push(("uwb".to_string(), "zCalcMode".to_string(), v.to_string()));
     }
+    if let Some(v) = config.uwb.rf_forward_enable {
+        params.push((
+            "uwb".to_string(),
+            "rfForwardEnable".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.rf_forward_sensor_id {
+        params.push((
+            "uwb".to_string(),
+            "rfForwardSensorId".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.rf_forward_orientation {
+        params.push((
+            "uwb".to_string(),
+            "rfForwardOrientation".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.rf_forward_preserve_src_ids {
+        params.push((
+            "uwb".to_string(),
+            "rfForwardPreserveSrcIds".to_string(),
+            v.to_string(),
+        ));
+    }
     if let Some(v) = config.uwb.channel {
         params.push(("uwb".to_string(), "channel".to_string(), v.to_string()));
     }
@@ -154,14 +182,26 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
     }
     // TDoA TDMA schedule (TDoA anchors only)
     if let Some(v) = config.uwb.tdoa_slot_count {
-        params.push(("uwb".to_string(), "tdoaSlotCount".to_string(), v.to_string()));
+        params.push((
+            "uwb".to_string(),
+            "tdoaSlotCount".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.uwb.tdoa_slot_duration_us {
-        params.push(("uwb".to_string(), "tdoaSlotDurationUs".to_string(), v.to_string()));
+        params.push((
+            "uwb".to_string(),
+            "tdoaSlotDurationUs".to_string(),
+            v.to_string(),
+        ));
     }
     // Dynamic anchor positioning (TDoA tags only)
     if let Some(v) = config.uwb.dynamic_anchor_pos_enabled {
-        params.push(("uwb".to_string(), "dynamicAnchorPosEnabled".to_string(), v.to_string()));
+        params.push((
+            "uwb".to_string(),
+            "dynamicAnchorPosEnabled".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.uwb.anchor_layout {
         params.push(("uwb".to_string(), "anchorLayout".to_string(), v.to_string()));
@@ -170,10 +210,18 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
         params.push(("uwb".to_string(), "anchorHeight".to_string(), v.to_string()));
     }
     if let Some(v) = config.uwb.anchor_pos_locked {
-        params.push(("uwb".to_string(), "anchorPosLocked".to_string(), v.to_string()));
+        params.push((
+            "uwb".to_string(),
+            "anchorPosLocked".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.uwb.distance_avg_samples {
-        params.push(("uwb".to_string(), "distanceAvgSamples".to_string(), v.to_string()));
+        params.push((
+            "uwb".to_string(),
+            "distanceAvgSamples".to_string(),
+            v.to_string(),
+        ));
     }
 
     // App params
@@ -290,6 +338,10 @@ mod tests {
                 mavlink_target_system_id: Some(1),
                 rotation_degrees: Some(0.0),
                 z_calc_mode: Some(1),
+                rf_forward_enable: Some(1),
+                rf_forward_sensor_id: Some(7),
+                rf_forward_orientation: Some(25),
+                rf_forward_preserve_src_ids: Some(1),
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,
@@ -334,5 +386,17 @@ mod tests {
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "wifi" && n == "ssidST" && v == "TestNetwork"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "rfForwardEnable" && v == "1"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "rfForwardSensorId" && v == "7"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "rfForwardOrientation" && v == "25"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "rfForwardPreserveSrcIds" && v == "1"));
     }
 }

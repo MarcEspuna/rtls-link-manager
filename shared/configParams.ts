@@ -52,6 +52,10 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.uwb.mavlinkTargetSystemId !== undefined) params.push(['uwb', 'mavlinkTargetSystemId', String(config.uwb.mavlinkTargetSystemId)]);
     if (config.uwb.rotationDegrees !== undefined) params.push(['uwb', 'rotationDegrees', String(config.uwb.rotationDegrees)]);
     if (config.uwb.zCalcMode !== undefined) params.push(['uwb', 'zCalcMode', String(config.uwb.zCalcMode)]);
+    if (config.uwb.rfForwardEnable !== undefined) params.push(['uwb', 'rfForwardEnable', String(config.uwb.rfForwardEnable)]);
+    if (config.uwb.rfForwardSensorId !== undefined) params.push(['uwb', 'rfForwardSensorId', String(config.uwb.rfForwardSensorId)]);
+    if (config.uwb.rfForwardOrientation !== undefined) params.push(['uwb', 'rfForwardOrientation', String(config.uwb.rfForwardOrientation)]);
+    if (config.uwb.rfForwardPreserveSrcIds !== undefined) params.push(['uwb', 'rfForwardPreserveSrcIds', String(config.uwb.rfForwardPreserveSrcIds)]);
     // UWB Radio settings (TDoA mode only, expert mode)
     if (config.uwb.channel !== undefined) params.push(['uwb', 'channel', String(config.uwb.channel)]);
     if (config.uwb.dwMode !== undefined) params.push(['uwb', 'dwMode', String(config.uwb.dwMode)]);
