@@ -236,6 +236,18 @@ pub struct UwbConfig {
     /// Z calculation mode: 0=None (TDoA Z), 1=Rangefinder, 2=UWB (reserved)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub z_calc_mode: Option<u8>,
+    /// Enable rangefinder DISTANCE_SENSOR forwarding (0=disabled, 1=enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rf_forward_enable: Option<u8>,
+    /// Rangefinder sensor ID override (0-254 override, 255=preserve source)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rf_forward_sensor_id: Option<u8>,
+    /// Rangefinder orientation override (MAVLink enum, 255=preserve source)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rf_forward_orientation: Option<u8>,
+    /// Preserve source sysid/compid when forwarding (0=no, 1=yes)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rf_forward_preserve_src_ids: Option<u8>,
     /// UWB channel (1-7), default 2
     #[serde(skip_serializing_if = "Option::is_none")]
     pub channel: Option<u8>,
@@ -598,6 +610,10 @@ mod tests {
                 mavlink_target_system_id: Some(1),
                 rotation_degrees: Some(0.0),
                 z_calc_mode: Some(1),
+                rf_forward_enable: Some(1),
+                rf_forward_sensor_id: Some(7),
+                rf_forward_orientation: Some(25),
+                rf_forward_preserve_src_ids: Some(1),
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,

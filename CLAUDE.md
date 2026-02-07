@@ -74,7 +74,7 @@ rtls-link-cli config read <IP> -g app -n led2State
 | Group | Parameter Names |
 |-------|----------------|
 | wifi  | `mode`, `ssidAP`, `pswdAP`, `ssidST`, `pswdST`, `gcsIp`, `udpPort`, `enableWebServer`, `enableDiscovery`, `discoveryPort`, `logUdpPort`, `logSerialEnabled`, `logUdpEnabled` |
-| uwb   | `mode`, `devShortAddr`, `anchorCount`, `devId1`..`devIdN`, `x1`..`xN`, `y1`..`yN`, `z1`..`zN`, `originLat`, `originLon`, `originAlt`, `mavlinkTargetSystemId`, `rotationDegrees`, `zCalcMode`, `channel`, `dwMode`, `txPowerLevel`, `smartPowerEnable` |
+| uwb   | `mode`, `devShortAddr`, `anchorCount`, `devId1`..`devIdN`, `x1`..`xN`, `y1`..`yN`, `z1`..`zN`, `originLat`, `originLon`, `originAlt`, `mavlinkTargetSystemId`, `rotationDegrees`, `zCalcMode`, `rfForwardEnable`, `rfForwardSensorId`, `rfForwardOrientation`, `rfForwardPreserveSrcIds`, `channel`, `dwMode`, `txPowerLevel`, `smartPowerEnable` |
 | app   | `led2Pin`, `led2State` |
 
 **IMPORTANT:** Parameter names are camelCase as listed above, NOT snake_case. For example, use `ssidST` not `ssid_st`.

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { DeviceConfig, AnchorConfig, Device, logLevelToName, AnchorLayout } from '@shared/types';
+import { MAV_SENSOR_ORIENTATION_OPTIONS } from '@shared/mavlink';
 import { Commands } from '@shared/commands';
 import { getAnchorWriteCommands } from '@shared/anchors';
 import { AnchorListEditor } from './AnchorListEditor';
@@ -27,6 +28,12 @@ const safeParseFloat = (value: string, fallback: number = 0): number => {
 const safeParseInt = (value: string, fallback: number = 0): number => {
   const parsed = parseInt(value, 10);
   return isNaN(parsed) ? fallback : parsed;
+};
+
+const safeParseU8 = (value: string, fallback: number = 0): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(255, Math.max(0, Math.trunc(parsed)));
 };
 
 export function ConfigEditor({
@@ -78,6 +85,21 @@ export function ConfigEditor({
     // Apply to device
     await handleApply('uwb', 'anchorPosLocked', newLockedMask);
   };
+
+  const rfForwardEnabled = config.uwb.rfForwardEnable ?? 0;
+  const rfForwardPreserveSrcIds = config.uwb.rfForwardPreserveSrcIds ?? 0;
+  const rfForwardSensorId = config.uwb.rfForwardSensorId ?? 255;
+  const rfForwardOrientation = config.uwb.rfForwardOrientation ?? 255;
+  const preserveSensorId = rfForwardSensorId === 255;
+  const preserveOrientation = rfForwardOrientation === 255;
+  const rfOrientationOptions = MAV_SENSOR_ORIENTATION_OPTIONS.some(
+    (option) => option.value === rfForwardOrientation
+  )
+    ? MAV_SENSOR_ORIENTATION_OPTIONS
+    : [
+        { value: rfForwardOrientation, label: `${rfForwardOrientation} - Unknown (as-is)` },
+        ...MAV_SENSOR_ORIENTATION_OPTIONS,
+      ];
 
   const handleAnchorsApply = async (newAnchors: AnchorConfig[]) => {
     pendingAnchorsRef.current = newAnchors;
@@ -314,6 +336,96 @@ export function ConfigEditor({
               <option value={1}>Rangefinder</option>
               <option value={2}>UWB (reserved)</option>
             </select>
+          </div>
+          <div className={styles.field}>
+            <label>Rangefinder Forwarding</label>
+            <select
+              value={rfForwardEnabled}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('uwb', 'rfForwardEnable', val);
+                handleApply('uwb', 'rfForwardEnable', val);
+              }}
+            >
+              <option value={0}>Disabled</option>
+              <option value={1}>Enabled</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label>Source SYS/COMP IDs</label>
+            <select
+              value={rfForwardPreserveSrcIds}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('uwb', 'rfForwardPreserveSrcIds', val);
+                handleApply('uwb', 'rfForwardPreserveSrcIds', val);
+              }}
+            >
+              <option value={0}>Use UWB Device IDs</option>
+              <option value={1}>Preserve Source IDs</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label>Sensor ID</label>
+            <select
+              value={preserveSensorId ? 'preserve' : 'override'}
+              onChange={(e) => {
+                const next = e.target.value === 'preserve' ? 255 : 0;
+                handleChange('uwb', 'rfForwardSensorId', next);
+                handleApply('uwb', 'rfForwardSensorId', next);
+              }}
+            >
+              <option value="preserve">Preserve Source</option>
+              <option value="override">Override</option>
+            </select>
+            {!preserveSensorId && (
+              <input
+                type="number"
+                step="1"
+                min={0}
+                max={254}
+                value={rfForwardSensorId}
+                onChange={(e) => handleChange('uwb', 'rfForwardSensorId', safeParseU8(e.target.value, 0))}
+                onBlur={(e) => {
+                  const val = Math.min(254, safeParseU8(e.target.value, 0));
+                  handleChange('uwb', 'rfForwardSensorId', val);
+                  handleApply('uwb', 'rfForwardSensorId', val);
+                }}
+              />
+            )}
+          </div>
+          <div className={styles.field}>
+            <label>Orientation</label>
+            <select
+              value={preserveOrientation ? 'preserve' : 'override'}
+              onChange={(e) => {
+                const next = e.target.value === 'preserve' ? 255 : 0;
+                handleChange('uwb', 'rfForwardOrientation', next);
+                handleApply('uwb', 'rfForwardOrientation', next);
+              }}
+            >
+              <option value="preserve">Preserve Source</option>
+              <option value="override">Override</option>
+            </select>
+            {!preserveOrientation && (
+              <select
+                value={rfForwardOrientation}
+                onChange={(e) => {
+                  const val = safeParseU8(e.target.value, 0);
+                  handleChange('uwb', 'rfForwardOrientation', val);
+                  handleApply('uwb', 'rfForwardOrientation', val);
+                }}
+              >
+                {rfOrientationOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div style={{ marginTop: 4, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              255 preserves source value.
+            </div>
           </div>
         </div>
       )}

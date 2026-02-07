@@ -36,6 +36,28 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
         errors.push('TDoA slot duration must be >= 0');
       }
     }
+
+    if (config.uwb.rfForwardEnable !== undefined && config.uwb.rfForwardEnable !== 0 && config.uwb.rfForwardEnable !== 1) {
+      errors.push('Rangefinder forwarding enable must be 0 or 1');
+    }
+
+    if (config.uwb.rfForwardPreserveSrcIds !== undefined && config.uwb.rfForwardPreserveSrcIds !== 0 && config.uwb.rfForwardPreserveSrcIds !== 1) {
+      errors.push('Rangefinder preserve source IDs must be 0 or 1');
+    }
+
+    if (config.uwb.rfForwardSensorId !== undefined) {
+      const v = Number(config.uwb.rfForwardSensorId);
+      if (Number.isNaN(v) || !Number.isInteger(v) || v < 0 || v > 255) {
+        errors.push('Rangefinder sensor ID must be an integer in 0-255');
+      }
+    }
+
+    if (config.uwb.rfForwardOrientation !== undefined) {
+      const v = Number(config.uwb.rfForwardOrientation);
+      if (Number.isNaN(v) || !Number.isInteger(v) || v < 0 || v > 255) {
+        errors.push('Rangefinder orientation must be an integer in 0-255');
+      }
+    }
   }
 
   return { valid: errors.length === 0, errors };
