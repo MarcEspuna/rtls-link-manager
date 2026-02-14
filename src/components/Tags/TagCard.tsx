@@ -89,14 +89,36 @@ export function TagCard({ device, selected, onSelect, onConfigure, isExpertMode 
             {formatStatus(device.originSent, 'Sent', 'Pending')}
           </span>
         </div>
-        {device.rfEnabled !== undefined && (
+        <div className={styles.telemetryRow}>
+          <span className={styles.telemetryLabel}>UWB:</span>
+          <span className={
+            device.uwbEnabled === undefined ? styles.statusPending :
+            device.uwbEnabled ? styles.statusOk : styles.statusMuted
+          }>
+            {formatStatus(device.uwbEnabled, 'On', 'Off')}
+          </span>
+        </div>
+        <div className={styles.telemetryRow}>
+          <span className={styles.telemetryLabel}>RF Fwd:</span>
+          <span className={
+            device.rfForwardEnabled === undefined ? styles.statusPending :
+            device.rfForwardEnabled ? styles.statusOk : styles.statusMuted
+          }>
+            {formatStatus(device.rfForwardEnabled, 'On', 'Off')}
+          </span>
+        </div>
+        {(device.rfEnabled !== undefined || device.rfHealthy !== undefined) && (
           <div className={styles.telemetryRow}>
-            <span className={styles.telemetryLabel}>RF:</span>
+            <span className={styles.telemetryLabel}>RF Health:</span>
             <span className={
+              device.rfEnabled === undefined ? styles.statusPending :
               !device.rfEnabled ? styles.statusMuted :
+              device.rfHealthy === undefined ? styles.statusPending :
               device.rfHealthy ? styles.statusOk : styles.statusWarn
             }>
-              {!device.rfEnabled ? 'Disabled' :
+              {device.rfEnabled === undefined ? '?' :
+               !device.rfEnabled ? 'Inactive' :
+               device.rfHealthy === undefined ? '?' :
                device.rfHealthy ? 'Healthy' : 'Unhealthy'}
             </span>
           </div>

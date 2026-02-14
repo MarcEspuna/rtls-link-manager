@@ -13,7 +13,9 @@ export interface Device {
   sendingPos?: boolean;     // True if sending positions to ArduPilot
   anchorsSeen?: number;     // Number of unique anchors in measurement set
   originSent?: boolean;     // True if GPS origin sent to ArduPilot
-  rfEnabled?: boolean;      // True if zCalcMode == RANGEFINDER
+  uwbEnabled?: boolean;     // True if runtime UWB backend is enabled
+  rfForwardEnabled?: boolean; // True if rangefinder forwarding is enabled
+  rfEnabled?: boolean;      // True if rangefinder functionality is active
   rfHealthy?: boolean;      // True if receiving non-stale rangefinder data
   // Update rate statistics (centi-Hz for 0.01 Hz precision)
   avgRateCHz?: number;      // Average update rate in centi-Hz (e.g., 1000 = 10.0 Hz)

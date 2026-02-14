@@ -42,7 +42,13 @@ pub struct Device {
     /// Whether GPS origin was sent to ArduPilot
     #[serde(skip_serializing_if = "Option::is_none")]
     pub origin_sent: Option<bool>,
-    /// Whether rangefinder mode is enabled (zCalcMode == RANGEFINDER)
+    /// Whether runtime UWB backend is enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uwb_enabled: Option<bool>,
+    /// Whether rangefinder forwarding is enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rf_forward_enabled: Option<bool>,
+    /// Whether rangefinder functionality is active
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rf_enabled: Option<bool>,
     /// Whether receiving non-stale rangefinder data
@@ -518,6 +524,8 @@ mod tests {
             sending_pos: Some(true),
             anchors_seen: Some(3),
             origin_sent: None,
+            uwb_enabled: None,
+            rf_forward_enabled: None,
             rf_enabled: None,
             rf_healthy: None,
             avg_rate_c_hz: None,
