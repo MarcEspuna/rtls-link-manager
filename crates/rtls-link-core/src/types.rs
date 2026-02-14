@@ -187,6 +187,9 @@ pub struct WifiConfig {
     /// Enable web server (0 or 1)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_web_server: Option<u8>,
+    /// Enable UART bridge (0 or 1)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_uart_bridge: Option<u8>,
     /// Enable UDP discovery (0 or 1)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_discovery: Option<u8>,
@@ -210,6 +213,9 @@ pub struct WifiConfig {
 pub struct UwbConfig {
     /// UWB mode: 0=TWR_ANCHOR, 1=TWR_TAG, 2=CALIBRATION, 3=TDOA_ANCHOR, 4=TDOA_TAG
     pub mode: u8,
+    /// Runtime UWB backend enable (0=disabled, 1=enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uwb_enable: Option<u8>,
     /// Device's UWB short address
     pub dev_short_addr: String,
     /// Number of anchors
@@ -574,6 +580,7 @@ mod tests {
                 gcs_ip: Some("192.168.1.1".to_string()),
                 udp_port: Some(14550),
                 enable_web_server: Some(1),
+                enable_uart_bridge: Some(1),
                 enable_discovery: Some(1),
                 discovery_port: Some(3333),
                 log_udp_port: None,
@@ -582,6 +589,7 @@ mod tests {
             },
             uwb: UwbConfig {
                 mode: 4,
+                uwb_enable: Some(1),
                 dev_short_addr: "1".to_string(),
                 anchor_count: Some(3),
                 anchors: Some(vec![

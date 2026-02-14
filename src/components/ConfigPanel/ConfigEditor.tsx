@@ -187,6 +187,20 @@ export function ConfigEditor({
       <div className={styles.section}>
         <h4>UWB Configuration</h4>
         <div className={styles.field}>
+          <label>UWB Runtime</label>
+          <select
+            value={config.uwb.uwbEnable ?? 1}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              handleChange('uwb', 'uwbEnable', val);
+              handleApply('uwb', 'uwbEnable', val);
+            }}
+          >
+            <option value={1}>Enabled</option>
+            <option value={0}>Disabled</option>
+          </select>
+        </div>
+        <div className={styles.field}>
           <label>Operation Mode</label>
           <select
             value={config.uwb.mode}
@@ -296,6 +310,20 @@ export function ConfigEditor({
       {isExpertMode && (
         <div className={styles.section}>
           <h4>Advanced Settings</h4>
+          <div className={styles.field}>
+            <label>UART Bridge</label>
+            <select
+              value={config.wifi.enableUartBridge ?? 1}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                handleChange('wifi', 'enableUartBridge', val);
+                handleApply('wifi', 'enableUartBridge', val);
+              }}
+            >
+              <option value={1}>Enabled</option>
+              <option value={0}>Disabled</option>
+            </select>
+          </div>
           <div className={styles.field}>
             <label>North Rotation (deg)</label>
             <input

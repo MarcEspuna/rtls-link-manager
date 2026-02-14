@@ -24,4 +24,12 @@ describe('validateConfig', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Rangefinder sensor ID must be an integer in 0-255');
   });
+
+  it('validates UWB runtime enable as boolean-like byte', () => {
+    const result = validateConfig({
+      uwb: { uwbEnable: 3 } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('UWB runtime enable must be 0 or 1');
+  });
 });

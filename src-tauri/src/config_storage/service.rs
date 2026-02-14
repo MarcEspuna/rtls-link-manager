@@ -78,6 +78,7 @@ mod tests {
                 gcs_ip: None,
                 udp_port: None,
                 enable_web_server: None,
+                enable_uart_bridge: None,
                 enable_discovery: None,
                 discovery_port: None,
                 log_udp_port: None,
@@ -86,6 +87,7 @@ mod tests {
             },
             uwb: crate::types::UwbConfig {
                 mode: 4,
+                uwb_enable: None,
                 dev_short_addr: "1".to_string(),
                 anchor_count: None,
                 anchors: None,

@@ -46,6 +46,13 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
+    if let Some(v) = config.wifi.enable_uart_bridge {
+        params.push((
+            "wifi".to_string(),
+            "enableUartBridge".to_string(),
+            v.to_string(),
+        ));
+    }
     if let Some(v) = config.wifi.enable_discovery {
         params.push((
             "wifi".to_string(),
@@ -84,6 +91,9 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
         "mode".to_string(),
         config.uwb.mode.to_string(),
     ));
+    if let Some(v) = config.uwb.uwb_enable {
+        params.push(("uwb".to_string(), "uwbEnable".to_string(), v.to_string()));
+    }
     // NOTE: devShortAddr intentionally skipped - preserved per-device
 
     // Flatten anchors array to devId1/x1/y1/z1, devId2/x2/y2/z2, etc.
@@ -308,6 +318,7 @@ mod tests {
                 gcs_ip: Some("192.168.1.1".to_string()),
                 udp_port: Some(14550),
                 enable_web_server: Some(1),
+                enable_uart_bridge: Some(1),
                 enable_discovery: Some(1),
                 discovery_port: Some(3333),
                 log_udp_port: None,
@@ -316,6 +327,7 @@ mod tests {
             },
             uwb: UwbConfig {
                 mode: 4,
+                uwb_enable: Some(1),
                 dev_short_addr: "1".to_string(), // Should be skipped
                 anchor_count: None,
                 anchors: Some(vec![
@@ -386,6 +398,12 @@ mod tests {
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "wifi" && n == "ssidST" && v == "TestNetwork"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "wifi" && n == "enableUartBridge" && v == "1"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "uwbEnable" && v == "1"));
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "rfForwardEnable" && v == "1"));

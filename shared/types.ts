@@ -76,6 +76,7 @@ export interface WifiConfig {
   gcsIp?: string;
   udpPort?: number;
   enableWebServer?: 0 | 1;
+  enableUartBridge?: 0 | 1;
   enableDiscovery?: 0 | 1;
   discoveryPort?: number;
   // Logging parameters
@@ -86,6 +87,7 @@ export interface WifiConfig {
 
 export interface UwbConfig {
   mode: 0 | 1 | 2 | 3 | 4;  // TWR_ANCHOR, TWR_TAG, CALIBRATION, TDOA_ANCHOR, TDOA_TAG
+  uwbEnable?: 0 | 1;        // Runtime UWB backend enable (0=disabled, 1=enabled)
   devShortAddr: string;
   anchorCount?: number;
   anchors?: AnchorConfig[];

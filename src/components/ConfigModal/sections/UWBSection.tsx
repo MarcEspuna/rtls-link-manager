@@ -23,6 +23,23 @@ export function UWBSection({ config, onChange, onApply, isExpertMode = false }: 
       <div className={styles.section}>
         <h3>UWB Configuration</h3>
         <div className={styles.field}>
+          <label>UWB Runtime</label>
+          <select
+            value={config.uwb.uwbEnable ?? 1}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              onChange('uwb', 'uwbEnable', val);
+              onApply('uwb', 'uwbEnable', val);
+            }}
+          >
+            <option value={1}>Enabled</option>
+            <option value={0}>Disabled</option>
+          </select>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+            Disables UWB ranging backend while keeping MAVLink/rangefinder and WiFi services active.
+          </span>
+        </div>
+        <div className={styles.field}>
           <label>Operation Mode</label>
           <select
             value={config.uwb.mode}
