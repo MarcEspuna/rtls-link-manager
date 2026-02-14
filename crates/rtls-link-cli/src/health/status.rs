@@ -144,6 +144,8 @@ mod tests {
             sending_pos: None,
             anchors_seen: None,
             origin_sent: None,
+            uwb_enabled: None,
+            rf_forward_enabled: None,
             rf_enabled: None,
             rf_healthy: None,
             avg_rate_c_hz: None,

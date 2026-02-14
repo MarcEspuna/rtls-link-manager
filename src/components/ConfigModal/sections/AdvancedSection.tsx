@@ -1,4 +1,5 @@
 import { DeviceConfig } from '@shared/types';
+import { MAV_SENSOR_ORIENTATION_OPTIONS } from '@shared/mavlink';
 import styles from '../ConfigModal.module.css';
 
 interface AdvancedSectionProps {
@@ -17,6 +18,29 @@ export function AdvancedSection({ config, onChange, onApply }: AdvancedSectionPr
     const parsed = parseInt(value, 10);
     return isNaN(parsed) ? fallback : parsed;
   };
+
+  const clampU8 = (value: number, fallback: number): number => {
+    if (!Number.isFinite(value)) return fallback;
+    return Math.min(255, Math.max(0, Math.trunc(value)));
+  };
+
+  const safeParseU8 = (value: string, fallback: number): number =>
+    clampU8(Number(value), fallback);
+
+  const rfForwardEnabled = config.uwb.rfForwardEnable ?? 0;
+  const rfForwardPreserveSrcIds = config.uwb.rfForwardPreserveSrcIds ?? 0;
+  const rfForwardSensorId = config.uwb.rfForwardSensorId ?? 255;
+  const rfForwardOrientation = config.uwb.rfForwardOrientation ?? 255;
+  const preserveSensorId = rfForwardSensorId === 255;
+  const preserveOrientation = rfForwardOrientation === 255;
+  const rfOrientationOptions = MAV_SENSOR_ORIENTATION_OPTIONS.some(
+    (option) => option.value === rfForwardOrientation
+  )
+    ? MAV_SENSOR_ORIENTATION_OPTIONS
+    : [
+        { value: rfForwardOrientation, label: `${rfForwardOrientation} - Unknown (as-is)` },
+        ...MAV_SENSOR_ORIENTATION_OPTIONS,
+      ];
 
   return (
     <div>
@@ -61,6 +85,111 @@ export function AdvancedSection({ config, onChange, onApply }: AdvancedSectionPr
             How to calculate the Z coordinate for position reports
           </span>
         </div>
+      </div>
+
+      <div className={styles.section}>
+        <h3>Rangefinder Forwarding</h3>
+        <p>
+          Forward incoming MAVLink <code>DISTANCE_SENSOR</code> from the rangefinder UART to ArduPilot.
+        </p>
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <label>Forwarding</label>
+            <select
+              value={rfForwardEnabled}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                onChange('uwb', 'rfForwardEnable', val);
+                onApply('uwb', 'rfForwardEnable', val);
+              }}
+            >
+              <option value={0}>Disabled</option>
+              <option value={1}>Enabled</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label>Source SYS/COMP IDs</label>
+            <select
+              value={rfForwardPreserveSrcIds}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                onChange('uwb', 'rfForwardPreserveSrcIds', val);
+                onApply('uwb', 'rfForwardPreserveSrcIds', val);
+              }}
+            >
+              <option value={0}>Use UWB Device IDs</option>
+              <option value={1}>Preserve Source IDs</option>
+            </select>
+          </div>
+        </div>
+
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <label>Sensor ID</label>
+            <select
+              value={preserveSensorId ? 'preserve' : 'override'}
+              onChange={(e) => {
+                const next = e.target.value === 'preserve' ? 255 : 0;
+                onChange('uwb', 'rfForwardSensorId', next);
+                onApply('uwb', 'rfForwardSensorId', next);
+              }}
+            >
+              <option value="preserve">Preserve Source</option>
+              <option value="override">Override</option>
+            </select>
+            {!preserveSensorId && (
+              <input
+                type="number"
+                step="1"
+                min={0}
+                max={254}
+                value={rfForwardSensorId}
+                onChange={(e) =>
+                  onChange('uwb', 'rfForwardSensorId', safeParseU8(e.target.value, 0))
+                }
+                onBlur={(e) => {
+                  const val = Math.min(254, safeParseU8(e.target.value, 0));
+                  onChange('uwb', 'rfForwardSensorId', val);
+                  onApply('uwb', 'rfForwardSensorId', val);
+                }}
+              />
+            )}
+          </div>
+
+          <div className={styles.field}>
+            <label>Orientation</label>
+            <select
+              value={preserveOrientation ? 'preserve' : 'override'}
+              onChange={(e) => {
+                const next = e.target.value === 'preserve' ? 255 : 0;
+                onChange('uwb', 'rfForwardOrientation', next);
+                onApply('uwb', 'rfForwardOrientation', next);
+              }}
+            >
+              <option value="preserve">Preserve Source</option>
+              <option value="override">Override</option>
+            </select>
+            {!preserveOrientation && (
+              <select
+                value={rfForwardOrientation}
+                onChange={(e) => {
+                  const val = safeParseU8(e.target.value, 0);
+                  onChange('uwb', 'rfForwardOrientation', val);
+                  onApply('uwb', 'rfForwardOrientation', val);
+                }}
+              >
+                {rfOrientationOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+          Sensor ID and orientation use MAVLink values. Value 255 means preserve source message value.
+        </span>
       </div>
 
       <div className={styles.section}>

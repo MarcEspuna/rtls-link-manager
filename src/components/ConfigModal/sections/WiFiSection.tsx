@@ -118,6 +118,20 @@ export function WiFiSection({ config, onChange, onApply }: WiFiSectionProps) {
             </select>
           </div>
           <div className={styles.field}>
+            <label>UART Bridge</label>
+            <select
+              value={config.wifi.enableUartBridge ?? 1}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                onChange('wifi', 'enableUartBridge', val);
+                onApply('wifi', 'enableUartBridge', val);
+              }}
+            >
+              <option value={1}>Enabled</option>
+              <option value={0}>Disabled</option>
+            </select>
+          </div>
+          <div className={styles.field}>
             <label>Discovery</label>
             <select
               value={config.wifi.enableDiscovery ?? 1}

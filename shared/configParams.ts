@@ -19,6 +19,7 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.wifi.gcsIp) params.push(['wifi', 'gcsIp', config.wifi.gcsIp]);
     if (config.wifi.udpPort !== undefined) params.push(['wifi', 'udpPort', String(config.wifi.udpPort)]);
     if (config.wifi.enableWebServer !== undefined) params.push(['wifi', 'enableWebServer', String(config.wifi.enableWebServer)]);
+    if (config.wifi.enableUartBridge !== undefined) params.push(['wifi', 'enableUartBridge', String(config.wifi.enableUartBridge)]);
     if (config.wifi.enableDiscovery !== undefined) params.push(['wifi', 'enableDiscovery', String(config.wifi.enableDiscovery)]);
     if (config.wifi.discoveryPort !== undefined) params.push(['wifi', 'discoveryPort', String(config.wifi.discoveryPort)]);
     // Logging parameters
@@ -30,6 +31,7 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
   // UWB params
   if (config.uwb) {
     if (config.uwb.mode !== undefined) params.push(['uwb', 'mode', String(config.uwb.mode)]);
+    if (config.uwb.uwbEnable !== undefined) params.push(['uwb', 'uwbEnable', String(config.uwb.uwbEnable)]);
     // NOTE: devShortAddr intentionally skipped - preserved per-device
 
     // Flatten anchors array to devId1/x1/y1/z1, devId2/x2/y2/z2, etc.
@@ -52,6 +54,10 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.uwb.mavlinkTargetSystemId !== undefined) params.push(['uwb', 'mavlinkTargetSystemId', String(config.uwb.mavlinkTargetSystemId)]);
     if (config.uwb.rotationDegrees !== undefined) params.push(['uwb', 'rotationDegrees', String(config.uwb.rotationDegrees)]);
     if (config.uwb.zCalcMode !== undefined) params.push(['uwb', 'zCalcMode', String(config.uwb.zCalcMode)]);
+    if (config.uwb.rfForwardEnable !== undefined) params.push(['uwb', 'rfForwardEnable', String(config.uwb.rfForwardEnable)]);
+    if (config.uwb.rfForwardSensorId !== undefined) params.push(['uwb', 'rfForwardSensorId', String(config.uwb.rfForwardSensorId)]);
+    if (config.uwb.rfForwardOrientation !== undefined) params.push(['uwb', 'rfForwardOrientation', String(config.uwb.rfForwardOrientation)]);
+    if (config.uwb.rfForwardPreserveSrcIds !== undefined) params.push(['uwb', 'rfForwardPreserveSrcIds', String(config.uwb.rfForwardPreserveSrcIds)]);
     // UWB Radio settings (TDoA mode only, expert mode)
     if (config.uwb.channel !== undefined) params.push(['uwb', 'channel', String(config.uwb.channel)]);
     if (config.uwb.dwMode !== undefined) params.push(['uwb', 'dwMode', String(config.uwb.dwMode)]);

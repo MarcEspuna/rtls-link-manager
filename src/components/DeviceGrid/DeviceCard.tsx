@@ -61,13 +61,19 @@ export function DeviceCard({ device, selected, onSelect, onConfigure }: DeviceCa
           <span className={device.originSent === undefined ? styles.statusUnknown : (device.originSent ? styles.statusOk : styles.statusPending)}>
             Origin: {device.originSent === undefined ? '?' : (device.originSent ? 'Sent' : 'Pending')}
           </span>
+          <span className={device.uwbEnabled === undefined ? styles.statusUnknown : (device.uwbEnabled ? styles.statusOk : styles.statusPending)}>
+            UWB: {device.uwbEnabled === undefined ? '?' : (device.uwbEnabled ? 'On' : 'Off')}
+          </span>
+          <span className={device.rfForwardEnabled === undefined ? styles.statusUnknown : (device.rfForwardEnabled ? styles.statusOk : styles.statusPending)}>
+            RF Fwd: {device.rfForwardEnabled === undefined ? '?' : (device.rfForwardEnabled ? 'On' : 'Off')}
+          </span>
           <span className={
             device.rfEnabled === undefined ? styles.statusUnknown :
             !device.rfEnabled ? styles.statusPending :
             device.rfHealthy ? styles.statusOk : styles.statusWarn
           }>
-            RF: {device.rfEnabled === undefined ? '?' :
-                 !device.rfEnabled ? 'Disabled' :
+            RF Health: {device.rfEnabled === undefined ? '?' :
+                 !device.rfEnabled ? 'Inactive' :
                  device.rfHealthy ? 'Healthy' : 'Unhealthy'}
           </span>
         </div>
