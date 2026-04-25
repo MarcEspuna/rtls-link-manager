@@ -293,6 +293,9 @@ pub struct UwbConfig {
     /// Number of distance samples to average (default: 50)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub distance_avg_samples: Option<u16>,
+    /// Position estimator mode: 0=3D, 1=2D (XY with fixed Z, default)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub use_2d_estimator: Option<u8>,
 }
 
 /// Single anchor configuration.
@@ -641,6 +644,7 @@ mod tests {
                 anchor_height: None,
                 anchor_pos_locked: None,
                 distance_avg_samples: None,
+                use_2d_estimator: None,
             },
             app: AppConfig {
                 led2_pin: Some(2),

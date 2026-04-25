@@ -118,6 +118,8 @@ export interface UwbConfig {
   anchorHeight?: number;            // Height for Z calculation (NED: Z = -height)
   anchorPosLocked?: number;         // Bitmask: bit N = anchor N position locked
   distanceAvgSamples?: number;      // Number of samples to average (default: 50)
+  // Position estimator configuration
+  use2DEstimator?: 0 | 1;           // 0=3D Newton-Raphson, 1=2D (XY with fixed Z, default)
 }
 
 export interface AnchorConfig {
