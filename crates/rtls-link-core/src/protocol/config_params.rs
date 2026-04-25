@@ -233,6 +233,13 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
+    if let Some(v) = config.uwb.use_2d_estimator {
+        params.push((
+            "uwb".to_string(),
+            "use2DEstimator".to_string(),
+            v.to_string(),
+        ));
+    }
 
     // App params
     if let Some(v) = config.app.led2_pin {
@@ -365,6 +372,7 @@ mod tests {
                 anchor_height: None,
                 anchor_pos_locked: None,
                 distance_avg_samples: None,
+                use_2d_estimator: None,
             },
             app: AppConfig {
                 led2_pin: Some(2),

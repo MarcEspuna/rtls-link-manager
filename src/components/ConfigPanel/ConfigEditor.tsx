@@ -366,6 +366,20 @@ export function ConfigEditor({
             </select>
           </div>
           <div className={styles.field}>
+            <label>Position Estimator</label>
+            <select
+              value={config.uwb.use2DEstimator ?? 1}
+              onChange={(e) => {
+                const val = Number(e.target.value) as 0 | 1;
+                handleChange('uwb', 'use2DEstimator', val);
+                handleApply('uwb', 'use2DEstimator', val);
+              }}
+            >
+              <option value={1}>2D (XY with fixed Z)</option>
+              <option value={0}>3D (full Newton-Raphson)</option>
+            </select>
+          </div>
+          <div className={styles.field}>
             <label>Rangefinder Forwarding</label>
             <select
               value={rfForwardEnabled}

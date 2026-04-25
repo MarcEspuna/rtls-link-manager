@@ -226,6 +226,7 @@ mod tests {
                     anchor_height: None,
                     anchor_pos_locked: None,
                     distance_avg_samples: None,
+                    use_2d_estimator: None,
                 },
                 app: AppConfig {
                     led2_pin: None,

@@ -72,6 +72,7 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.uwb.anchorHeight !== undefined) params.push(['uwb', 'anchorHeight', String(config.uwb.anchorHeight)]);
     if (config.uwb.anchorPosLocked !== undefined) params.push(['uwb', 'anchorPosLocked', String(config.uwb.anchorPosLocked)]);
     if (config.uwb.distanceAvgSamples !== undefined) params.push(['uwb', 'distanceAvgSamples', String(config.uwb.distanceAvgSamples)]);
+    if (config.uwb.use2DEstimator !== undefined) params.push(['uwb', 'use2DEstimator', String(config.uwb.use2DEstimator)]);
   }
 
   // App params
