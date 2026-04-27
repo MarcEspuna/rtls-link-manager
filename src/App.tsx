@@ -5,6 +5,7 @@ import { AnchorsPanel } from './components/Anchors';
 import { TagsPanel } from './components/Tags';
 import { ConfigModal } from './components/ConfigModal';
 import { PresetsPanel } from './components/Presets';
+import { ArduPilotUpdatePanel } from './components/ArduPilotUpdate';
 import { getDevices, clearDevices, onDevicesUpdated } from './lib/tauri-api';
 import { useSettings } from './hooks/useSettings';
 import './App.css';
@@ -138,6 +139,8 @@ function App() {
             allDevices={devices}
           />
         );
+      case 'ardupilot-update':
+        return <ArduPilotUpdatePanel devices={devices} />;
       default:
         return null;
     }
