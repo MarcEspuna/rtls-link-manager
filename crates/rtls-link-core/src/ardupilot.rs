@@ -15,6 +15,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, Web
 
 use crate::device::websocket::send_command;
 use crate::error::{CoreError, DeviceError};
+use crate::protocol::response::parse_json_response;
 
 const INSYNC: u8 = 0x12;
 const EOC: u8 = 0x20;
@@ -319,7 +320,11 @@ impl<T: ArduPilotTransport> ArduPilotBootloaderClient<T> {
 
     pub async fn reboot(&mut self) -> Result<(), CoreError> {
         self.transport.write(&[REBOOT, EOC]).await?;
-        let _ = self.get_sync(Duration::from_secs(2)).await;
+        match self.read_sync_status(Duration::from_secs(2)).await {
+            Ok(OK) => {}
+            Ok(status) => return Err(sync_status_error(status)),
+            Err(_) => {}
+        }
         Ok(())
     }
 
@@ -335,6 +340,14 @@ impl<T: ArduPilotTransport> ArduPilotBootloaderClient<T> {
     }
 
     async fn get_sync(&mut self, timeout_duration: Duration) -> Result<(), CoreError> {
+        let status = self.read_sync_status(timeout_duration).await?;
+        if status == OK {
+            return Ok(());
+        }
+        Err(sync_status_error(status))
+    }
+
+    async fn read_sync_status(&mut self, timeout_duration: Duration) -> Result<u8, CoreError> {
         let deadline = Instant::now() + timeout_duration;
 
         loop {
@@ -358,23 +371,19 @@ impl<T: ArduPilotTransport> ArduPilotBootloaderClient<T> {
             }
 
             let status = self.transport.read_exact_timeout(1, deadline - now).await?[0];
-            return match status {
-                OK => Ok(()),
-                INVALID => Err(CoreError::Other(
-                    "Bootloader reports invalid operation".to_string(),
-                )),
-                FAILED => Err(CoreError::Other(
-                    "Bootloader reports failed operation".to_string(),
-                )),
-                BAD_SILICON_REV => Err(CoreError::Other(
-                    "Bootloader reports unsupported silicon revision".to_string(),
-                )),
-                other => Err(CoreError::Other(format!(
-                    "Expected OK, got 0x{:02x}",
-                    other
-                ))),
-            };
+            return Ok(status);
         }
+    }
+}
+
+fn sync_status_error(status: u8) -> CoreError {
+    match status {
+        INVALID => CoreError::Other("Bootloader reports invalid operation".to_string()),
+        FAILED => CoreError::Other("Bootloader reports failed operation".to_string()),
+        BAD_SILICON_REV => {
+            CoreError::Other("Bootloader reports unsupported silicon revision".to_string())
+        }
+        other => CoreError::Other(format!("Expected OK, got 0x{:02x}", other)),
     }
 }
 
@@ -395,14 +404,11 @@ pub async fn update_over_maplink(
 
     let begin_cmd = format!("ardupilot-update begin {}", target_system.unwrap_or(0));
     let begin_response = send_command(ip, &begin_cmd, Duration::from_secs(8)).await?;
-    let begin_json: serde_json::Value = match serde_json::from_str(&begin_response) {
+    let begin_json: serde_json::Value = match parse_json_response(&begin_response, ip) {
         Ok(value) => value,
         Err(e) => {
             cleanup_update_session(ip).await;
-            return Err(CoreError::Other(format!(
-                "Invalid ardupilot-update response: {}",
-                e
-            )));
+            return Err(e.into());
         }
     };
     if begin_json.get("success").and_then(|v| v.as_bool()) != Some(true) {
@@ -670,5 +676,30 @@ mod tests {
         let state = state.lock().unwrap();
         assert!(state.expected_writes.is_empty());
         assert!(state.reads.is_empty());
+    }
+
+    #[tokio::test]
+    async fn reboot_fails_on_explicit_bootloader_failure_status() {
+        let (transport, _state) =
+            MockTransport::new(vec![vec![REBOOT, EOC]], vec![vec![INSYNC, FAILED]]);
+        let mut client = ArduPilotBootloaderClient::new(transport);
+
+        let err = client.reboot().await.unwrap_err();
+        assert!(err.to_string().contains("failed operation"));
+    }
+
+    #[tokio::test]
+    async fn reboot_tolerates_closed_transport_after_command() {
+        let (transport, _state) = MockTransport::new(vec![vec![REBOOT, EOC]], vec![]);
+        let mut client = ArduPilotBootloaderClient::new(transport);
+
+        client.reboot().await.unwrap();
+    }
+
+    #[test]
+    fn begin_response_parser_accepts_prefixed_json() {
+        let parsed: serde_json::Value =
+            parse_json_response("OK\n{\"success\":true}", "192.168.1.1").unwrap();
+        assert_eq!(parsed.get("success").and_then(|v| v.as_bool()), Some(true));
     }
 }
