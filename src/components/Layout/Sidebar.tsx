@@ -1,6 +1,6 @@
 import styles from './Layout.module.css';
 
-export type TabType = 'anchors' | 'tags' | 'presets';
+export type TabType = 'anchors' | 'tags' | 'presets' | 'ardupilot-update';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -14,6 +14,7 @@ export function Sidebar({ activeTab, onTabChange, anchorCount, tagCount }: Sideb
     { id: 'anchors', label: 'Anchors', count: anchorCount },
     { id: 'tags', label: 'Tags', count: tagCount },
     { id: 'presets', label: 'Presets' },
+    { id: 'ardupilot-update', label: 'ArduPilot Update' },
   ];
 
   return (

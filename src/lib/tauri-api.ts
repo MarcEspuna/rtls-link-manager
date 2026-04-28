@@ -223,6 +223,22 @@ export interface FirmwareInfo {
   [key: string]: unknown;
 }
 
+export interface ApjMetadata {
+  boardId: number;
+  imageSize: number;
+  boardRevision?: number;
+  gitIdentity?: string;
+  vehicleType?: string;
+  description?: string;
+}
+
+export interface BootloaderInfo {
+  revision: number;
+  boardId: number;
+  boardRevision: number;
+  flashSize: number;
+}
+
 /**
  * Get firmware info from a device.
  */
@@ -231,6 +247,18 @@ export async function getFirmwareInfo(
   timeoutMs?: number
 ): Promise<FirmwareInfo> {
   return await invokeSafe('get_firmware_info', { ip, timeoutMs });
+}
+
+export async function readApjMetadata(filePath: string): Promise<ApjMetadata> {
+  return await invokeSafe('read_apj_metadata', { filePath });
+}
+
+export async function updateArduPilotFromFile(
+  ip: string,
+  filePath: string,
+  targetSystem?: number
+): Promise<BootloaderInfo> {
+  return await invokeSafe('update_ardupilot_from_file', { ip, filePath, targetSystem });
 }
 
 // ============================================================================
@@ -269,6 +297,13 @@ export interface OtaErrorEvent {
   error: string;
 }
 
+export interface ArduPilotUpdateProgressEvent {
+  ip: string;
+  phase: string;
+  percent: number;
+  detail?: string;
+}
+
 /**
  * Listen for OTA firmware upload progress events.
  */
@@ -298,6 +333,14 @@ export async function onOtaError(
   callback: (event: OtaErrorEvent) => void
 ): Promise<UnlistenFn> {
   return await listen<OtaErrorEvent>('ota-error', (event) => {
+    callback(event.payload);
+  });
+}
+
+export async function onArduPilotUpdateProgress(
+  callback: (event: ArduPilotUpdateProgressEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<ArduPilotUpdateProgressEvent>('ardupilot-update-progress', (event) => {
     callback(event.payload);
   });
 }

@@ -96,6 +96,8 @@ pub fn run() {
             commands::device_comm::upload_firmware_from_file,
             commands::device_comm::upload_firmware_to_devices,
             commands::device_comm::get_firmware_info,
+            commands::device_comm::read_apj_metadata,
+            commands::device_comm::update_ardupilot_from_file,
             commands::logging::start_log_stream,
             commands::logging::stop_log_stream,
             commands::logging::get_active_log_streams,

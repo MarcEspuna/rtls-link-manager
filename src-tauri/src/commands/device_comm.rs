@@ -8,6 +8,9 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::error::AppError;
+use rtls_link_core::ardupilot::{
+    update_over_maplink, ApjFirmware, ArduPilotUpdateProgress, ArduPilotUpdateProgressHandler,
+};
 use rtls_link_core::device::ota::{upload_firmware, upload_firmware_bulk, OtaProgressHandler};
 use rtls_link_core::device::websocket::{
     send_command_parsed, DeviceCommandResponse, DeviceConnection,
@@ -41,6 +44,16 @@ impl OtaProgressHandler for TauriOtaProgress {
         let _ = self
             .app_handle
             .emit("ota-error", serde_json::json!({ "ip": ip, "error": error }));
+    }
+}
+
+struct TauriArduPilotProgress {
+    app_handle: AppHandle,
+}
+
+impl ArduPilotUpdateProgressHandler for TauriArduPilotProgress {
+    fn on_progress(&self, progress: ArduPilotUpdateProgress) {
+        let _ = self.app_handle.emit("ardupilot-update-progress", progress);
     }
 }
 
@@ -186,4 +199,28 @@ pub async fn get_firmware_info(
     response
         .json
         .ok_or_else(|| AppError::Json("No JSON found in firmware info response".to_string()))
+}
+
+/// Read metadata from an ArduPilot .apj firmware file.
+#[tauri::command]
+pub async fn read_apj_metadata(file_path: String) -> Result<serde_json::Value, AppError> {
+    let path = PathBuf::from(&file_path);
+    let firmware = ApjFirmware::from_path(&path).map_err(AppError::from)?;
+    serde_json::to_value(firmware.metadata).map_err(AppError::from)
+}
+
+/// Update the ArduPilot connected behind one RTLS/MAP-Link device.
+#[tauri::command]
+pub async fn update_ardupilot_from_file(
+    ip: String,
+    file_path: String,
+    target_system: Option<u8>,
+    app_handle: AppHandle,
+) -> Result<serde_json::Value, AppError> {
+    let progress = TauriArduPilotProgress { app_handle };
+    let path = PathBuf::from(file_path);
+    let info = update_over_maplink(&ip, path.as_path(), target_system, &progress)
+        .await
+        .map_err(AppError::from)?;
+    serde_json::to_value(info).map_err(AppError::from)
 }

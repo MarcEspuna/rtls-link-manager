@@ -1,3 +1,4 @@
+pub mod ardupilot;
 pub mod device;
 pub mod discovery;
 pub mod error;
