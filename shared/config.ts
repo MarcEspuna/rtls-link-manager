@@ -70,6 +70,19 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       config.uwb.uwbEnable !== 1) {
       errors.push('UWB runtime enable must be 0 or 1');
     }
+
+    if (config.uwb.enableCovMatrix !== undefined &&
+      config.uwb.enableCovMatrix !== 0 &&
+      config.uwb.enableCovMatrix !== 1) {
+      errors.push('Covariance matrix enable must be 0 or 1');
+    }
+
+    if (config.uwb.rmseThreshold !== undefined) {
+      const v = Number(config.uwb.rmseThreshold);
+      if (Number.isNaN(v) || !Number.isFinite(v) || v <= 0) {
+        errors.push('RMSE threshold must be a positive number');
+      }
+    }
   }
 
   return { valid: errors.length === 0, errors };

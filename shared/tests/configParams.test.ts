@@ -14,6 +14,8 @@ describe('configToParams', () => {
         rfForwardSensorId: 7,
         rfForwardOrientation: 25,
         rfForwardPreserveSrcIds: 1,
+        enableCovMatrix: 1,
+        rmseThreshold: 0.8,
       },
       app: {},
     };
@@ -26,5 +28,7 @@ describe('configToParams', () => {
     expect(params).toContainEqual(['uwb', 'rfForwardSensorId', '7']);
     expect(params).toContainEqual(['uwb', 'rfForwardOrientation', '25']);
     expect(params).toContainEqual(['uwb', 'rfForwardPreserveSrcIds', '1']);
+    expect(params).toContainEqual(['uwb', 'enableCovMatrix', '1']);
+    expect(params).toContainEqual(['uwb', 'rmseThreshold', '0.8']);
   });
 });

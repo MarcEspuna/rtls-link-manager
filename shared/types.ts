@@ -104,6 +104,9 @@ export interface UwbConfig {
   rfForwardSensorId?: number;       // 0-254 override, 255=preserve source
   rfForwardOrientation?: number;    // MAVLink orientation enum, 255=preserve source
   rfForwardPreserveSrcIds?: 0 | 1;  // 0=use UWB IDs, 1=preserve source IDs
+  // Position estimation / covariance settings
+  enableCovMatrix?: 0 | 1;    // 0=disabled, 1=enabled (send covariance to ArduPilot)
+  rmseThreshold?: number;     // RMSE threshold for position validity in meters
   // UWB Radio settings (TDoA mode only, expert mode)
   channel?: number;           // UWB channel (1-7), default 2
   dwMode?: number;            // DW1000 mode index (0-7), default 0 (SHORTDATA_FAST_ACCURACY)

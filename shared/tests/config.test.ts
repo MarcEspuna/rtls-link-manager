@@ -32,4 +32,20 @@ describe('validateConfig', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('UWB runtime enable must be 0 or 1');
   });
+
+  it('validates covariance enable as boolean-like byte', () => {
+    const result = validateConfig({
+      uwb: { enableCovMatrix: 3 } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Covariance matrix enable must be 0 or 1');
+  });
+
+  it('requires a positive RMSE threshold', () => {
+    const result = validateConfig({
+      uwb: { rmseThreshold: 0 } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('RMSE threshold must be a positive number');
+  });
 });

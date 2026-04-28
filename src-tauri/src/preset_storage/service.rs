@@ -109,6 +109,8 @@ mod tests {
                     rf_forward_sensor_id: None,
                     rf_forward_orientation: None,
                     rf_forward_preserve_src_ids: None,
+                    enable_cov_matrix: None,
+                    rmse_threshold: None,
                     channel: None,
                     dw_mode: None,
                     tx_power_level: None,
