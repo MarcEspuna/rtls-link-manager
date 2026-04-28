@@ -174,6 +174,20 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
+    if let Some(v) = config.uwb.enable_cov_matrix {
+        params.push((
+            "uwb".to_string(),
+            "enableCovMatrix".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.rmse_threshold {
+        params.push((
+            "uwb".to_string(),
+            "rmseThreshold".to_string(),
+            v.to_string(),
+        ));
+    }
     if let Some(v) = config.uwb.channel {
         params.push(("uwb".to_string(), "channel".to_string(), v.to_string()));
     }
@@ -361,6 +375,8 @@ mod tests {
                 rf_forward_sensor_id: Some(7),
                 rf_forward_orientation: Some(25),
                 rf_forward_preserve_src_ids: Some(1),
+                enable_cov_matrix: Some(1),
+                rmse_threshold: Some(0.8),
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,
@@ -424,5 +440,11 @@ mod tests {
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "rfForwardPreserveSrcIds" && v == "1"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "enableCovMatrix" && v == "1"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "rmseThreshold" && v == "0.8"));
     }
 }

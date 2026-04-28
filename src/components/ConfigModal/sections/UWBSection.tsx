@@ -158,6 +158,56 @@ export function UWBSection({ config, onChange, onApply, isExpertMode = false }: 
         </div>
       )}
 
+      {/* Position Estimation - TDoA Tag only */}
+      {config.uwb.mode === 4 && (
+        <div className={styles.section}>
+          <h3>Position Estimation</h3>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label>Covariance Matrix</label>
+              <select
+                value={config.uwb.enableCovMatrix ?? 0}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  onChange('uwb', 'enableCovMatrix', val);
+                  onApply('uwb', 'enableCovMatrix', val);
+                }}
+              >
+                <option value={0}>Disabled</option>
+                <option value={1}>Enabled</option>
+              </select>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                Sends position covariance in MAVLink VISION_POSITION_ESTIMATE messages.
+              </span>
+            </div>
+            <div className={styles.field}>
+              <label>RMSE Threshold (m)</label>
+              <input
+                type="number"
+                min={0.01}
+                step={0.05}
+                value={config.uwb.rmseThreshold ?? 0.8}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 0.8 : Number(raw);
+                  onChange('uwb', 'rmseThreshold', val);
+                }}
+                onBlur={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 0.8 : Number(raw);
+                  if (!Number.isFinite(val) || val <= 0) return;
+                  onChange('uwb', 'rmseThreshold', val);
+                  onApply('uwb', 'rmseThreshold', val);
+                }}
+              />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                Rejects position estimates whose solver RMSE exceeds this value.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TDMA Schedule - Expert Mode + TDoA Anchor only */}
       {isExpertMode && config.uwb.mode === 3 && (
         <div className={styles.section}>

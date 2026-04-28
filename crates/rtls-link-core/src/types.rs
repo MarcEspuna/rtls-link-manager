@@ -260,6 +260,12 @@ pub struct UwbConfig {
     /// Preserve source sysid/compid when forwarding (0=no, 1=yes)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rf_forward_preserve_src_ids: Option<u8>,
+    /// Send position covariance matrix to ArduPilot (0=disabled, 1=enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_cov_matrix: Option<u8>,
+    /// RMSE threshold for position validity in meters
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rmse_threshold: Option<f64>,
     /// UWB channel (1-7), default 2
     #[serde(skip_serializing_if = "Option::is_none")]
     pub channel: Option<u8>,
@@ -633,6 +639,8 @@ mod tests {
                 rf_forward_sensor_id: Some(7),
                 rf_forward_orientation: Some(25),
                 rf_forward_preserve_src_ids: Some(1),
+                enable_cov_matrix: Some(1),
+                rmse_threshold: Some(0.8),
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,
