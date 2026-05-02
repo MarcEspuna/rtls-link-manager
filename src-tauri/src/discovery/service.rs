@@ -98,7 +98,7 @@ mod tests {
     fn test_parse_heartbeat() {
         let json = r#"{
             "id": "device1",
-            "role": "tag",
+            "role": "tag_tdoa",
             "mac": "AA:BB:CC:DD:EE:FF",
             "uwb_short": "1",
             "mav_sysid": 1,
@@ -111,7 +111,7 @@ mod tests {
 
         assert_eq!(device.ip, "192.168.1.100");
         assert_eq!(device.id, "device1");
-        assert_eq!(device.role, DeviceRole::Tag);
+        assert_eq!(device.role, DeviceRole::TagTdoa);
         assert_eq!(device.mac, "AA:BB:CC:DD:EE:FF");
         assert_eq!(device.uwb_short, "1");
         assert_eq!(device.mav_sys_id, 1);
@@ -122,13 +122,13 @@ mod tests {
 
     #[test]
     fn test_parse_minimal_heartbeat() {
-        let json = r#"{"id": "test", "role": "anchor"}"#;
+        let json = r#"{"id": "test", "role": "anchor_tdoa"}"#;
 
         let device = parse_heartbeat(json.as_bytes(), "10.0.0.1".to_string()).unwrap();
 
         assert_eq!(device.ip, "10.0.0.1");
         assert_eq!(device.id, "test");
-        assert_eq!(device.role, DeviceRole::Anchor);
+        assert_eq!(device.role, DeviceRole::AnchorTdoa);
         assert_eq!(device.sending_pos, None);
     }
 
@@ -149,7 +149,7 @@ mod tests {
                 Device {
                     ip: "192.168.1.1".to_string(),
                     id: "fresh".to_string(),
-                    role: DeviceRole::Tag,
+                    role: DeviceRole::TagTdoa,
                     mac: "".to_string(),
                     uwb_short: "1".to_string(),
                     mav_sys_id: 1,
@@ -182,7 +182,7 @@ mod tests {
                 Device {
                     ip: "192.168.1.2".to_string(),
                     id: "stale".to_string(),
-                    role: DeviceRole::Anchor,
+                    role: DeviceRole::AnchorTdoa,
                     mac: "".to_string(),
                     uwb_short: "2".to_string(),
                     mav_sys_id: 2,
@@ -219,11 +219,11 @@ mod tests {
     #[test]
     fn test_all_device_roles() {
         let roles = [
-            ("anchor", DeviceRole::Anchor),
-            ("tag", DeviceRole::Tag),
+            ("anchor", DeviceRole::Unknown),
+            ("tag", DeviceRole::Unknown),
             ("anchor_tdoa", DeviceRole::AnchorTdoa),
             ("tag_tdoa", DeviceRole::TagTdoa),
-            ("calibration", DeviceRole::Calibration),
+            ("calibration", DeviceRole::Unknown),
             ("unknown_role", DeviceRole::Unknown),
         ];
 

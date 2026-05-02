@@ -51,7 +51,7 @@ mod tests {
                 Device {
                     ip: "192.168.1.100".to_string(),
                     id: "test".to_string(),
-                    role: DeviceRole::Tag,
+                    role: DeviceRole::TagTdoa,
                     mac: "AA:BB:CC:DD:EE:FF".to_string(),
                     uwb_short: "1".to_string(),
                     mav_sys_id: 1,

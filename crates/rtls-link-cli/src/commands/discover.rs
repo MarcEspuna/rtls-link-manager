@@ -89,8 +89,8 @@ async fn run_watch_mode(
 
             for device in &devices {
                 let _role_color = match device.role {
-                    DeviceRole::Tag | DeviceRole::TagTdoa => "cyan",
-                    DeviceRole::Anchor | DeviceRole::AnchorTdoa => "green",
+                    DeviceRole::TagTdoa => "cyan",
+                    DeviceRole::AnchorTdoa => "green",
                     _ => "yellow",
                 };
 
@@ -115,14 +115,6 @@ async fn run_watch_mode(
 
 fn filter_devices(devices: Vec<Device>, filter: Option<RoleFilter>) -> Vec<Device> {
     match filter {
-        Some(RoleFilter::Anchor) => devices
-            .into_iter()
-            .filter(|d| d.role == DeviceRole::Anchor)
-            .collect(),
-        Some(RoleFilter::Tag) => devices
-            .into_iter()
-            .filter(|d| d.role == DeviceRole::Tag)
-            .collect(),
         Some(RoleFilter::AnchorTdoa) => devices
             .into_iter()
             .filter(|d| d.role == DeviceRole::AnchorTdoa)
@@ -130,10 +122,6 @@ fn filter_devices(devices: Vec<Device>, filter: Option<RoleFilter>) -> Vec<Devic
         Some(RoleFilter::TagTdoa) => devices
             .into_iter()
             .filter(|d| d.role == DeviceRole::TagTdoa)
-            .collect(),
-        Some(RoleFilter::Calibration) => devices
-            .into_iter()
-            .filter(|d| d.role == DeviceRole::Calibration)
             .collect(),
         None => devices,
     }

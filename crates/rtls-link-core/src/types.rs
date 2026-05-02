@@ -75,12 +75,12 @@ pub struct Device {
     /// Whether UDP log streaming is enabled at runtime
     #[serde(skip_serializing_if = "Option::is_none")]
     pub log_udp_enabled: Option<bool>,
-    /// Dynamic anchor positions (calculated from inter-anchor TWR)
+    /// Dynamic anchor positions (calculated from inter-anchor ToF)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dynamic_anchors: Option<Vec<DynamicAnchorPosition>>,
 }
 
-/// Dynamic anchor position from inter-anchor TWR measurements.
+/// Dynamic anchor position from inter-anchor ToF measurements.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DynamicAnchorPosition {
     /// Anchor ID (0-7)
@@ -97,16 +97,10 @@ pub struct DynamicAnchorPosition {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DeviceRole {
-    /// TWR Anchor mode (0)
-    Anchor,
-    /// TWR Tag mode (1)
-    Tag,
     /// TDoA Anchor mode (3)
     AnchorTdoa,
     /// TDoA Tag mode (4)
     TagTdoa,
-    /// Calibration mode (2)
-    Calibration,
     /// Unknown/unrecognized mode
     Unknown,
 }
@@ -115,33 +109,27 @@ impl DeviceRole {
     /// Parse a role string from device heartbeat
     pub fn from_str(s: &str) -> Self {
         match s {
-            "anchor" => DeviceRole::Anchor,
-            "tag" => DeviceRole::Tag,
             "anchor_tdoa" => DeviceRole::AnchorTdoa,
             "tag_tdoa" => DeviceRole::TagTdoa,
-            "calibration" => DeviceRole::Calibration,
             _ => DeviceRole::Unknown,
         }
     }
 
     /// Check if role is an anchor type
     pub fn is_anchor(&self) -> bool {
-        matches!(self, DeviceRole::Anchor | DeviceRole::AnchorTdoa)
+        matches!(self, DeviceRole::AnchorTdoa)
     }
 
     /// Check if role is a tag type
     pub fn is_tag(&self) -> bool {
-        matches!(self, DeviceRole::Tag | DeviceRole::TagTdoa)
+        matches!(self, DeviceRole::TagTdoa)
     }
 
     /// Get display name
     pub fn display_name(&self) -> &'static str {
         match self {
-            DeviceRole::Anchor => "Anchor",
-            DeviceRole::Tag => "Tag",
             DeviceRole::AnchorTdoa => "Anchor (TDoA)",
             DeviceRole::TagTdoa => "Tag (TDoA)",
-            DeviceRole::Calibration => "Calibration",
             DeviceRole::Unknown => "Unknown",
         }
     }
@@ -217,7 +205,7 @@ pub struct WifiConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UwbConfig {
-    /// UWB mode: 0=TWR_ANCHOR, 1=TWR_TAG, 2=CALIBRATION, 3=TDOA_ANCHOR, 4=TDOA_TAG
+    /// UWB mode: 3=TDOA_ANCHOR, 4=TDOA_TAG
     pub mode: u8,
     /// Runtime UWB backend enable (0=disabled, 1=enabled)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -523,7 +511,7 @@ mod tests {
         let device = Device {
             ip: "192.168.1.100".to_string(),
             id: "test-device".to_string(),
-            role: DeviceRole::Tag,
+            role: DeviceRole::TagTdoa,
             mac: "AA:BB:CC:DD:EE:FF".to_string(),
             uwb_short: "1".to_string(),
             mav_sys_id: 1,
@@ -549,7 +537,7 @@ mod tests {
 
         let json = serde_json::to_string(&device).unwrap();
         assert!(json.contains("\"ip\":\"192.168.1.100\""));
-        assert!(json.contains("\"role\":\"tag\""));
+        assert!(json.contains("\"role\":\"tag_tdoa\""));
         assert!(json.contains("\"uwbShort\":\"1\""));
         assert!(json.contains("\"mavSysId\":1"));
 
@@ -560,28 +548,26 @@ mod tests {
 
     #[test]
     fn test_device_role_from_str() {
-        assert_eq!(DeviceRole::from_str("anchor"), DeviceRole::Anchor);
-        assert_eq!(DeviceRole::from_str("tag"), DeviceRole::Tag);
+        assert_eq!(DeviceRole::from_str("anchor"), DeviceRole::Unknown);
+        assert_eq!(DeviceRole::from_str("tag"), DeviceRole::Unknown);
         assert_eq!(DeviceRole::from_str("anchor_tdoa"), DeviceRole::AnchorTdoa);
         assert_eq!(DeviceRole::from_str("tag_tdoa"), DeviceRole::TagTdoa);
-        assert_eq!(DeviceRole::from_str("calibration"), DeviceRole::Calibration);
+        assert_eq!(DeviceRole::from_str("calibration"), DeviceRole::Unknown);
         assert_eq!(DeviceRole::from_str("invalid"), DeviceRole::Unknown);
     }
 
     #[test]
     fn test_device_role_helpers() {
-        assert!(DeviceRole::Anchor.is_anchor());
         assert!(DeviceRole::AnchorTdoa.is_anchor());
-        assert!(!DeviceRole::Tag.is_anchor());
+        assert!(!DeviceRole::TagTdoa.is_anchor());
 
-        assert!(DeviceRole::Tag.is_tag());
         assert!(DeviceRole::TagTdoa.is_tag());
-        assert!(!DeviceRole::Anchor.is_tag());
+        assert!(!DeviceRole::AnchorTdoa.is_tag());
     }
 
     #[test]
     fn test_device_role_display() {
-        assert_eq!(format!("{}", DeviceRole::Anchor), "Anchor");
+        assert_eq!(format!("{}", DeviceRole::AnchorTdoa), "Anchor (TDoA)");
         assert_eq!(format!("{}", DeviceRole::TagTdoa), "Tag (TDoA)");
     }
 

@@ -210,9 +210,6 @@ export function ConfigEditor({
               handleApply('uwb', 'mode', val);
             }}
           >
-            <option value={0}>TWR Anchor</option>
-            <option value={1}>TWR Tag</option>
-            <option value={2}>Calibration</option>
             <option value={3}>TDoA Anchor</option>
             <option value={4}>TDoA Tag</option>
           </select>
@@ -572,7 +569,7 @@ export function ConfigEditor({
         <div className={styles.section}>
           <h4>Dynamic Anchor Positioning</h4>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-            Calculate anchor positions from inter-anchor TWR measurements instead of using static coordinates.
+            Calculate anchor positions from inter-anchor ToF measurements instead of using static coordinates.
           </p>
           <div className={styles.field}>
             <label>Dynamic Positioning</label>

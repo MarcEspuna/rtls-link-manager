@@ -49,9 +49,6 @@ export function UWBSection({ config, onChange, onApply, isExpertMode = false }: 
               onApply('uwb', 'mode', val);
             }}
           >
-            <option value={0}>TWR Anchor</option>
-            <option value={1}>TWR Tag</option>
-            <option value={2}>Calibration</option>
             <option value={3}>TDoA Anchor</option>
             <option value={4}>TDoA Tag</option>
           </select>
