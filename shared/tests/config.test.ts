@@ -10,11 +10,35 @@ describe('validateConfig', () => {
     expect(result.errors).toContain('Station mode requires ssidST');
   });
 
-  it('limits anchor count to 6', () => {
+  it('limits anchor count to 8', () => {
+    const result = validateConfig({
+      uwb: { anchorCount: 9 } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Maximum 8 anchors supported');
+  });
+
+  it('accepts eight anchors', () => {
     const result = validateConfig({
       uwb: { anchorCount: 8 } as any
     });
+    expect(result.valid).toBe(true);
+  });
+
+  it('validates ArduPilot beacon output settings', () => {
+    const result = validateConfig({
+      uwb: {
+        apOutputMode: 3,
+        apBeaconPositionMode: 4,
+        apBeaconPositionStartupMs: -1,
+        apBeaconPositionErrorMm: 0,
+      } as any
+    });
     expect(result.valid).toBe(false);
+    expect(result.errors).toContain('ArduPilot output mode must be 0 or 1');
+    expect(result.errors).toContain('Beacon position mode must be 0, 1, or 2');
+    expect(result.errors).toContain('Beacon position startup window must be a non-negative integer');
+    expect(result.errors).toContain('Beacon position error must be an integer in 1-65535 mm');
   });
 
   it('validates rangefinder forwarding sensor ID byte range', () => {

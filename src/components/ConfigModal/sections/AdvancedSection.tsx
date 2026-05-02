@@ -27,6 +27,23 @@ export function AdvancedSection({ config, onChange, onApply }: AdvancedSectionPr
   const safeParseU8 = (value: string, fallback: number): number =>
     clampU8(Number(value), fallback);
 
+  const clampU16 = (value: number, fallback: number): number => {
+    if (!Number.isFinite(value)) return fallback;
+    return Math.min(65535, Math.max(0, Math.trunc(value)));
+  };
+
+  const safeParseU16 = (value: string, fallback: number): number =>
+    clampU16(Number(value), fallback);
+
+  const safeParseNonNegativeInt = (value: string, fallback: number): number => {
+    const parsed = parseInt(value, 10);
+    return isNaN(parsed) ? fallback : Math.max(0, parsed);
+  };
+
+  const apOutputMode = config.uwb.apOutputMode ?? 0;
+  const apBeaconPositionMode = config.uwb.apBeaconPositionMode ?? 1;
+  const apBeaconPositionStartupMs = config.uwb.apBeaconPositionStartupMs ?? 10000;
+  const apBeaconPositionErrorMm = config.uwb.apBeaconPositionErrorMm ?? 500;
   const rfForwardEnabled = config.uwb.rfForwardEnable ?? 0;
   const rfForwardPreserveSrcIds = config.uwb.rfForwardPreserveSrcIds ?? 0;
   const rfForwardSensorId = config.uwb.rfForwardSensorId ?? 255;
@@ -62,6 +79,78 @@ export function AdvancedSection({ config, onChange, onApply }: AdvancedSectionPr
           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
             Rotation offset from true north (clockwise positive)
           </span>
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <h3>ArduPilot Output</h3>
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <label>Output Mode</label>
+            <select
+              value={apOutputMode}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                onChange('uwb', 'apOutputMode', val);
+                onApply('uwb', 'apOutputMode', val);
+              }}
+            >
+              <option value={0}>MAVLink External Nav</option>
+              <option value={1}>Beacon TDoA</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label>Position Feed</label>
+            <select
+              value={apBeaconPositionMode}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                onChange('uwb', 'apBeaconPositionMode', val);
+                onApply('uwb', 'apBeaconPositionMode', val);
+              }}
+            >
+              <option value={0}>Disabled</option>
+              <option value={1}>Startup Window</option>
+              <option value={2}>Continuous</option>
+            </select>
+          </div>
+        </div>
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <label>Startup Window (ms)</label>
+            <input
+              type="number"
+              step="100"
+              min={0}
+              value={apBeaconPositionStartupMs}
+              onChange={(e) =>
+                onChange('uwb', 'apBeaconPositionStartupMs', safeParseNonNegativeInt(e.target.value, 10000))
+              }
+              onBlur={(e) => {
+                const val = safeParseNonNegativeInt(e.target.value, 10000);
+                onChange('uwb', 'apBeaconPositionStartupMs', val);
+                onApply('uwb', 'apBeaconPositionStartupMs', val);
+              }}
+            />
+          </div>
+          <div className={styles.field}>
+            <label>Position Error (mm)</label>
+            <input
+              type="number"
+              step="50"
+              min={1}
+              max={65535}
+              value={apBeaconPositionErrorMm}
+              onChange={(e) =>
+                onChange('uwb', 'apBeaconPositionErrorMm', Math.max(1, safeParseU16(e.target.value, 500)))
+              }
+              onBlur={(e) => {
+                const val = Math.max(1, safeParseU16(e.target.value, 500));
+                onChange('uwb', 'apBeaconPositionErrorMm', val);
+                onApply('uwb', 'apBeaconPositionErrorMm', val);
+              }}
+            />
+          </div>
         </div>
       </div>
 

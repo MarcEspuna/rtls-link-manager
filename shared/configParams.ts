@@ -53,6 +53,10 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.uwb.originAlt !== undefined) params.push(['uwb', 'originAlt', String(config.uwb.originAlt)]);
     if (config.uwb.mavlinkTargetSystemId !== undefined) params.push(['uwb', 'mavlinkTargetSystemId', String(config.uwb.mavlinkTargetSystemId)]);
     if (config.uwb.rotationDegrees !== undefined) params.push(['uwb', 'rotationDegrees', String(config.uwb.rotationDegrees)]);
+    if (config.uwb.apOutputMode !== undefined) params.push(['uwb', 'apOutputMode', String(config.uwb.apOutputMode)]);
+    if (config.uwb.apBeaconPositionMode !== undefined) params.push(['uwb', 'apBeaconPositionMode', String(config.uwb.apBeaconPositionMode)]);
+    if (config.uwb.apBeaconPositionStartupMs !== undefined) params.push(['uwb', 'apBeaconPositionStartupMs', String(config.uwb.apBeaconPositionStartupMs)]);
+    if (config.uwb.apBeaconPositionErrorMm !== undefined) params.push(['uwb', 'apBeaconPositionErrorMm', String(config.uwb.apBeaconPositionErrorMm)]);
     if (config.uwb.zCalcMode !== undefined) params.push(['uwb', 'zCalcMode', String(config.uwb.zCalcMode)]);
     if (config.uwb.rfForwardEnable !== undefined) params.push(['uwb', 'rfForwardEnable', String(config.uwb.rfForwardEnable)]);
     if (config.uwb.rfForwardSensorId !== undefined) params.push(['uwb', 'rfForwardSensorId', String(config.uwb.rfForwardSensorId)]);

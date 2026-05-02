@@ -16,6 +16,10 @@ describe('configToParams', () => {
         rfForwardPreserveSrcIds: 1,
         enableCovMatrix: 1,
         rmseThreshold: 0.8,
+        apOutputMode: 1,
+        apBeaconPositionMode: 1,
+        apBeaconPositionStartupMs: 10000,
+        apBeaconPositionErrorMm: 500,
       },
       app: {},
     };
@@ -30,5 +34,9 @@ describe('configToParams', () => {
     expect(params).toContainEqual(['uwb', 'rfForwardPreserveSrcIds', '1']);
     expect(params).toContainEqual(['uwb', 'enableCovMatrix', '1']);
     expect(params).toContainEqual(['uwb', 'rmseThreshold', '0.8']);
+    expect(params).toContainEqual(['uwb', 'apOutputMode', '1']);
+    expect(params).toContainEqual(['uwb', 'apBeaconPositionMode', '1']);
+    expect(params).toContainEqual(['uwb', 'apBeaconPositionStartupMs', '10000']);
+    expect(params).toContainEqual(['uwb', 'apBeaconPositionErrorMm', '500']);
   });
 });

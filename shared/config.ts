@@ -21,8 +21,35 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
   }
 
   if (config.uwb) {
-    if (config.uwb.anchorCount && config.uwb.anchorCount > 6) {
-      errors.push('Maximum 6 anchors supported');
+    if (config.uwb.anchorCount && config.uwb.anchorCount > 8) {
+      errors.push('Maximum 8 anchors supported');
+    }
+
+    if (config.uwb.apOutputMode !== undefined &&
+      config.uwb.apOutputMode !== 0 &&
+      config.uwb.apOutputMode !== 1) {
+      errors.push('ArduPilot output mode must be 0 or 1');
+    }
+
+    if (config.uwb.apBeaconPositionMode !== undefined &&
+      config.uwb.apBeaconPositionMode !== 0 &&
+      config.uwb.apBeaconPositionMode !== 1 &&
+      config.uwb.apBeaconPositionMode !== 2) {
+      errors.push('Beacon position mode must be 0, 1, or 2');
+    }
+
+    if (config.uwb.apBeaconPositionStartupMs !== undefined) {
+      const v = Number(config.uwb.apBeaconPositionStartupMs);
+      if (Number.isNaN(v) || !Number.isInteger(v) || v < 0) {
+        errors.push('Beacon position startup window must be a non-negative integer');
+      }
+    }
+
+    if (config.uwb.apBeaconPositionErrorMm !== undefined) {
+      const v = Number(config.uwb.apBeaconPositionErrorMm);
+      if (Number.isNaN(v) || !Number.isInteger(v) || v <= 0 || v > 65535) {
+        errors.push('Beacon position error must be an integer in 1-65535 mm');
+      }
     }
 
     if (config.uwb.tdoaSlotCount !== undefined) {

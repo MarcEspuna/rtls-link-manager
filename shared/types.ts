@@ -98,6 +98,10 @@ export interface UwbConfig {
   originAlt?: number;
   mavlinkTargetSystemId?: number;
   rotationDegrees?: number;
+  apOutputMode?: 0 | 1;               // 0=MAVLink external nav, 1=ArduPilot beacon TDoA
+  apBeaconPositionMode?: 0 | 1 | 2;   // 0=disabled, 1=startup window, 2=continuous
+  apBeaconPositionStartupMs?: number; // Startup position window after beacon config ACK
+  apBeaconPositionErrorMm?: number;   // Position seed error estimate in millimeters
   zCalcMode?: 0 | 1 | 2;  // 0=None (TDoA Z), 1=Rangefinder, 2=UWB (reserved)
   // Rangefinder forwarding settings
   rfForwardEnable?: 0 | 1;          // 0=disabled, 1=enabled
