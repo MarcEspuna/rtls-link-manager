@@ -4,6 +4,7 @@
 //! and uploading firmware via OTA. This routes all device communication
 //! through the Rust backend instead of direct browser connections.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -70,30 +71,39 @@ async fn run_device_batches(
 
     for chunk in work.chunks(concurrency) {
         let mut join_set = tokio::task::JoinSet::new();
+        let mut task_ips = HashMap::new();
         for (ip, commands) in chunk.iter().cloned() {
-            join_set.spawn(async move {
+            let ip_for_error = ip.clone();
+            let handle = join_set.spawn(async move {
                 let result = send_commands_parsed(&ip, &commands, timeout).await;
                 (ip, result)
             });
+            task_ips.insert(handle.id(), ip_for_error);
         }
 
-        while let Some(joined) = join_set.join_next().await {
+        while let Some(joined) = join_set.join_next_with_id().await {
             let (ip, result) = match joined {
-                Ok(v) => v,
+                Ok((id, v)) => {
+                    task_ips.remove(&id);
+                    v
+                }
                 Err(e) => {
                     completed += 1;
+                    let ip = task_ips
+                        .remove(&e.id())
+                        .unwrap_or_else(|| "unknown".to_string());
                     let message = e.to_string();
                     emit_operation_progress(
                         &app_handle,
                         &operation_id,
                         completed,
                         total,
-                        None,
+                        Some(&ip),
                         Some(false),
                         Some(&message),
                     );
                     results.push(DeviceOperationResult {
-                        ip: "unknown".to_string(),
+                        ip,
                         success: false,
                         error: Some(message),
                     });
@@ -298,7 +308,7 @@ pub async fn upload_preset_to_devices(
 ) -> Result<Vec<DeviceOperationResult>, AppError> {
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(3000));
     let operation_id = operation_id.unwrap_or_else(|| "upload-preset".to_string());
-    let mut commands = match preset.preset_type {
+    let commands = match preset.preset_type {
         PresetType::Full => {
             let config = preset.config.as_ref().ok_or_else(|| {
                 AppError::Json("Full preset must include config data".to_string())
@@ -316,9 +326,6 @@ pub async fn upload_preset_to_devices(
             commands
         }
     };
-    if commands.is_empty() {
-        commands.push(Commands::save_config().to_string());
-    }
     let command_batches = ips.iter().map(|_| commands.clone()).collect();
 
     Ok(run_device_batches(

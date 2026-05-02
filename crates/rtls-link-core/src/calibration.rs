@@ -902,3 +902,135 @@ async fn apply_delays(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_close(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < 1e-9,
+            "expected {expected}, got {actual}"
+        );
+    }
+
+    fn measurement(i: usize, j: usize) -> Measurement {
+        Measurement {
+            i,
+            j,
+            b: 0.0,
+            weight: 1.0,
+        }
+    }
+
+    #[test]
+    fn build_rectangular_targets_maps_each_layout() {
+        let cases = [
+            (
+                RectLayout::RectangularA1xA3y,
+                [
+                    [0.0, 3.0, 5.0, 4.0],
+                    [3.0, 0.0, 4.0, 5.0],
+                    [5.0, 4.0, 0.0, 3.0],
+                    [4.0, 5.0, 3.0, 0.0],
+                ],
+            ),
+            (
+                RectLayout::RectangularA1xA2y,
+                [
+                    [0.0, 3.0, 4.0, 5.0],
+                    [3.0, 0.0, 5.0, 4.0],
+                    [4.0, 5.0, 0.0, 3.0],
+                    [5.0, 4.0, 3.0, 0.0],
+                ],
+            ),
+            (
+                RectLayout::RectangularA3xA1y,
+                [
+                    [0.0, 4.0, 5.0, 3.0],
+                    [4.0, 0.0, 3.0, 5.0],
+                    [5.0, 3.0, 0.0, 4.0],
+                    [3.0, 5.0, 4.0, 0.0],
+                ],
+            ),
+            (
+                RectLayout::RectangularA2xA3y,
+                [
+                    [0.0, 5.0, 3.0, 4.0],
+                    [5.0, 0.0, 4.0, 3.0],
+                    [3.0, 4.0, 0.0, 5.0],
+                    [4.0, 3.0, 5.0, 0.0],
+                ],
+            ),
+        ];
+
+        for (layout, expected) in cases {
+            let actual = build_rectangular_targets(layout, 3.0, 4.0);
+            for i in 0..4 {
+                for j in 0..4 {
+                    assert_close(actual[i][j], expected[i][j]);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ensure_measurement_graph_requires_connected_non_bipartite_graph() {
+        let disconnected = vec![measurement(0, 1), measurement(2, 3)];
+        assert!(ensure_measurement_graph_ok(&disconnected, 4).is_err());
+
+        let bipartite_square = vec![
+            measurement(0, 1),
+            measurement(1, 2),
+            measurement(2, 3),
+            measurement(3, 0),
+        ];
+        assert!(ensure_measurement_graph_ok(&bipartite_square, 4).is_err());
+
+        let connected_with_odd_cycle = vec![
+            measurement(0, 1),
+            measurement(1, 2),
+            measurement(2, 0),
+            measurement(2, 3),
+        ];
+        assert!(ensure_measurement_graph_ok(&connected_with_odd_cycle, 4).is_ok());
+    }
+
+    #[test]
+    fn solve_antenna_delays_irls_solves_known_complete_system() {
+        let expected = [10100.0, 10900.0, 12150.0, 12950.0];
+        let mut measurements = Vec::new();
+        for i in 0..4 {
+            for j in (i + 1)..4 {
+                measurements.push(Measurement {
+                    i,
+                    j,
+                    b: expected[i] + expected[j],
+                    weight: 10.0,
+                });
+            }
+        }
+
+        let solved = solve_antenna_delays_irls(&measurements, &[0.0; 4], 0.0).unwrap();
+
+        for (actual, expected) in solved.iter().zip(expected) {
+            assert!(
+                (*actual - expected).abs() < 1e-6,
+                "expected {expected}, got {actual}"
+            );
+        }
+    }
+
+    #[test]
+    fn samples_robust_mean_rejects_large_outlier() {
+        let mut samples = Samples::default();
+        for value in [998.0, 1000.0, 1002.0, 50_000.0] {
+            samples.add(value);
+        }
+
+        let (mean, inliers) = samples.robust_mean().unwrap();
+
+        assert_eq!(inliers, 3);
+        assert_close(mean, 1000.0);
+    }
+}

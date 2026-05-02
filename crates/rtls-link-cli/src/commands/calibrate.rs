@@ -63,6 +63,7 @@ async fn run_calibrate_anchors(
                         .join("  ")
                 );
             }
+            // The awaited return value is the same final run payload; avoid duplicate output.
             CalibrationEvent::Complete { .. } => {}
         }
     })

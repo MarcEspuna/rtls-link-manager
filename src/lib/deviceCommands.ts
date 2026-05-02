@@ -50,8 +50,7 @@ export async function sendDeviceCommand<T = string>(
 /**
  * Send multiple commands to a device sequentially.
  *
- * The Rust backend sends commands sequentially. (Current implementation opens a
- * new WebSocket connection per command.)
+ * The Rust backend sends commands sequentially over one WebSocket connection.
  * Response validation and progress callbacks are handled on the frontend.
  */
 export async function sendDeviceCommands(
