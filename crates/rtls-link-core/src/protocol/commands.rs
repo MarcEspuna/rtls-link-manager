@@ -2,7 +2,7 @@
 //!
 //! These commands are sent over WebSocket to devices at ws://<ip>/ws
 
-/// Commands that return JSON responses
+/// Commands that return structured responses.
 pub const JSON_COMMANDS: &[&str] = &[
     "backup-config",
     "list-configs",
@@ -16,7 +16,7 @@ pub const JSON_COMMANDS: &[&str] = &[
     "tdoa-distances",
 ];
 
-/// Check if a command is expected to return JSON
+/// Check if a command is expected to return a structured response.
 pub fn is_json_command(cmd: &str) -> bool {
     JSON_COMMANDS.iter().any(|c| cmd.starts_with(c))
 }
@@ -53,7 +53,7 @@ impl Commands {
 
     // ==================== Config commands ====================
 
-    /// Backup current configuration (returns JSON)
+    /// Backup current configuration.
     pub fn backup_config() -> &'static str {
         "backup-config"
     }
@@ -68,39 +68,39 @@ impl Commands {
         "load-config"
     }
 
-    /// List saved configurations on device (returns JSON)
+    /// List saved configurations on device.
     pub fn list_configs() -> &'static str {
         "list-configs"
     }
 
-    /// Save current config with a name (returns JSON)
+    /// Save current config with a name.
     pub fn save_config_as(name: &str) -> String {
         format!("save-config-as -name {}", name)
     }
 
-    /// Load a named configuration (returns JSON)
+    /// Load a named configuration.
     pub fn load_config_named(name: &str) -> String {
         format!("load-config-named -name {}", name)
     }
 
-    /// Read a named configuration without loading (returns JSON)
+    /// Read a named configuration without loading.
     pub fn read_config_named(name: &str) -> String {
         format!("read-config-named -name {}", name)
     }
 
-    /// Delete a named configuration (returns JSON)
+    /// Delete a named configuration.
     pub fn delete_config(name: &str) -> String {
         format!("delete-config -name {}", name)
     }
 
     // ==================== Control commands ====================
 
-    /// Toggle LED2 state (returns JSON)
+    /// Toggle LED2 state.
     pub fn toggle_led() -> &'static str {
         "toggle-led2"
     }
 
-    /// Get LED2 state (returns JSON)
+    /// Get LED2 state.
     pub fn get_led_state() -> &'static str {
         "get-led2-state"
     }
@@ -122,14 +122,14 @@ impl Commands {
         "version"
     }
 
-    /// Get firmware info (returns JSON)
+    /// Get firmware info.
     pub fn get_firmware_info() -> &'static str {
         "firmware-info"
     }
 
     // ==================== Diagnostics / calibration ====================
 
-    /// Get latest inter-anchor ToF ticks (TDoA anchors, returns JSON)
+    /// Get latest inter-anchor ToF ticks from TDoA anchors.
     pub fn tdoa_distances() -> &'static str {
         "tdoa-distances"
     }

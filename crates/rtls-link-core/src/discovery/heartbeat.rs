@@ -1,5 +1,6 @@
 //! Heartbeat parsing and device pruning utilities.
 
+use crate::protocol::binary::decode_heartbeat;
 use crate::types::{Device, DeviceRole, DynamicAnchorPosition};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -9,7 +10,10 @@ pub const DEVICE_TTL: Duration = Duration::from_secs(5);
 
 /// Parse a heartbeat packet into a Device struct.
 pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Error> {
-    let json: serde_json::Value = serde_json::from_slice(data)?;
+    let json: serde_json::Value = match decode_heartbeat(data) {
+        Ok(value) => value,
+        Err(_) => serde_json::from_slice(data)?,
+    };
 
     // Parse optional dynamic anchor positions
     let dynamic_anchors = json["dyn_anchors"].as_array().map(|arr| {
