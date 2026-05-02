@@ -6,7 +6,7 @@ Desktop application for configuring and monitoring RTLS-Link UWB devices.
 
 ## Overview
 
-RTLS-Link Manager is a cross-platform desktop application built with Tauri for managing RTLS-Link devices - ESP32S3 microcontrollers with DW1000 UWB modules that perform Time Difference of Arrival (TDoA) localization for minidrones.
+RTLS-Link Manager is a cross-platform desktop application built with Tauri for managing RTLS-Link devices: ESP32/ESP32S3 boards with DW1000 UWB modules that perform Time Difference of Arrival (TDoA) localization.
 
 The tool provides:
 - Automatic device discovery on the network
@@ -18,26 +18,11 @@ The tool provides:
 
 ## Architecture
 
+The manager repo also owns the automation CLI. Shared device behavior belongs in `rtls-link-core`, then both the desktop backend and CLI call the same implementation.
+
 ```
-+-------------------------------------------------------------+
-|                      RTLS-Link System                       |
-+-------------------------------------------------------------+
-|                                                             |
-|  +-----------------+         +-------------------------+    |
-|  |   Minidrone     | <-UWB-> |   RTLS-Link Anchors     |    |
-|  |   (Tag Mode)    |         | (ESP32S3 + DW1000 x4-6) |    |
-|  +-----------------+         +------------+------------+    |
-|                                           |                 |
-|                                      WiFi/UDP               |
-|                                           |                 |
-|                           +---------------v---------------+ |
-|                           | RTLS-Link Manager (Desktop)   | |
-|                           | +----------+   +------------+ | |
-|                           | | React UI |<->| Rust/Tauri | | |
-|                           | +----------+   +------------+ | |
-|                           +-------------------------------+ |
-|                                                             |
-+-------------------------------------------------------------+
+React UI -> Tauri IPC -> src-tauri -> rtls-link-core
+CLI -------------------------------> rtls-link-core
 ```
 
 ## Features
@@ -110,9 +95,10 @@ rtls-link-manager/
 │   ├── lib/
 │   │   └── tauri-api.ts      # Tauri IPC wrapper
 │   └── components/
-│       ├── ConfigModal/      # Device configuration UI
+│       ├── ConfigModal/      # Per-device configuration UI
 │       ├── DeviceGrid/       # Device list display
 │       ├── LocalConfigs/     # Local config management
+│       ├── Presets/          # Local preset management
 │       └── common/           # Shared UI components
 ├── src-tauri/                # Rust backend
 │   ├── Cargo.toml            # Rust dependencies
@@ -124,7 +110,8 @@ rtls-link-manager/
 │       ├── state.rs          # Shared app state
 │       ├── error.rs          # Error handling
 │       ├── discovery/        # UDP device discovery
-│       ├── config_storage/   # Local config storage
+│       ├── config_storage/   # Tauri storage wrappers
+│       ├── preset_storage/   # Tauri storage wrappers
 │       └── commands/         # Tauri IPC commands
 └── shared/                   # Shared types and utilities
     ├── types.ts              # TypeScript interfaces
@@ -170,6 +157,11 @@ Configure up to 6 anchors with:
 
 ## Development
 
+Keep device-facing behavior in Rust:
+- `rtls-link-core` owns protocol, discovery, OTA, health, calibration, and config/preset conversion.
+- `src-tauri` exposes those workflows to the UI through Tauri commands and progress events.
+- `src` should focus on presentation and user interaction, not protocol or solver logic.
+
 ### Commands
 
 ```bash
@@ -180,7 +172,7 @@ npm run dev
 npm run build
 
 # Run frontend tests
-npm test
+npm run test:run
 
 # Run Rust tests
 cargo test --workspace
@@ -208,10 +200,10 @@ Configurations are stored in the OS-specific app data directory:
 
 ```bash
 # Run all Rust tests
-cd src-tauri && cargo test
+cargo test --workspace
 
 # Run frontend tests
-npm test
+npm run test:run
 ```
 
 ## Troubleshooting
