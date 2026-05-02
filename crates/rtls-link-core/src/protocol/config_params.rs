@@ -5,7 +5,110 @@
 //!
 //! IMPORTANT: devShortAddr is intentionally skipped to preserve device identity.
 
-use crate::types::{DeviceConfig, LocationData};
+use crate::types::{AnchorConfig, DeviceConfig, LocationData};
+
+/// Parse a firmware `backup-config` payload into a DeviceConfig.
+///
+/// Firmware stores anchor geometry as flat `uwb.devIdN/xN/yN/zN` fields.
+/// The manager stores anchors as `uwb.anchors`, so rebuild that array before
+/// saving or uploading the config again.
+pub fn device_config_from_backup_value(
+    value: serde_json::Value,
+) -> serde_json::Result<DeviceConfig> {
+    let mut config: DeviceConfig = serde_json::from_value(value.clone())?;
+    rebuild_flat_anchors(&mut config, &value);
+    Ok(config)
+}
+
+fn rebuild_flat_anchors(config: &mut DeviceConfig, value: &serde_json::Value) {
+    if config
+        .uwb
+        .anchors
+        .as_ref()
+        .is_some_and(|anchors| !anchors.is_empty())
+    {
+        return;
+    }
+
+    let Some(uwb) = value.get("uwb").and_then(|v| v.as_object()) else {
+        return;
+    };
+
+    let count = config
+        .uwb
+        .anchor_count
+        .or_else(|| value_to_u8(uwb.get("anchorCount")))
+        .unwrap_or(0)
+        .min(6);
+
+    if count == 0 {
+        return;
+    }
+
+    let mut anchors = Vec::with_capacity(count as usize);
+    for idx in 1..=count {
+        anchors.push(AnchorConfig {
+            id: normalize_uwb_short_addr(uwb.get(&format!("devId{}", idx))),
+            x: value_to_f64(uwb.get(&format!("x{}", idx))).unwrap_or(0.0),
+            y: value_to_f64(uwb.get(&format!("y{}", idx))).unwrap_or(0.0),
+            z: value_to_f64(uwb.get(&format!("z{}", idx))).unwrap_or(0.0),
+        });
+    }
+
+    config.uwb.anchors = Some(anchors);
+}
+
+fn value_to_u8(value: Option<&serde_json::Value>) -> Option<u8> {
+    value
+        .and_then(|v| v.as_u64().or_else(|| v.as_str()?.trim().parse().ok()))
+        .and_then(|v| u8::try_from(v).ok())
+}
+
+fn value_to_f64(value: Option<&serde_json::Value>) -> Option<f64> {
+    value.and_then(|v| {
+        v.as_f64()
+            .or_else(|| v.as_i64().map(|n| n as f64))
+            .or_else(|| v.as_str()?.trim().parse().ok())
+    })
+}
+
+fn normalize_uwb_short_addr(value: Option<&serde_json::Value>) -> String {
+    let Some(value) = value else {
+        return "0".to_string();
+    };
+    let raw = value
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| value.to_string());
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return "0".to_string();
+    }
+    if raw.len() <= 2 && raw.chars().all(|c| c.is_ascii_digit()) {
+        return raw.to_string();
+    }
+
+    if raw.len() == 4 && raw.chars().all(|c| c.is_ascii_hexdigit()) {
+        let chars = [0usize, 2usize]
+            .into_iter()
+            .filter_map(|start| u8::from_str_radix(&raw[start..start + 2], 16).ok())
+            .filter(|b| *b != 0)
+            .map(char::from)
+            .collect::<String>();
+        let digits = chars
+            .chars()
+            .filter(|c| c.is_ascii_digit())
+            .collect::<String>();
+        let normalized = digits.trim_start_matches('0');
+        return if normalized.is_empty() {
+            "0".to_string()
+        } else {
+            normalized.to_string()
+        };
+    }
+
+    raw.to_string()
+}
 
 /// Convert a DeviceConfig to parameter tuples.
 ///
@@ -446,5 +549,75 @@ mod tests {
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "rmseThreshold" && v == "0.8"));
+    }
+
+    #[test]
+    fn device_config_from_backup_value_rebuilds_flat_anchors() {
+        let raw = serde_json::json!({
+            "wifi": {
+                "mode": 1,
+                "ssidST": "field-router"
+            },
+            "uwb": {
+                "mode": 4,
+                "devShortAddr": "7",
+                "anchorCount": 2,
+                "devId1": "3031",
+                "x1": "1.5",
+                "y1": 2.0,
+                "z1": "-0.5",
+                "devId2": 2,
+                "x2": 3,
+                "y2": "4.25",
+                "z2": 0
+            },
+            "app": {}
+        });
+
+        let config = device_config_from_backup_value(raw).unwrap();
+        let anchors = config.uwb.anchors.as_ref().unwrap();
+
+        assert_eq!(anchors.len(), 2);
+        assert_eq!(anchors[0].id, "1");
+        assert_eq!(anchors[0].x, 1.5);
+        assert_eq!(anchors[0].y, 2.0);
+        assert_eq!(anchors[0].z, -0.5);
+        assert_eq!(anchors[1].id, "2");
+        assert_eq!(anchors[1].x, 3.0);
+        assert_eq!(anchors[1].y, 4.25);
+        assert_eq!(anchors[1].z, 0.0);
+
+        let params = config_to_params(&config);
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "devId1" && v == "1"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "x2" && v == "3"));
+    }
+
+    #[test]
+    fn device_config_from_backup_value_preserves_existing_anchor_array() {
+        let raw = serde_json::json!({
+            "wifi": { "mode": 1 },
+            "uwb": {
+                "mode": 4,
+                "devShortAddr": "7",
+                "anchorCount": 1,
+                "anchors": [{ "id": "9", "x": 9.0, "y": 8.0, "z": 7.0 }],
+                "devId1": "1",
+                "x1": 1.0,
+                "y1": 2.0,
+                "z1": 3.0
+            },
+            "app": {}
+        });
+
+        let config = device_config_from_backup_value(raw).unwrap();
+        let anchors = config.uwb.anchors.as_ref().unwrap();
+
+        assert_eq!(anchors.len(), 1);
+        assert_eq!(anchors[0].id, "9");
+        assert_eq!(anchors[0].x, 9.0);
     }
 }

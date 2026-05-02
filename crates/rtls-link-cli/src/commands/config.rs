@@ -10,7 +10,7 @@ use crate::types::{Device, DeviceConfig, DeviceRole};
 
 use rtls_link_core::device::websocket::{send_command, DeviceConnection};
 use rtls_link_core::protocol::commands::Commands;
-use rtls_link_core::protocol::config_params::config_to_params;
+use rtls_link_core::protocol::config_params::{config_to_params, device_config_from_backup_value};
 use rtls_link_core::protocol::response::parse_json_response;
 
 /// Run the config command
@@ -74,7 +74,9 @@ async fn run_backup(
 ) -> Result<(), CliError> {
     let response = send_command(ip, Commands::backup_config(), timeout).await?;
 
-    let config: DeviceConfig = parse_json_response(&response, ip)?;
+    let json: serde_json::Value = parse_json_response(&response, ip)?;
+    let config: DeviceConfig =
+        device_config_from_backup_value(json).map_err(ConfigError::ParseError)?;
 
     let config_json = serde_json::to_string_pretty(&config).map_err(ConfigError::ParseError)?;
 

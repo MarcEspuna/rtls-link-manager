@@ -5,6 +5,7 @@ use crate::preset_storage::PresetStorageService;
 use crate::types::{GpsOrigin, LocationData, Preset, PresetInfo, PresetType};
 use rtls_link_core::device::websocket::send_command_parsed;
 use rtls_link_core::protocol::commands::Commands;
+use rtls_link_core::protocol::config_params::device_config_from_backup_value;
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::State;
@@ -61,8 +62,7 @@ pub async fn backup_device_preset(
     let json = response
         .json
         .ok_or_else(|| AppError::Json("No JSON found in backup-config response".to_string()))?;
-    let config: crate::types::DeviceConfig =
-        serde_json::from_value(json).map_err(AppError::from)?;
+    let config = device_config_from_backup_value(json).map_err(AppError::from)?;
     let now = chrono::Utc::now().to_rfc3339();
 
     let preset = match preset_type {
