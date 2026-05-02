@@ -376,6 +376,23 @@ export function ConfigEditor({
               <option value={0}>3D (full Newton-Raphson)</option>
             </select>
           </div>
+          {config.uwb.mode === 4 && (
+            <div className={styles.field}>
+              <label>TDoA Matcher Policy</label>
+              <select
+                value={config.uwb.tdoaMatcherPolicy ?? 0}
+                onChange={(e) => {
+                  const val = Number(e.target.value) as 0 | 1 | 2;
+                  handleChange('uwb', 'tdoaMatcherPolicy', val);
+                  handleApply('uwb', 'tdoaMatcherPolicy', val);
+                }}
+              >
+                <option value={0}>Youngest</option>
+                <option value={1}>Random</option>
+                <option value={2}>All eligible</option>
+              </select>
+            </div>
+          )}
           <div className={styles.field}>
             <label>Rangefinder Forwarding</label>
             <select

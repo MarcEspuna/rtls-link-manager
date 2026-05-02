@@ -48,4 +48,12 @@ describe('validateConfig', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('RMSE threshold must be a positive number');
   });
+
+  it('validates TDoA matcher policy range', () => {
+    const result = validateConfig({
+      uwb: { tdoaMatcherPolicy: 3 } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('TDoA matcher policy must be 0 (youngest), 1 (random), or 2 (all eligible)');
+  });
 });

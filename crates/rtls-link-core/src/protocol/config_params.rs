@@ -219,6 +219,13 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
+    if let Some(v) = config.uwb.tdoa_matcher_policy {
+        params.push((
+            "uwb".to_string(),
+            "tdoaMatcherPolicy".to_string(),
+            v.to_string(),
+        ));
+    }
     // Dynamic anchor positioning (TDoA tags only)
     if let Some(v) = config.uwb.dynamic_anchor_pos_enabled {
         params.push((
@@ -383,6 +390,7 @@ mod tests {
                 smart_power_enable: None,
                 tdoa_slot_count: None,
                 tdoa_slot_duration_us: None,
+                tdoa_matcher_policy: Some(2),
                 dynamic_anchor_pos_enabled: None,
                 anchor_layout: None,
                 anchor_height: None,
@@ -446,5 +454,8 @@ mod tests {
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "rmseThreshold" && v == "0.8"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "tdoaMatcherPolicy" && v == "2"));
     }
 }

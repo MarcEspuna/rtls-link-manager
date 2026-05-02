@@ -272,6 +272,9 @@ pub struct UwbConfig {
     /// TDoA TDMA slot duration in microseconds, 0=legacy (~2ms)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tdoa_slot_duration_us: Option<u16>,
+    /// TDoA tag matcher policy: 0=youngest, 1=random, 2=all eligible
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_matcher_policy: Option<u8>,
     /// Dynamic anchor positioning enable (0=static, 1=dynamic)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dynamic_anchor_pos_enabled: Option<u8>,
@@ -633,6 +636,7 @@ mod tests {
                 smart_power_enable: None,
                 tdoa_slot_count: None,
                 tdoa_slot_duration_us: None,
+                tdoa_matcher_policy: None,
                 dynamic_anchor_pos_enabled: None,
                 anchor_layout: None,
                 anchor_height: None,

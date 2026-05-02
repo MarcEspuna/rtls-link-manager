@@ -201,6 +201,24 @@ export function UWBSection({ config, onChange, onApply, isExpertMode = false }: 
                 Rejects position estimates whose solver RMSE exceeds this value.
               </span>
             </div>
+            <div className={styles.field}>
+              <label>TDoA Matcher Policy</label>
+              <select
+                value={config.uwb.tdoaMatcherPolicy ?? 0}
+                onChange={(e) => {
+                  const val = Number(e.target.value) as 0 | 1 | 2;
+                  onChange('uwb', 'tdoaMatcherPolicy', val);
+                  onApply('uwb', 'tdoaMatcherPolicy', val);
+                }}
+              >
+                <option value={0}>Youngest</option>
+                <option value={1}>Random</option>
+                <option value={2}>All eligible</option>
+              </select>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                Selects which anchor-pair candidates feed each Newton-Raphson batch.
+              </span>
+            </div>
           </div>
         </div>
       )}

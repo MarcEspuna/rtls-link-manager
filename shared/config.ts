@@ -43,6 +43,13 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       }
     }
 
+    if (config.uwb.tdoaMatcherPolicy !== undefined) {
+      const v = Number(config.uwb.tdoaMatcherPolicy);
+      if (!Number.isInteger(v) || v < 0 || v > 2) {
+        errors.push('TDoA matcher policy must be 0 (youngest), 1 (random), or 2 (all eligible)');
+      }
+    }
+
     if (config.uwb.rfForwardEnable !== undefined && config.uwb.rfForwardEnable !== 0 && config.uwb.rfForwardEnable !== 1) {
       errors.push('Rangefinder forwarding enable must be 0 or 1');
     }

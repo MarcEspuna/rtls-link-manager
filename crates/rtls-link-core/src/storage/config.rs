@@ -224,6 +224,7 @@ mod tests {
                 smart_power_enable: None,
                 tdoa_slot_count: None,
                 tdoa_slot_duration_us: None,
+                tdoa_matcher_policy: None,
                 dynamic_anchor_pos_enabled: None,
                 anchor_layout: None,
                 anchor_height: None,
