@@ -12,9 +12,11 @@ import {
   sendDeviceCommands as tauriSendCommands,
   uploadFirmwareFromFile,
   uploadFirmwareBulk as tauriUploadBulk,
+  runBulkDeviceCommand,
   onOtaProgress,
   onOtaComplete,
   onOtaError,
+  onDeviceOperationProgress,
   type FirmwareResult,
   type OtaProgressEvent,
 } from './tauri-api';
@@ -81,30 +83,35 @@ export async function executeBulkCommand(
   }
 ): Promise<BulkCommandResult[]> {
   const { concurrency = 5, timeout = DEFAULT_COMMAND_TIMEOUT_MS, onProgress } = options ?? {};
-
-  const results: BulkCommandResult[] = [];
-
-  for (let i = 0; i < devices.length; i += concurrency) {
-    const batch = devices.slice(i, i + concurrency);
-    const batchResults = await Promise.all(
-      batch.map(async (device): Promise<BulkCommandResult> => {
-        try {
-          await sendDeviceCommand(device.ip, command, timeout);
-          return { device, success: true };
-        } catch (e) {
-          return {
-            device,
-            success: false,
-            error: e instanceof Error ? e.message : 'Failed',
-          };
-        }
-      })
-    );
-    results.push(...batchResults);
-    onProgress?.(results.length, devices.length);
+  const operationId = `bulk-${Date.now()}`;
+  let unlisten: (() => void) | undefined;
+  if (onProgress) {
+    unlisten = await onDeviceOperationProgress((event) => {
+      if (event.operationId === operationId) {
+        onProgress(event.completed, event.total);
+      }
+    });
   }
 
-  return results;
+  try {
+    const rawResults = await runBulkDeviceCommand(
+      devices.map((d) => d.ip),
+      command,
+      { timeoutMs: timeout, concurrency, operationId }
+    );
+    const deviceByIp = new Map(devices.map((device) => [device.ip, device]));
+    return rawResults.flatMap((result) => {
+      const device = deviceByIp.get(result.ip);
+      if (!device) return [];
+      return [{
+        device,
+        success: result.success,
+        error: result.error,
+      }];
+    });
+  } finally {
+    unlisten?.();
+  }
 }
 
 /**

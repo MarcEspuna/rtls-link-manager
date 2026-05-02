@@ -83,9 +83,13 @@ npm run dev
 ```bash
 # Build release packages
 npm run build
+
+# Build only the CLI
+cargo build --release -p rtls-link-cli
 ```
 
 Outputs:
+- **CLI**: `target/release/rtls-link-cli`
 - **Linux**: `src-tauri/target/release/bundle/deb/*.deb`, `*.rpm`, `*.AppImage`
 - **Windows**: `src-tauri/target/release/bundle/nsis/*.exe`
 
@@ -93,16 +97,20 @@ Outputs:
 
 ```
 rtls-link-manager/
+├── Cargo.toml                # Rust workspace manifest
 ├── package.json              # Frontend dependencies
 ├── index.html                # HTML entry point
 ├── vite.config.ts            # Vite bundler config
+├── crates/
+│   ├── rtls-link-core/       # Shared Rust discovery, device protocol, OTA, storage, calibration
+│   └── rtls-link-cli/        # CLI built on top of rtls-link-core
 ├── src/                      # React frontend
 │   ├── main.tsx              # React entry point
 │   ├── App.tsx               # Main application component
 │   ├── lib/
 │   │   └── tauri-api.ts      # Tauri IPC wrapper
 │   └── components/
-│       ├── ConfigPanel/      # Device configuration UI
+│       ├── ConfigModal/      # Device configuration UI
 │       ├── DeviceGrid/       # Device list display
 │       ├── LocalConfigs/     # Local config management
 │       └── common/           # Shared UI components
@@ -175,7 +183,11 @@ npm run build
 npm test
 
 # Run Rust tests
-cd src-tauri && cargo test
+cargo test --workspace
+
+# Build the CLI used by automation and hardware workflows
+cargo build --release -p rtls-link-cli
+./target/release/rtls-link-cli discover
 ```
 
 ### Network Ports

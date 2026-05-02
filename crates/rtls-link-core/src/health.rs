@@ -1,12 +1,12 @@
 //! Health status calculation for RTLS-Link devices.
 //!
-//! Ported from rtls-link-manager's healthStatus.ts
+//! Device health calculation shared by the manager backend and CLI.
 
 use crate::types::Device;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Health level classification
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum HealthLevel {
     /// Device is operating normally
@@ -31,7 +31,7 @@ impl HealthLevel {
 }
 
 /// Device health information
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceHealth {
     /// Overall health level
     pub level: HealthLevel,
@@ -156,6 +156,7 @@ mod tests {
             log_serial_enabled: None,
             log_udp_enabled: None,
             dynamic_anchors: None,
+            health: None,
         }
     }
 

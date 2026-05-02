@@ -1,0 +1,159 @@
+.anchorList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.anchorHeader,
+.anchorRow {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 1fr 32px;
+  gap: 8px;
+}
+
+.anchorHeaderWithLock,
+.anchorRowWithLock {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 1fr 32px 32px;
+  gap: 8px;
+}
+
+.anchorHeader,
+.anchorHeaderWithLock {
+  padding: 0 4px;
+  margin-bottom: 4px;
+}
+
+.anchorHeader label,
+.anchorHeaderWithLock label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.anchorHeader label:first-child,
+.anchorHeaderWithLock label:first-child {
+  text-align: left;
+}
+
+.anchorRow,
+.anchorRowWithLock {
+  align-items: center;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s;
+}
+
+.anchorRowGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.anchorRow:hover,
+.anchorRowWithLock:hover {
+  border-color: var(--border-color-light);
+}
+
+.anchorInput,
+.anchorInputSmall {
+  width: 100% !important;
+  padding: 8px 10px !important;
+  text-align: right;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+.anchorInput:focus,
+.anchorInputSmall:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-primary-muted);
+}
+
+.anchorInputSmall {
+  text-align: left;
+  font-family: monospace;
+}
+
+.inputError {
+  border-color: var(--accent-danger) !important;
+  box-shadow: 0 0 0 2px var(--accent-danger-muted);
+}
+
+.anchorError {
+  font-size: 0.75rem;
+  color: var(--accent-danger);
+  padding-left: 8px;
+}
+
+.removeBtn,
+.lockBtn {
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.removeBtn {
+  font-size: 1.2rem;
+}
+
+.lockBtn {
+  font-size: 1rem;
+}
+
+.removeBtn:hover {
+  background: var(--accent-danger-muted);
+  border-color: var(--accent-danger);
+  color: var(--accent-danger);
+}
+
+.lockBtn:hover {
+  background: var(--accent-primary-muted);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.lockBtnLocked {
+  color: var(--accent-warning);
+}
+
+.lockBtnLocked:hover {
+  background: var(--accent-warning-muted);
+  border-color: var(--accent-warning);
+  color: var(--accent-warning);
+}
+
+.addBtn {
+  margin-top: 12px;
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-color-light);
+  color: var(--text-primary);
+}

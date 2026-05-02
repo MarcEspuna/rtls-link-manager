@@ -2,8 +2,11 @@
 
 use crate::error::AppError;
 use crate::preset_storage::PresetStorageService;
-use crate::types::{Preset, PresetInfo};
+use crate::types::{GpsOrigin, LocationData, Preset, PresetInfo, PresetType};
+use rtls_link_core::device::websocket::send_command_parsed;
+use rtls_link_core::protocol::commands::Commands;
 use std::sync::Arc;
+use std::time::Duration;
 use tauri::State;
 
 /// List all saved presets.
@@ -39,4 +42,60 @@ pub async fn delete_preset(
     preset_service: State<'_, Arc<PresetStorageService>>,
 ) -> Result<bool, AppError> {
     preset_service.delete(&name).await
+}
+
+/// Backup current config from a device and save it as a preset.
+#[tauri::command]
+pub async fn backup_device_preset(
+    ip: String,
+    name: String,
+    description: Option<String>,
+    preset_type: PresetType,
+    timeout_ms: Option<u64>,
+    preset_service: State<'_, Arc<PresetStorageService>>,
+) -> Result<bool, AppError> {
+    let timeout = Duration::from_millis(timeout_ms.unwrap_or(5000));
+    let response = send_command_parsed(&ip, Commands::backup_config(), timeout)
+        .await
+        .map_err(AppError::from)?;
+    let json = response
+        .json
+        .ok_or_else(|| AppError::Json("No JSON found in backup-config response".to_string()))?;
+    let config: crate::types::DeviceConfig =
+        serde_json::from_value(json).map_err(AppError::from)?;
+    let now = chrono::Utc::now().to_rfc3339();
+
+    let preset = match preset_type {
+        PresetType::Full => Preset {
+            name,
+            description,
+            preset_type: PresetType::Full,
+            config: Some(config),
+            locations: None,
+            created_at: now.clone(),
+            updated_at: now,
+        },
+        PresetType::Locations => {
+            let locations = LocationData {
+                origin: GpsOrigin {
+                    lat: config.uwb.origin_lat.unwrap_or(0.0),
+                    lon: config.uwb.origin_lon.unwrap_or(0.0),
+                    alt: config.uwb.origin_alt.unwrap_or(0.0),
+                },
+                rotation: config.uwb.rotation_degrees.unwrap_or(0.0),
+                anchors: config.uwb.anchors.unwrap_or_default(),
+            };
+            Preset {
+                name,
+                description,
+                preset_type: PresetType::Locations,
+                config: None,
+                locations: Some(locations),
+                created_at: now.clone(),
+                updated_at: now,
+            }
+        }
+    };
+
+    preset_service.save(preset).await
 }

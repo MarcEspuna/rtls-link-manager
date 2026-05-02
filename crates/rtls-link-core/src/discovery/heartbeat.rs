@@ -1,5 +1,6 @@
 //! Heartbeat parsing and device pruning utilities.
 
+use crate::health::calculate_device_health;
 use crate::types::{Device, DeviceRole, DynamicAnchorPosition};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -25,7 +26,7 @@ pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Er
             .collect()
     });
 
-    Ok(Device {
+    let mut device = Device {
         ip,
         id: json["id"].as_str().unwrap_or("").to_string(),
         role: DeviceRole::from_str(json["role"].as_str().unwrap_or("")),
@@ -50,7 +51,10 @@ pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Er
         log_serial_enabled: json["log_serial_enabled"].as_bool(),
         log_udp_enabled: json["log_udp_enabled"].as_bool(),
         dynamic_anchors,
-    })
+        health: None,
+    };
+    device.health = Some(calculate_device_health(&device));
+    Ok(device)
 }
 
 /// Prune stale devices from a device map based on TTL.
@@ -150,6 +154,7 @@ mod tests {
             log_serial_enabled: None,
             log_udp_enabled: None,
             dynamic_anchors: None,
+            health: None,
         };
 
         devices.insert(

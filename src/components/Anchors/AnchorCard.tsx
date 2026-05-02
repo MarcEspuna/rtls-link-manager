@@ -4,7 +4,7 @@ import { Commands } from '@shared/commands';
 import { useDeviceCommand } from '../../hooks/useDeviceCommand';
 import { StatusBadge } from '../common/StatusBadge';
 import { HealthBadge } from '../common/HealthBadge';
-import { calculateDeviceHealth } from '../../lib/healthStatus';
+import { unknownHealth } from '../../lib/healthStatus';
 import styles from './AnchorCard.module.css';
 
 interface AnchorCardProps {
@@ -18,7 +18,7 @@ interface AnchorCardProps {
 export function AnchorCard({ device, selected, onSelect, onConfigure, isExpertMode = false }: AnchorCardProps) {
   const { sendCommand, loading } = useDeviceCommand(device.ip);
   const [ledState, setLedState] = useState<boolean | null>(null);
-  const health = calculateDeviceHealth(device);
+  const health = device.health ?? unknownHealth;
 
   const handleToggleLed = async () => {
     const result = await sendCommand<{ success: boolean; led2State: boolean }>(

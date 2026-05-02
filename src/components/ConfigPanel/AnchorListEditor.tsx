@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AnchorConfig } from '@shared/types';
-import styles from './ConfigEditor.module.css';
+import styles from './AnchorListEditor.module.css';
 
 interface AnchorListEditorProps {
   anchors: AnchorConfig[];

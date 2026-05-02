@@ -28,6 +28,15 @@ export interface Device {
   logUdpEnabled?: boolean;  // Runtime: UDP log streaming enabled
   // Dynamic anchor positions (from heartbeat, TDoA tags only)
   dynamicAnchors?: DynamicAnchorPosition[];
+  // Backend-calculated health summary
+  health?: DeviceHealth;
+}
+
+export type HealthLevel = 'healthy' | 'warning' | 'degraded' | 'unknown';
+
+export interface DeviceHealth {
+  level: HealthLevel;
+  issues: string[];
 }
 
 // Dynamic anchor position from inter-anchor TWR measurements

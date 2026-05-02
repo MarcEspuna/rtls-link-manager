@@ -7,6 +7,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::health::DeviceHealth;
+
 // ==================== Device Types ====================
 
 /// Represents a discovered RTLS-Link device.
@@ -78,6 +80,9 @@ pub struct Device {
     /// Dynamic anchor positions (calculated from inter-anchor TWR)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dynamic_anchors: Option<Vec<DynamicAnchorPosition>>,
+    /// Backend-calculated health summary.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub health: Option<DeviceHealth>,
 }
 
 /// Dynamic anchor position from inter-anchor TWR measurements.
@@ -545,6 +550,7 @@ mod tests {
             log_serial_enabled: None,
             log_udp_enabled: None,
             dynamic_anchors: None,
+            health: None,
         };
 
         let json = serde_json::to_string(&device).unwrap();

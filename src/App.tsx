@@ -135,7 +135,6 @@ function App() {
         return (
           <PresetsPanel
             selectedDevices={allSelectedDevices}
-            allDevices={devices}
           />
         );
       default:
