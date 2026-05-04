@@ -1,6 +1,7 @@
 //! Command implementations.
 
 pub mod bulk;
+pub mod calibrate;
 pub mod cmd;
 pub mod config;
 pub mod discover;
@@ -10,6 +11,7 @@ pub mod preset;
 pub mod status;
 
 pub use bulk::run_bulk;
+pub use calibrate::run_calibrate;
 pub use cmd::run_cmd;
 pub use config::run_config;
 pub use discover::run_discover;

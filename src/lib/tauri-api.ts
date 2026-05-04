@@ -125,6 +125,14 @@ export async function deleteConfig(name: string): Promise<boolean> {
   return await invokeSafe('delete_config', { name });
 }
 
+export async function backupDeviceConfigToLocal(
+  ip: string,
+  name: string,
+  timeoutMs?: number
+): Promise<boolean> {
+  return await invokeSafe('backup_device_config_to_local', { ip, name, timeoutMs });
+}
+
 // ============================================================================
 // Preset Commands
 // ============================================================================
@@ -157,6 +165,16 @@ export async function deletePreset(name: string): Promise<boolean> {
   return await invokeSafe('delete_preset', { name });
 }
 
+export async function backupDevicePreset(
+  ip: string,
+  name: string,
+  description: string | undefined,
+  presetType: 'full' | 'locations',
+  timeoutMs?: number
+): Promise<boolean> {
+  return await invokeSafe('backup_device_preset', { ip, name, description, presetType, timeoutMs });
+}
+
 // ============================================================================
 // Device Communication Commands
 // ============================================================================
@@ -186,6 +204,136 @@ export async function sendDeviceCommands(
   timeoutMs?: number
 ): Promise<DeviceCommandResponse[]> {
   return await invokeSafe('send_device_commands', { ip, commands, timeoutMs });
+}
+
+export interface DeviceOperationResult {
+  ip: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface DeviceOperationProgressEvent {
+  operationId: string;
+  completed: number;
+  total: number;
+  ip?: string;
+  success?: boolean;
+  error?: string;
+}
+
+export async function runBulkDeviceCommand(
+  ips: string[],
+  command: string,
+  options?: { timeoutMs?: number; concurrency?: number; operationId?: string }
+): Promise<DeviceOperationResult[]> {
+  return await invokeSafe('run_bulk_device_command', {
+    ips,
+    command,
+    timeoutMs: options?.timeoutMs,
+    concurrency: options?.concurrency,
+    operationId: options?.operationId,
+  });
+}
+
+export async function applyConfigToDevices(
+  ips: string[],
+  config: DeviceConfig,
+  configName: string,
+  options?: { timeoutMs?: number; concurrency?: number; operationId?: string }
+): Promise<DeviceOperationResult[]> {
+  return await invokeSafe('apply_config_to_devices', {
+    ips,
+    config,
+    configName,
+    timeoutMs: options?.timeoutMs,
+    concurrency: options?.concurrency,
+    operationId: options?.operationId,
+  });
+}
+
+export async function activateConfigOnDevices(
+  ips: string[],
+  configName: string,
+  options?: { timeoutMs?: number; concurrency?: number; operationId?: string }
+): Promise<DeviceOperationResult[]> {
+  return await invokeSafe('activate_config_on_devices', {
+    ips,
+    configName,
+    timeoutMs: options?.timeoutMs,
+    concurrency: options?.concurrency,
+    operationId: options?.operationId,
+  });
+}
+
+export async function uploadPresetToDevices(
+  ips: string[],
+  preset: Preset,
+  options?: { timeoutMs?: number; concurrency?: number; operationId?: string }
+): Promise<DeviceOperationResult[]> {
+  return await invokeSafe('upload_preset_to_devices', {
+    ips,
+    preset,
+    timeoutMs: options?.timeoutMs,
+    concurrency: options?.concurrency,
+    operationId: options?.operationId,
+  });
+}
+
+export interface AnchorCalibrationConfig {
+  x: number;
+  y: number;
+  layout: 'rectangular-a1x-a3y' | 'rectangular-a1x-a2y' | 'rectangular-a3x-a1y' | 'rectangular-a2x-a3y';
+  ips?: string[];
+  discoveryDuration: number;
+  minSamples: number;
+  sampleDuration: number;
+  sampleIntervalMs: number;
+  maxIters: number;
+  toleranceM: number;
+  minImprovementM: number;
+  priorSigmaTicks: number;
+  maxDeltaTicks: number;
+  dryRun: boolean;
+  timeoutMs: number;
+}
+
+export interface CalibrationPairError {
+  a: number;
+  b: number;
+  errorM: number;
+}
+
+export interface CalibrationErrorReport {
+  pairErrors: CalibrationPairError[];
+  rmsM: number;
+  maxAbsM: number;
+}
+
+export interface CalibrationIteration {
+  iteration: number;
+  delays: number[];
+  error: CalibrationErrorReport;
+}
+
+export interface CalibrationRun {
+  layout: string;
+  xM: number;
+  yM: number;
+  anchors: Array<{ anchorId: number; ip: string }>;
+  iterations: CalibrationIteration[];
+  finalResult?: CalibrationIteration;
+  dryRun: boolean;
+}
+
+export type CalibrationEvent =
+  | { type: 'log'; message: string }
+  | { type: 'iteration'; iteration: number; maxIterations: number; delays: number[]; error: CalibrationErrorReport }
+  | { type: 'complete'; result: CalibrationRun };
+
+export async function runAntennaCalibration(
+  config: AnchorCalibrationConfig
+): Promise<CalibrationRun> {
+  return await invokeSafe('run_antenna_calibration', { config });
 }
 
 /**
@@ -298,6 +446,22 @@ export async function onOtaError(
   callback: (event: OtaErrorEvent) => void
 ): Promise<UnlistenFn> {
   return await listen<OtaErrorEvent>('ota-error', (event) => {
+    callback(event.payload);
+  });
+}
+
+export async function onDeviceOperationProgress(
+  callback: (event: DeviceOperationProgressEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<DeviceOperationProgressEvent>('device-operation-progress', (event) => {
+    callback(event.payload);
+  });
+}
+
+export async function onAntennaCalibrationEvent(
+  callback: (event: CalibrationEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<CalibrationEvent>('antenna-calibration-event', (event) => {
     callback(event.payload);
   });
 }

@@ -1,52 +1,39 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Device,
-  DeviceConfig,
   Preset,
   PresetInfo,
   PresetType,
-  LocationData,
   isTagRole,
 } from '@shared/types';
-import { Commands } from '@shared/commands';
-import { configToParams } from '@shared/configParams';
-import { flatToAnchors, normalizeUwbShortAddr } from '@shared/anchors';
-import { listPresets, getPreset, savePreset, deletePreset } from '../../lib/tauri-api';
 import {
-  sendDeviceCommand,
-  sendDeviceCommands,
-  BulkCommandResult,
-} from '../../lib/deviceCommands';
+  backupDevicePreset,
+  deletePreset,
+  getPreset,
+  listPresets,
+  onDeviceOperationProgress,
+  uploadPresetToDevices,
+} from '../../lib/tauri-api';
 import { ProgressBar } from '../common/ProgressBar';
 import styles from './PresetsPanel.module.css';
 
 interface PresetsPanelProps {
   selectedDevices: Device[];
-  allDevices: Device[];
 }
 
-// Transform flat backup-config response to normalized DeviceConfig with anchors array
-const transformConfigResult = (result: unknown): DeviceConfig => {
-  const data = result as Record<string, unknown>;
-  const uwb = (data.uwb || {}) as Record<string, unknown>;
-  const anchors = flatToAnchors(uwb, (uwb.anchorCount as number) || 0);
-  return {
-    ...data,
-    uwb: {
-      ...uwb,
-      devShortAddr: normalizeUwbShortAddr(uwb.devShortAddr as string | number | undefined),
-      anchors,
-    },
-  } as DeviceConfig;
-};
+interface PresetUploadResult {
+  ip: string;
+  success: boolean;
+  error?: string;
+}
 
-export function PresetsPanel({ selectedDevices, allDevices: _allDevices }: PresetsPanelProps) {
+export function PresetsPanel({ selectedDevices }: PresetsPanelProps) {
   const [presets, setPresets] = useState<PresetInfo[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [presetData, setPresetData] = useState<Preset | null>(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number; label?: string } | null>(null);
-  const [results, setResults] = useState<BulkCommandResult[]>([]);
+  const [results, setResults] = useState<PresetUploadResult[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveType, setSaveType] = useState<PresetType>('full');
   const [newPresetName, setNewPresetName] = useState('');
@@ -84,60 +71,6 @@ export function PresetsPanel({ selectedDevices, allDevices: _allDevices }: Prese
     })();
   }, [selectedPreset]);
 
-  // Upload full preset to device
-  const uploadFullPresetToDevice = async (
-    device: Device,
-    config: DeviceConfig,
-    presetName: string,
-    onProgress?: (step: number, total: number) => void
-  ): Promise<{ success: boolean; error?: string }> => {
-    const params = configToParams(config);
-    const commands = [
-      ...params.map(([group, name, value]) => Commands.writeParam(group, name, value)),
-      Commands.saveConfigAs(presetName),
-    ];
-
-    try {
-      await sendDeviceCommands(device.ip, commands, { onProgress });
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e instanceof Error ? e.message : 'Failed' };
-    }
-  };
-
-  // Upload location preset to device (tags only)
-  const uploadLocationPresetToDevice = async (
-    device: Device,
-    locations: LocationData,
-    onProgress?: (step: number, total: number) => void
-  ): Promise<{ success: boolean; error?: string }> => {
-    const commands: string[] = [];
-
-    // Origin coordinates
-    commands.push(Commands.writeParam('uwb', 'originLat', locations.origin.lat));
-    commands.push(Commands.writeParam('uwb', 'originLon', locations.origin.lon));
-    commands.push(Commands.writeParam('uwb', 'originAlt', locations.origin.alt));
-    commands.push(Commands.writeParam('uwb', 'rotationDegrees', locations.rotation));
-
-    // Anchors
-    commands.push(Commands.writeParam('uwb', 'anchorCount', locations.anchors.length));
-    locations.anchors.forEach((anchor, i) => {
-      commands.push(Commands.writeParam('uwb', `devId${i + 1}`, anchor.id));
-      commands.push(Commands.writeParam('uwb', `x${i + 1}`, anchor.x));
-      commands.push(Commands.writeParam('uwb', `y${i + 1}`, anchor.y));
-      commands.push(Commands.writeParam('uwb', `z${i + 1}`, anchor.z));
-    });
-
-    commands.push(Commands.saveConfig());
-
-    try {
-      await sendDeviceCommands(device.ip, commands, { onProgress });
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e instanceof Error ? e.message : 'Failed' };
-    }
-  };
-
   // Upload preset to selected devices
   const handleUploadToSelected = async () => {
     if (!selectedPreset || !presetData || selectedDevices.length === 0) return;
@@ -163,54 +96,33 @@ export function PresetsPanel({ selectedDevices, allDevices: _allDevices }: Prese
 
     setLoading(true);
     setResults([]);
+    const operationId = `upload-preset-${Date.now()}`;
+    const unlisten = await onDeviceOperationProgress((event) => {
+      if (event.operationId === operationId) {
+        setProgress({
+          current: event.completed,
+          total: event.total,
+          label: event.ip,
+        });
+      }
+    });
 
-    const newResults: BulkCommandResult[] = [];
-    const CONCURRENT = 3;
-
-    for (let i = 0; i < targetDevices.length; i += CONCURRENT) {
-      const batch = targetDevices.slice(i, i + CONCURRENT);
-      const batchResults = await Promise.all(
-        batch.map(async (device) => {
-          let result: { success: boolean; error?: string };
-
-          if (presetData.type === 'full' && presetData.config) {
-            result = await uploadFullPresetToDevice(
-              device,
-              presetData.config,
-              selectedPreset,
-              (step, total) => {
-                setProgress({
-                  current: newResults.length * total + step,
-                  total: targetDevices.length * total,
-                  label: `${device.ip}: ${step}/${total}`,
-                });
-              }
-            );
-          } else if (presetData.type === 'locations' && presetData.locations) {
-            result = await uploadLocationPresetToDevice(
-              device,
-              presetData.locations,
-              (step, total) => {
-                setProgress({
-                  current: newResults.length * total + step,
-                  total: targetDevices.length * total,
-                  label: `${device.ip}: ${step}/${total}`,
-                });
-              }
-            );
-          } else {
-            result = { success: false, error: 'Invalid preset data' };
-          }
-
-          return { device, ...result };
-        })
+    try {
+      const backendResults = await uploadPresetToDevices(
+        targetDevices.map((device) => device.ip),
+        presetData,
+        { concurrency: 3, operationId }
       );
-      newResults.push(...batchResults);
+      setResults(backendResults.map((result) => ({
+        ip: result.ip,
+        success: result.success,
+        error: result.error,
+      })));
+    } finally {
+      unlisten();
+      setProgress(null);
+      setLoading(false);
     }
-
-    setResults(newResults);
-    setProgress(null);
-    setLoading(false);
   };
 
   // Save preset from device
@@ -235,42 +147,12 @@ export function PresetsPanel({ selectedDevices, allDevices: _allDevices }: Prese
 
     try {
       const device = selectedDevices[0];
-      const rawConfig = await sendDeviceCommand<any>(device.ip, Commands.backupConfig());
-      const config = transformConfigResult(rawConfig);
-
-      const now = new Date().toISOString();
-
-      let preset: Preset;
-      if (saveType === 'full') {
-        preset = {
-          name: newPresetName,
-          description: newPresetDescription || undefined,
-          type: 'full',
-          config: config,
-          createdAt: now,
-          updatedAt: now,
-        };
-      } else {
-        // Extract location data from config
-        preset = {
-          name: newPresetName,
-          description: newPresetDescription || undefined,
-          type: 'locations',
-          locations: {
-            origin: {
-              lat: config.uwb.originLat || 0,
-              lon: config.uwb.originLon || 0,
-              alt: config.uwb.originAlt || 0,
-            },
-            rotation: config.uwb.rotationDegrees || 0,
-            anchors: config.uwb.anchors || [],
-          },
-          createdAt: now,
-          updatedAt: now,
-        };
-      }
-
-      const success = await savePreset(preset);
+      const success = await backupDevicePreset(
+        device.ip,
+        newPresetName,
+        newPresetDescription || undefined,
+        saveType
+      );
       if (!success) throw new Error('Failed to save preset');
 
       await fetchPresets();
@@ -398,8 +280,8 @@ export function PresetsPanel({ selectedDevices, allDevices: _allDevices }: Prese
       {results.length > 0 && (
         <div className={styles.results}>
           {results.map((r) => (
-            <div key={r.device.ip} className={r.success ? styles.success : styles.error}>
-              {r.success ? 'OK' : 'FAIL'} {r.device.ip}
+            <div key={r.ip} className={r.success ? styles.success : styles.error}>
+              {r.success ? 'OK' : 'FAIL'} {r.ip}
               {r.error && <span className={styles.errorMsg}>{r.error}</span>}
             </div>
           ))}

@@ -1,5 +1,3 @@
 //! Device health status calculation.
 
-mod status;
-
-pub use status::{calculate_device_health, DeviceHealth, HealthLevel};
+pub use rtls_link_core::health::{calculate_device_health, DeviceHealth, HealthLevel};
