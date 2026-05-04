@@ -11,6 +11,7 @@ use tokio::net::UdpSocket;
 use crate::cli::LogsArgs;
 use crate::error::CliError;
 use crate::types::{LogLevel, LogMessage};
+use rtls_link_core::protocol::binary::decode_log_message;
 
 /// Run the logs command
 pub async fn run_logs(args: LogsArgs, json: bool) -> Result<(), CliError> {
@@ -99,11 +100,18 @@ fn create_log_socket(port: u16) -> Result<std::net::UdpSocket, std::io::Error> {
     Ok(socket.into())
 }
 
-fn parse_log_message(data: &[u8], ip: &str) -> Result<LogMessage, serde_json::Error> {
-    let json: serde_json::Value = serde_json::from_slice(data)?;
+fn parse_log_message(data: &[u8], ip: &str) -> Result<LogMessage, String> {
+    if let Ok(log) = decode_log_message(data, ip) {
+        return Ok(log);
+    }
 
-    let level_num = json["level"].as_u64().unwrap_or(3) as u8;
-    let level = LogLevel::from_u8(level_num);
+    let json: serde_json::Value = serde_json::from_slice(data).map_err(|e| e.to_string())?;
+
+    let level = json["level"]
+        .as_u64()
+        .map(|value| LogLevel::from_u8(value as u8))
+        .or_else(|| json["lvl"].as_str().and_then(LogLevel::from_str))
+        .unwrap_or(LogLevel::Info);
 
     Ok(LogMessage {
         ip: ip.to_string(),

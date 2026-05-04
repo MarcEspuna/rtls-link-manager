@@ -9,6 +9,7 @@ use tokio::time::timeout;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 use crate::error::{CoreError, DeviceError};
+use crate::protocol::binary::decode_command_frame;
 use crate::protocol::commands::is_json_command;
 use crate::protocol::response::is_error_response;
 
@@ -80,6 +81,10 @@ impl DeviceConnection {
             while let Some(msg) = self.ws_stream.next().await {
                 match msg {
                     Ok(Message::Text(text)) => return Ok(text),
+                    Ok(Message::Binary(bytes)) => {
+                        let json = decode_command_frame(&bytes, &ip_string)?;
+                        return Ok(json.to_string());
+                    }
                     Ok(Message::Close(_)) => break,
                     Ok(_) => continue,
                     Err(e) => return Err(CoreError::Other(format!("WebSocket error: {}", e))),
@@ -160,6 +165,10 @@ pub async fn send_command(
             match msg {
                 Ok(Message::Text(text)) => {
                     return Ok(text);
+                }
+                Ok(Message::Binary(bytes)) => {
+                    let json = decode_command_frame(&bytes, &ip_string)?;
+                    return Ok(json.to_string());
                 }
                 Ok(Message::Close(_)) => break,
                 Ok(_) => continue,

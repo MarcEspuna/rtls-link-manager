@@ -1,9 +1,10 @@
 //! Log receiver service implementation.
 //!
-//! Listens on a UDP port for JSON log messages from devices and emits
+//! Listens on a UDP port for binary log messages from devices and emits
 //! them to the frontend via Tauri events. Buffers logs per device so
 //! they can be retrieved even if the log terminal wasn't open.
 
+use rtls_link_core::protocol::binary::decode_log_message;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
@@ -36,7 +37,7 @@ pub struct LogMessage {
     pub received_at: u64,
 }
 
-/// Raw JSON format from device
+/// Legacy JSON format from older firmware.
 #[derive(Debug, Deserialize)]
 struct RawLogMessage {
     ts: u64,
@@ -57,7 +58,8 @@ pub struct LogStreamState {
 impl LogStreamState {
     /// Add a log message to the device's buffer
     pub fn add_log(&mut self, device_ip: &str, log: LogMessage) {
-        let buffer = self.log_buffers
+        let buffer = self
+            .log_buffers
             .entry(device_ip.to_string())
             .or_insert_with(|| VecDeque::with_capacity(MAX_LOGS_PER_DEVICE));
 
@@ -105,7 +107,7 @@ impl LogReceiverService {
 
     /// Run the log receiver loop
     ///
-    /// Continuously receives UDP packets, parses JSON log messages,
+    /// Continuously receives UDP packets, parses binary log messages,
     /// buffers them per device, and emits to frontend if stream is active.
     pub async fn run(
         &self,
@@ -119,20 +121,7 @@ impl LogReceiverService {
                 Ok((len, addr)) => {
                     let device_ip = addr.ip().to_string();
 
-                    // Try to parse the log message
-                    if let Ok(raw) = serde_json::from_slice::<RawLogMessage>(&buf[..len]) {
-                        let log_msg = LogMessage {
-                            device_ip: device_ip.clone(),
-                            ts: raw.ts,
-                            lvl: raw.lvl,
-                            tag: raw.tag,
-                            msg: raw.msg,
-                            received_at: std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .map(|d| d.as_millis() as u64)
-                                .unwrap_or(0),
-                        };
-
+                    if let Some(log_msg) = parse_log_message(&buf[..len], addr) {
                         // Always buffer the log
                         let mut state = stream_state.write().await;
                         state.add_log(&device_ip, log_msg.clone());
@@ -154,19 +143,34 @@ impl LogReceiverService {
 
 /// Parse a log message from raw bytes
 pub fn parse_log_message(data: &[u8], addr: SocketAddr) -> Option<LogMessage> {
-    let raw: RawLogMessage = serde_json::from_slice(data).ok()?;
+    let device_ip = addr.ip().to_string();
+    if let Ok(log) = decode_log_message(data, &device_ip) {
+        return Some(LogMessage {
+            device_ip,
+            ts: log.timestamp.unwrap_or(0),
+            lvl: log.level.as_str().to_string(),
+            tag: log.tag,
+            msg: log.message,
+            received_at: received_at_ms(),
+        });
+    }
 
+    let raw: RawLogMessage = serde_json::from_slice(data).ok()?;
     Some(LogMessage {
-        device_ip: addr.ip().to_string(),
+        device_ip,
         ts: raw.ts,
         lvl: raw.lvl,
         tag: raw.tag,
         msg: raw.msg,
-        received_at: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0),
+        received_at: received_at_ms(),
     })
+}
+
+fn received_at_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -176,10 +180,10 @@ mod tests {
 
     #[test]
     fn test_parse_log_message() {
-        let json = r#"{"ts":12345,"lvl":"INFO","tag":"app.cpp","msg":"Hello world"}"#;
+        let packet = binary_log_packet(12345, 3, "app.cpp", "Hello world");
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 3334);
 
-        let msg = parse_log_message(json.as_bytes(), addr).unwrap();
+        let msg = parse_log_message(&packet, addr).unwrap();
 
         assert_eq!(msg.device_ip, "192.168.1.100");
         assert_eq!(msg.ts, 12345);
@@ -190,12 +194,12 @@ mod tests {
 
     #[test]
     fn test_parse_log_message_with_escaped_chars() {
-        let json = r#"{"ts":100,"lvl":"DEBUG","tag":"test","msg":"Line1\\nLine2"}"#;
+        let packet = binary_log_packet(100, 4, "test", "Line1\nLine2");
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), 3334);
 
-        let msg = parse_log_message(json.as_bytes(), addr).unwrap();
+        let msg = parse_log_message(&packet, addr).unwrap();
 
-        assert_eq!(msg.msg, "Line1\\nLine2");
+        assert_eq!(msg.msg, "Line1\nLine2");
     }
 
     #[test]
@@ -207,6 +211,34 @@ mod tests {
         assert!(result.is_none());
     }
 
+    fn push_u16(out: &mut Vec<u8>, value: u16) {
+        out.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn push_string(out: &mut Vec<u8>, value: &str) {
+        push_u16(out, value.len() as u16);
+        out.extend_from_slice(value.as_bytes());
+    }
+
+    fn binary_log_packet(ts: u32, level: u8, tag: &str, msg: &str) -> Vec<u8> {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&ts.to_le_bytes());
+        payload.push(level);
+        push_string(&mut payload, tag);
+        push_string(&mut payload, msg);
+
+        let mut out = Vec::new();
+        push_u16(&mut out, 0x4c52);
+        out.push(1);
+        out.push(17);
+        push_u16(&mut out, payload.len() as u16);
+        push_u16(&mut out, 1);
+        out.push(0);
+        out.push(0);
+        out.extend_from_slice(&payload);
+        out
+    }
+
     #[test]
     fn test_log_buffer() {
         let mut state = LogStreamState::default();
@@ -214,14 +246,17 @@ mod tests {
 
         // Add some logs
         for i in 0..10 {
-            state.add_log(device_ip, LogMessage {
-                device_ip: device_ip.to_string(),
-                ts: i as u64,
-                lvl: "INFO".to_string(),
-                tag: "test".to_string(),
-                msg: format!("Message {}", i),
-                received_at: 0,
-            });
+            state.add_log(
+                device_ip,
+                LogMessage {
+                    device_ip: device_ip.to_string(),
+                    ts: i as u64,
+                    lvl: "INFO".to_string(),
+                    tag: "test".to_string(),
+                    msg: format!("Message {}", i),
+                    received_at: 0,
+                },
+            );
         }
 
         let logs = state.get_logs(device_ip);
@@ -237,14 +272,17 @@ mod tests {
 
         // Add more than MAX_LOGS_PER_DEVICE logs
         for i in 0..(MAX_LOGS_PER_DEVICE + 100) {
-            state.add_log(device_ip, LogMessage {
-                device_ip: device_ip.to_string(),
-                ts: i as u64,
-                lvl: "INFO".to_string(),
-                tag: "test".to_string(),
-                msg: format!("Message {}", i),
-                received_at: 0,
-            });
+            state.add_log(
+                device_ip,
+                LogMessage {
+                    device_ip: device_ip.to_string(),
+                    ts: i as u64,
+                    lvl: "INFO".to_string(),
+                    tag: "test".to_string(),
+                    msg: format!("Message {}", i),
+                    received_at: 0,
+                },
+            );
         }
 
         let logs = state.get_logs(device_ip);

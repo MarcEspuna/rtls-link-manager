@@ -1,5 +1,6 @@
 //! Heartbeat parsing and device pruning utilities.
 
+use crate::protocol::binary::decode_heartbeat;
 use crate::types::{Device, DeviceRole, DynamicAnchorPosition};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -9,7 +10,10 @@ pub const DEVICE_TTL: Duration = Duration::from_secs(5);
 
 /// Parse a heartbeat packet into a Device struct.
 pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Error> {
-    let json: serde_json::Value = serde_json::from_slice(data)?;
+    let json: serde_json::Value = match decode_heartbeat(data) {
+        Ok(value) => value,
+        Err(_) => serde_json::from_slice(data)?,
+    };
 
     // Parse optional dynamic anchor positions
     let dynamic_anchors = json["dyn_anchors"].as_array().map(|arr| {
@@ -87,12 +91,12 @@ mod tests {
 
     #[test]
     fn test_parse_minimal_heartbeat() {
-        let json = r#"{"id": "test", "role": "anchor"}"#;
+        let json = r#"{"id": "test", "role": "anchor_tdoa"}"#;
         let device = parse_heartbeat(json.as_bytes(), "10.0.0.1".to_string()).unwrap();
 
         assert_eq!(device.ip, "10.0.0.1");
         assert_eq!(device.id, "test");
-        assert_eq!(device.role, DeviceRole::Anchor);
+        assert_eq!(device.role, DeviceRole::AnchorTdoa);
         assert_eq!(device.sending_pos, None);
     }
 
@@ -107,7 +111,7 @@ mod tests {
     fn test_parse_heartbeat_with_log_fields() {
         let json = r#"{
             "id": "device1",
-            "role": "tag",
+            "role": "tag_tdoa",
             "log_level": 3,
             "log_udp_port": 3334,
             "log_serial_enabled": true,
@@ -128,7 +132,7 @@ mod tests {
         let fresh_device = Device {
             ip: "192.168.1.1".to_string(),
             id: "fresh".to_string(),
-            role: DeviceRole::Tag,
+            role: DeviceRole::TagTdoa,
             mac: "".to_string(),
             uwb_short: "1".to_string(),
             mav_sys_id: 1,
@@ -174,11 +178,11 @@ mod tests {
     #[test]
     fn test_all_device_roles() {
         let roles = [
-            ("anchor", DeviceRole::Anchor),
-            ("tag", DeviceRole::Tag),
+            ("anchor", DeviceRole::Unknown),
+            ("tag", DeviceRole::Unknown),
             ("anchor_tdoa", DeviceRole::AnchorTdoa),
             ("tag_tdoa", DeviceRole::TagTdoa),
-            ("calibration", DeviceRole::Calibration),
+            ("calibration", DeviceRole::Unknown),
             ("unknown_role", DeviceRole::Unknown),
         ];
 

@@ -131,9 +131,6 @@ rtls-link-manager/
 
 | Mode | Value | Description |
 |------|-------|-------------|
-| TWR Anchor | 0 | Two-Way Ranging anchor (responds to tags) |
-| TWR Tag | 1 | Two-Way Ranging tag (queries anchors) |
-| Calibration | 2 | Calibration mode for anchor setup |
 | TDoA Anchor | 3 | Time Difference of Arrival anchor |
 | TDoA Tag | 4 | Time Difference of Arrival tag |
 

@@ -35,7 +35,7 @@ export const Commands = {
   tdoaDistances: () => 'tdoa-distances',
 } as const;
 
-// Commands that return JSON responses
+// Commands that return structured responses.
 export const JSON_COMMANDS = [
   'backup-config',
   'list-configs',

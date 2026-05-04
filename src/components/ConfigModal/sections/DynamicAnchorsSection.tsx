@@ -43,7 +43,7 @@ export function DynamicAnchorsSection({
       <div className={styles.section}>
         <h3>Dynamic Anchor Positioning</h3>
         <p>
-          Calculate anchor positions automatically from inter-anchor TWR measurements
+          Calculate anchor positions automatically from inter-anchor ToF measurements
           instead of using manually configured static coordinates.
         </p>
 
@@ -116,7 +116,7 @@ export function DynamicAnchorsSection({
           <div className={styles.section}>
             <h3>Calculated Positions</h3>
             <p>
-              Positions calculated from inter-anchor TWR measurements. Lock an anchor to preserve
+              Positions calculated from inter-anchor ToF measurements. Lock an anchor to preserve
               its calculated position even if new measurements arrive.
             </p>
 

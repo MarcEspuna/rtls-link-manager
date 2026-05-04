@@ -30,7 +30,7 @@ export interface Device {
   dynamicAnchors?: DynamicAnchorPosition[];
 }
 
-// Dynamic anchor position from inter-anchor TWR measurements
+// Dynamic anchor position from inter-anchor ToF measurements
 export interface DynamicAnchorPosition {
   id: number;
   x: number;
@@ -88,7 +88,7 @@ export interface WifiConfig {
 }
 
 export interface UwbConfig {
-  mode: 0 | 1 | 2 | 3 | 4;  // TWR_ANCHOR, TWR_TAG, CALIBRATION, TDOA_ANCHOR, TDOA_TAG
+  mode: 3 | 4;              // 3=TDOA_ANCHOR, 4=TDOA_TAG
   uwbEnable?: 0 | 1;        // Runtime UWB backend enable (0=disabled, 1=enabled)
   devShortAddr: string;
   anchorCount?: number;
