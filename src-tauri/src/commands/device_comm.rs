@@ -11,7 +11,9 @@ use std::time::Duration;
 use crate::error::AppError;
 use crate::types::{DeviceConfig, Preset, PresetType};
 use rtls_link_core::calibration::{calibrate_anchors, AnchorCalibrationConfig, CalibrationRun};
-use rtls_link_core::device::ota::{upload_firmware, upload_firmware_bulk, OtaProgressHandler};
+use rtls_link_core::device::ota::{
+    upload_firmware_bulk, upload_firmware_with_progress, OtaProgressHandler,
+};
 use rtls_link_core::device::websocket::{
     send_command_parsed, send_commands_parsed, DeviceCommandResponse, DeviceConnection,
 };
@@ -372,11 +374,8 @@ pub async fn upload_firmware_from_file(
         .unwrap_or("firmware.bin");
 
     let progress = TauriOtaProgress { app_handle };
-    let total = data.len() as u64;
 
-    progress.on_progress(&ip, 0, total);
-
-    upload_firmware(&ip, data, filename)
+    upload_firmware_with_progress(&ip, data, filename, &progress)
         .await
         .map_err(AppError::from)?;
 

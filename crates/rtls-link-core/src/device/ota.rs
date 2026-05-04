@@ -8,6 +8,11 @@ use tokio::time::timeout;
 
 use crate::error::{CoreError, DeviceError};
 
+const CONNECT_TIMEOUT_SECS: u64 = 10;
+const UPLOAD_TIMEOUT_SECS: u64 = 120;
+const RESPONSE_TIMEOUT_SECS: u64 = 10;
+const UPLOAD_CHUNK_SIZE: usize = 4096;
+
 /// Trait for receiving OTA progress updates.
 ///
 /// Implement this trait to receive progress callbacks during firmware uploads.
@@ -18,18 +23,19 @@ pub trait OtaProgressHandler: Send + Sync {
     fn on_error(&self, ip: &str, error: &str);
 }
 
-/// No-op progress handler for when progress tracking isn't needed.
-pub struct NoopProgress;
-
-impl OtaProgressHandler for NoopProgress {
-    fn on_progress(&self, _ip: &str, _bytes_sent: u64, _total_bytes: u64) {}
-    fn on_complete(&self, _ip: &str) {}
-    fn on_error(&self, _ip: &str, _error: &str) {}
-}
-
 /// Upload firmware data to a device via HTTP multipart POST.
 pub async fn upload_firmware(ip: &str, data: Vec<u8>, filename: &str) -> Result<(), CoreError> {
     upload_firmware_data(ip, data, filename, None).await
+}
+
+/// Upload firmware data to a device and report transfer progress.
+pub async fn upload_firmware_with_progress<P: OtaProgressHandler>(
+    ip: &str,
+    data: Vec<u8>,
+    filename: &str,
+    progress: &P,
+) -> Result<(), CoreError> {
+    upload_firmware_data(ip, data, filename, Some(progress)).await
 }
 
 /// Upload firmware to multiple devices concurrently.
@@ -43,7 +49,6 @@ pub async fn upload_firmware_bulk<P: OtaProgressHandler>(
     use futures::stream::{self, StreamExt};
 
     let concurrency = concurrency.max(1);
-    let total_bytes = data.len() as u64;
     let filename = filename.to_string();
 
     let results: Vec<_> = stream::iter(ips.iter().cloned())
@@ -51,11 +56,9 @@ pub async fn upload_firmware_bulk<P: OtaProgressHandler>(
             let data = data.clone();
             let name = filename.clone();
             async move {
-                progress.on_progress(&ip, 0, total_bytes);
                 let result = upload_firmware_data(&ip, data, &name, Some(progress)).await;
                 match &result {
                     Ok(()) => {
-                        progress.on_progress(&ip, total_bytes, total_bytes);
                         progress.on_complete(&ip);
                     }
                     Err(e) => {
@@ -93,18 +96,25 @@ async fn upload_firmware_data(
         ip, boundary, content_length
     );
 
-    let mut stream = timeout(Duration::from_secs(10), TcpStream::connect(&address))
-        .await
-        .map_err(|_| CoreError::Other(format!("Timed out connecting to {}", ip)))?
-        .map_err(|e| CoreError::Other(format!("Failed to connect to {}: {}", ip, e)))?;
+    let mut stream = timeout(
+        Duration::from_secs(CONNECT_TIMEOUT_SECS),
+        TcpStream::connect(&address),
+    )
+    .await
+    .map_err(|_| CoreError::Other(format!("Timed out connecting to {}", ip)))?
+    .map_err(|e| CoreError::Other(format!("Failed to connect to {}: {}", ip, e)))?;
 
-    timeout(Duration::from_secs(120), async {
+    timeout(Duration::from_secs(UPLOAD_TIMEOUT_SECS), async {
         stream.write_all(request_headers.as_bytes()).await?;
         stream.write_all(prefix.as_bytes()).await?;
 
         let total = data.len() as u64;
         let mut sent = 0u64;
-        for chunk in data.chunks(4096) {
+        if let Some(handler) = progress {
+            handler.on_progress(ip, 0, total);
+        }
+
+        for chunk in data.chunks(UPLOAD_CHUNK_SIZE) {
             stream.write_all(chunk).await?;
             sent += chunk.len() as u64;
             if let Some(handler) = progress {
@@ -123,11 +133,14 @@ async fn upload_firmware_data(
     })?;
 
     let mut response = Vec::new();
-    match timeout(Duration::from_secs(30), stream.read_to_end(&mut response)).await {
+    match timeout(
+        Duration::from_secs(RESPONSE_TIMEOUT_SECS),
+        stream.read_to_end(&mut response),
+    )
+    .await
+    {
         Ok(Ok(_)) => {}
         Ok(Err(e)) => {
-            // The firmware may reboot immediately after accepting a complete OTA
-            // body, which can surface as a read error on the response path.
             return if response.is_empty() {
                 Ok(())
             } else {
@@ -138,16 +151,12 @@ async fn upload_firmware_data(
             };
         }
         Err(_) => {
-            // If the whole firmware body has been sent, lack of an HTTP response
-            // is not enough to mark OTA as failed. Some firmware revisions hang
-            // or reboot before flushing the final response.
             return Ok(());
         }
     }
 
-    // Some ESPAsyncWebServer builds close the connection during the reboot path
-    // before the client receives the response. If the full request body was sent,
-    // an empty response is treated as accepted.
+    // The full request body was accepted; older firmware may reboot before the
+    // HTTP response is flushed.
     if response.is_empty() {
         return Ok(());
     }
