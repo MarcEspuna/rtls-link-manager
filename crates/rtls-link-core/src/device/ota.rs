@@ -2,8 +2,9 @@
 
 use std::time::Duration;
 
-use reqwest::multipart;
-use reqwest::Client;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio::time::timeout;
 
 use crate::error::{CoreError, DeviceError};
 
@@ -28,8 +29,7 @@ impl OtaProgressHandler for NoopProgress {
 
 /// Upload firmware data to a device via HTTP multipart POST.
 pub async fn upload_firmware(ip: &str, data: Vec<u8>, filename: &str) -> Result<(), CoreError> {
-    let client = build_client()?;
-    upload_firmware_data(&client, ip, data, filename).await
+    upload_firmware_data(ip, data, filename, None).await
 }
 
 /// Upload firmware to multiple devices concurrently.
@@ -44,27 +44,15 @@ pub async fn upload_firmware_bulk<P: OtaProgressHandler>(
 
     let concurrency = concurrency.max(1);
     let total_bytes = data.len() as u64;
-    let client = match build_client() {
-        Ok(c) => c,
-        Err(e) => {
-            let msg = e.to_string();
-            return ips
-                .iter()
-                .cloned()
-                .map(|ip| (ip, Err(CoreError::Other(msg.clone()))))
-                .collect();
-        }
-    };
     let filename = filename.to_string();
 
     let results: Vec<_> = stream::iter(ips.iter().cloned())
         .map(|ip| {
             let data = data.clone();
             let name = filename.clone();
-            let client = client.clone();
             async move {
                 progress.on_progress(&ip, 0, total_bytes);
-                let result = upload_firmware_data(&client, &ip, data, &name).await;
+                let result = upload_firmware_data(&ip, data, &name, Some(progress)).await;
                 match &result {
                     Ok(()) => {
                         progress.on_progress(&ip, total_bytes, total_bytes);
@@ -84,44 +72,87 @@ pub async fn upload_firmware_bulk<P: OtaProgressHandler>(
     results
 }
 
-fn build_client() -> Result<Client, CoreError> {
-    Client::builder()
-        .timeout(Duration::from_secs(120))
-        .build()
-        .map_err(|e| CoreError::Other(format!("HTTP client error: {}", e)))
-}
-
 /// Upload firmware data (already loaded) to a single device.
 async fn upload_firmware_data(
-    client: &Client,
     ip: &str,
     data: Vec<u8>,
     file_name: &str,
+    progress: Option<&dyn OtaProgressHandler>,
 ) -> Result<(), CoreError> {
-    let part = multipart::Part::bytes(data)
-        .file_name(file_name.to_string())
-        .mime_str("application/octet-stream")
-        .map_err(|e| CoreError::Other(format!("Failed to create multipart: {}", e)))?;
+    let (host, port) = split_host_port(ip);
+    let address = format!("{}:{}", host, port);
+    let boundary = "----rtls-link-ota-boundary";
+    let prefix = format!(
+        "--{}\r\nContent-Disposition: form-data; name=\"firmware\"; filename=\"{}\"\r\nContent-Type: application/octet-stream\r\n\r\n",
+        boundary, file_name
+    );
+    let suffix = format!("\r\n--{}--\r\n", boundary);
+    let content_length = prefix.len() + data.len() + suffix.len();
+    let request_headers = format!(
+        "POST /update HTTP/1.1\r\nHost: {}\r\nAccept: */*\r\nContent-Type: multipart/form-data; boundary={}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        ip, boundary, content_length
+    );
 
-    let form = multipart::Form::new().part("firmware", part);
-
-    let url = format!("http://{}/update", ip);
-
-    let response = client
-        .post(&url)
-        .multipart(form)
-        .send()
+    let mut stream = timeout(Duration::from_secs(10), TcpStream::connect(&address))
         .await
-        .map_err(|e| CoreError::Other(format!("HTTP request to {} failed: {}", ip, e)))?;
+        .map_err(|_| CoreError::Other(format!("Timed out connecting to {}", ip)))?
+        .map_err(|e| CoreError::Other(format!("Failed to connect to {}: {}", ip, e)))?;
 
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
+    timeout(Duration::from_secs(120), async {
+        stream.write_all(request_headers.as_bytes()).await?;
+        stream.write_all(prefix.as_bytes()).await?;
+
+        let total = data.len() as u64;
+        let mut sent = 0u64;
+        for chunk in data.chunks(4096) {
+            stream.write_all(chunk).await?;
+            sent += chunk.len() as u64;
+            if let Some(handler) = progress {
+                handler.on_progress(ip, sent, total);
+            }
+            tokio::task::yield_now().await;
+        }
+
+        stream.write_all(suffix.as_bytes()).await?;
+        stream.flush().await
+    })
+    .await
+    .map_err(|_| CoreError::Other(format!("Timed out uploading firmware to {}", ip)))?
+    .map_err(|e: std::io::Error| {
+        CoreError::Other(format!("HTTP upload to {} failed: {}", ip, e))
+    })?;
+
+    let mut response = Vec::new();
+    timeout(Duration::from_secs(30), stream.read_to_end(&mut response))
+        .await
+        .map_err(|_| CoreError::Other(format!("Timed out waiting for OTA response from {}", ip)))?
+        .map_err(|e| CoreError::Other(format!("Failed reading OTA response from {}: {}", ip, e)))?;
+
+    // Some ESPAsyncWebServer builds close the connection during the reboot path
+    // before the client receives the response. If the full request body was sent,
+    // an empty response is treated as accepted.
+    if response.is_empty() {
+        return Ok(());
+    }
+
+    let response_text = String::from_utf8_lossy(&response);
+    let status_line = response_text.lines().next().unwrap_or_default();
+    let success = status_line.contains(" 200 ") || status_line.ends_with(" 200");
+    if !success {
         return Err(CoreError::Device(DeviceError::OtaFailed {
             ip: ip.to_string(),
-            message: format!("HTTP {}: {}", status, body),
+            message: response_text.to_string(),
         }));
     }
 
     Ok(())
+}
+
+fn split_host_port(ip: &str) -> (&str, u16) {
+    if let Some((host, port)) = ip.rsplit_once(':') {
+        if let Ok(port) = port.parse::<u16>() {
+            return (host, port);
+        }
+    }
+    (ip, 80)
 }
