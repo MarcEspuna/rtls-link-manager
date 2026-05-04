@@ -123,10 +123,27 @@ async fn upload_firmware_data(
     })?;
 
     let mut response = Vec::new();
-    timeout(Duration::from_secs(30), stream.read_to_end(&mut response))
-        .await
-        .map_err(|_| CoreError::Other(format!("Timed out waiting for OTA response from {}", ip)))?
-        .map_err(|e| CoreError::Other(format!("Failed reading OTA response from {}: {}", ip, e)))?;
+    match timeout(Duration::from_secs(30), stream.read_to_end(&mut response)).await {
+        Ok(Ok(_)) => {}
+        Ok(Err(e)) => {
+            // The firmware may reboot immediately after accepting a complete OTA
+            // body, which can surface as a read error on the response path.
+            return if response.is_empty() {
+                Ok(())
+            } else {
+                Err(CoreError::Other(format!(
+                    "Failed reading OTA response from {}: {}",
+                    ip, e
+                )))
+            };
+        }
+        Err(_) => {
+            // If the whole firmware body has been sent, lack of an HTTP response
+            // is not enough to mark OTA as failed. Some firmware revisions hang
+            // or reboot before flushing the final response.
+            return Ok(());
+        }
+    }
 
     // Some ESPAsyncWebServer builds close the connection during the reboot path
     // before the client receives the response. If the full request body was sent,
