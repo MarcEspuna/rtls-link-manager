@@ -235,6 +235,12 @@ pub struct UwbConfig {
     /// MAVLink target system ID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mavlink_target_system_id: Option<u8>,
+    /// Output backend: 0=MAVLink, 1=RTLSLink Beacon
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_backend: Option<u8>,
+    /// Safety bias added to RTLSLink TDoA age estimates, in milliseconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rtls_beacon_age_bias_ms: Option<u8>,
     /// Coordinate rotation in degrees
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rotation_degrees: Option<f64>,
@@ -625,6 +631,8 @@ mod tests {
                 origin_lon: Some(2.1744),
                 origin_alt: Some(100.0),
                 mavlink_target_system_id: Some(1),
+                output_backend: Some(1),
+                rtls_beacon_age_bias_ms: Some(2),
                 rotation_degrees: Some(0.0),
                 z_calc_mode: Some(1),
                 rf_forward_enable: Some(1),

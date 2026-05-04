@@ -77,6 +77,19 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       errors.push('Covariance matrix enable must be 0 or 1');
     }
 
+    if (config.uwb.outputBackend !== undefined &&
+      config.uwb.outputBackend !== 0 &&
+      config.uwb.outputBackend !== 1) {
+      errors.push('Output backend must be 0 or 1');
+    }
+
+    if (config.uwb.rtlsBeaconAgeBiasMs !== undefined) {
+      const v = Number(config.uwb.rtlsBeaconAgeBiasMs);
+      if (Number.isNaN(v) || !Number.isInteger(v) || v < 0 || v > 20) {
+        errors.push('RTLSLink beacon age bias must be an integer in 0-20 ms');
+      }
+    }
+
     if (config.uwb.rmseThreshold !== undefined) {
       const v = Number(config.uwb.rmseThreshold);
       if (Number.isNaN(v) || !Number.isFinite(v) || v <= 0) {

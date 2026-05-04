@@ -16,6 +16,8 @@ describe('configToParams', () => {
         rfForwardPreserveSrcIds: 1,
         enableCovMatrix: 1,
         rmseThreshold: 0.8,
+        outputBackend: 1,
+        rtlsBeaconAgeBiasMs: 2,
       },
       app: {},
     };
@@ -30,5 +32,7 @@ describe('configToParams', () => {
     expect(params).toContainEqual(['uwb', 'rfForwardPreserveSrcIds', '1']);
     expect(params).toContainEqual(['uwb', 'enableCovMatrix', '1']);
     expect(params).toContainEqual(['uwb', 'rmseThreshold', '0.8']);
+    expect(params).toContainEqual(['uwb', 'outputBackend', '1']);
+    expect(params).toContainEqual(['uwb', 'rtlsBeaconAgeBiasMs', '2']);
   });
 });

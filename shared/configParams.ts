@@ -52,6 +52,8 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.uwb.originLon !== undefined) params.push(['uwb', 'originLon', String(config.uwb.originLon)]);
     if (config.uwb.originAlt !== undefined) params.push(['uwb', 'originAlt', String(config.uwb.originAlt)]);
     if (config.uwb.mavlinkTargetSystemId !== undefined) params.push(['uwb', 'mavlinkTargetSystemId', String(config.uwb.mavlinkTargetSystemId)]);
+    if (config.uwb.outputBackend !== undefined) params.push(['uwb', 'outputBackend', String(config.uwb.outputBackend)]);
+    if (config.uwb.rtlsBeaconAgeBiasMs !== undefined) params.push(['uwb', 'rtlsBeaconAgeBiasMs', String(config.uwb.rtlsBeaconAgeBiasMs)]);
     if (config.uwb.rotationDegrees !== undefined) params.push(['uwb', 'rotationDegrees', String(config.uwb.rotationDegrees)]);
     if (config.uwb.zCalcMode !== undefined) params.push(['uwb', 'zCalcMode', String(config.uwb.zCalcMode)]);
     if (config.uwb.rfForwardEnable !== undefined) params.push(['uwb', 'rfForwardEnable', String(config.uwb.rfForwardEnable)]);
