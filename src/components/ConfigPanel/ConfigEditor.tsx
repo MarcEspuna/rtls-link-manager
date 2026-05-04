@@ -218,6 +218,20 @@ export function ConfigEditor({
           </select>
         </div>
         <div className={styles.field}>
+          <label>Output Backend</label>
+          <select
+            value={config.uwb.outputBackend ?? 0}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              handleChange('uwb', 'outputBackend', val);
+              handleApply('uwb', 'outputBackend', val);
+            }}
+          >
+            <option value={0}>MAVLink</option>
+            <option value={1}>RTLSLink Beacon</option>
+          </select>
+        </div>
+        <div className={styles.field}>
           <label>UWB Short Address</label>
           <div className={styles.inputWithError}>
             <input
@@ -350,6 +364,24 @@ export function ConfigEditor({
               }}
             />
           </div>
+          {config.uwb.mode === 4 && (config.uwb.outputBackend ?? 0) === 1 && (
+            <div className={styles.field}>
+              <label>Beacon Age Bias (ms)</label>
+              <input
+                type="number"
+                step="1"
+                min={0}
+                max={20}
+                value={config.uwb.rtlsBeaconAgeBiasMs ?? 2}
+                onChange={(e) => handleChange('uwb', 'rtlsBeaconAgeBiasMs', safeParseU8(e.target.value, 2))}
+                onBlur={(e) => {
+                  const val = Math.min(20, safeParseU8(e.target.value, 2));
+                  handleChange('uwb', 'rtlsBeaconAgeBiasMs', val);
+                  handleApply('uwb', 'rtlsBeaconAgeBiasMs', val);
+                }}
+              />
+            </div>
+          )}
           <div className={styles.field}>
             <label>Z Calculation Mode</label>
             <select

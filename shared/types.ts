@@ -97,6 +97,8 @@ export interface UwbConfig {
   originLon?: number;
   originAlt?: number;
   mavlinkTargetSystemId?: number;
+  outputBackend?: 0 | 1;    // 0=MAVLink, 1=RTLSLink Beacon
+  rtlsBeaconAgeBiasMs?: number; // Safety bias added to RTLSLink TDoA age estimate
   rotationDegrees?: number;
   zCalcMode?: 0 | 1 | 2;  // 0=None (TDoA Z), 1=Rangefinder, 2=UWB (reserved)
   // Rangefinder forwarding settings

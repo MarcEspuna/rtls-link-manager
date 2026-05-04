@@ -210,6 +210,8 @@ mod tests {
                 origin_lon: None,
                 origin_alt: None,
                 mavlink_target_system_id: None,
+                output_backend: None,
+                rtls_beacon_age_bias_ms: None,
                 rotation_degrees: None,
                 z_calc_mode: None,
                 rf_forward_enable: None,

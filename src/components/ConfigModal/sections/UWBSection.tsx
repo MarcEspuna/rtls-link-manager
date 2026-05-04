@@ -57,6 +57,20 @@ export function UWBSection({ config, onChange, onApply, isExpertMode = false }: 
           </select>
         </div>
         <div className={styles.field}>
+          <label>Output Backend</label>
+          <select
+            value={config.uwb.outputBackend ?? 0}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              onChange('uwb', 'outputBackend', val);
+              onApply('uwb', 'outputBackend', val);
+            }}
+          >
+            <option value={0}>MAVLink</option>
+            <option value={1}>RTLSLink Beacon</option>
+          </select>
+        </div>
+        <div className={styles.field}>
           <label>UWB Short Address</label>
           <input
             value={config.uwb.devShortAddr || ''}
@@ -180,6 +194,33 @@ export function UWBSection({ config, onChange, onApply, isExpertMode = false }: 
                 Sends position covariance in MAVLink VISION_POSITION_ESTIMATE messages.
               </span>
             </div>
+            {isExpertMode && (config.uwb.outputBackend ?? 0) === 1 && (
+              <div className={styles.field}>
+                <label>Beacon Age Bias (ms)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  step={1}
+                  value={config.uwb.rtlsBeaconAgeBiasMs ?? 2}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const val = raw === '' ? 2 : Number(raw);
+                    onChange('uwb', 'rtlsBeaconAgeBiasMs', val);
+                  }}
+                  onBlur={(e) => {
+                    const raw = e.target.value;
+                    const val = raw === '' ? 2 : Number(raw);
+                    if (!Number.isFinite(val) || !Number.isInteger(val) || val < 0 || val > 20) return;
+                    onChange('uwb', 'rtlsBeaconAgeBiasMs', val);
+                    onApply('uwb', 'rtlsBeaconAgeBiasMs', val);
+                  }}
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                  Adds a small safety margin to the TDoA measurement age sent to ArduPilot.
+                </span>
+              </div>
+            )}
             <div className={styles.field}>
               <label>RMSE Threshold (m)</label>
               <input
