@@ -2,7 +2,6 @@
 
 use std::time::Duration;
 
-use bytes::Bytes;
 use reqwest::multipart;
 use reqwest::Client;
 
@@ -30,7 +29,7 @@ impl OtaProgressHandler for NoopProgress {
 /// Upload firmware data to a device via HTTP multipart POST.
 pub async fn upload_firmware(ip: &str, data: Vec<u8>, filename: &str) -> Result<(), CoreError> {
     let client = build_client()?;
-    upload_firmware_data(&client, ip, Bytes::from(data), filename).await
+    upload_firmware_data(&client, ip, data, filename).await
 }
 
 /// Upload firmware to multiple devices concurrently.
@@ -44,7 +43,6 @@ pub async fn upload_firmware_bulk<P: OtaProgressHandler>(
     use futures::stream::{self, StreamExt};
 
     let concurrency = concurrency.max(1);
-    let data = Bytes::from(data);
     let total_bytes = data.len() as u64;
     let client = match build_client() {
         Ok(c) => c,
@@ -97,10 +95,10 @@ fn build_client() -> Result<Client, CoreError> {
 async fn upload_firmware_data(
     client: &Client,
     ip: &str,
-    data: Bytes,
+    data: Vec<u8>,
     file_name: &str,
 ) -> Result<(), CoreError> {
-    let part = multipart::Part::stream(data)
+    let part = multipart::Part::bytes(data)
         .file_name(file_name.to_string())
         .mime_str("application/octet-stream")
         .map_err(|e| CoreError::Other(format!("Failed to create multipart: {}", e)))?;
