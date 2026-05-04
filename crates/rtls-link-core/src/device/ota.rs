@@ -15,7 +15,7 @@ use crate::error::{CoreError, DeviceError};
 
 const CONNECT_TIMEOUT_SECS: u64 = 10;
 const UPLOAD_TIMEOUT_SECS: u64 = 120;
-const WRITE_TIMEOUT_SECS: u64 = 10;
+const WRITE_TIMEOUT_SECS: u64 = 20;
 const RESPONSE_TIMEOUT_SECS: u64 = 10;
 const UPLOAD_CHUNK_SIZE: usize = 4096;
 
@@ -260,4 +260,36 @@ fn split_host_port(ip: &str) -> (&str, u16) {
         }
     }
     (ip, 80)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_cancelled_allows_active_upload() {
+        let cancel = AtomicBool::new(false);
+        assert!(check_cancelled("192.168.0.10", Some(&cancel)).is_ok());
+        assert!(check_cancelled("192.168.0.10", None).is_ok());
+    }
+
+    #[test]
+    fn check_cancelled_reports_canceled_upload() {
+        let cancel = AtomicBool::new(true);
+        let error = check_cancelled("192.168.0.10", Some(&cancel)).unwrap_err();
+        match error {
+            CoreError::Other(message) => assert!(message.contains("192.168.0.10")),
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn split_host_port_uses_default_port_for_plain_ip() {
+        assert_eq!(split_host_port("192.168.0.10"), ("192.168.0.10", 80));
+    }
+
+    #[test]
+    fn split_host_port_accepts_explicit_port() {
+        assert_eq!(split_host_port("192.168.0.10:8080"), ("192.168.0.10", 8080));
+    }
 }

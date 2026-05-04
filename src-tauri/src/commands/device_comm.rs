@@ -25,10 +25,35 @@ use rtls_link_core::device::websocket::{
 use rtls_link_core::protocol::commands::Commands;
 use rtls_link_core::protocol::config_params::{config_to_params, location_to_params};
 use tauri::{AppHandle, Emitter, State};
+use tokio::sync::RwLock;
 
 /// Progress handler that emits Tauri events for OTA progress tracking.
 struct TauriOtaProgress {
     app_handle: AppHandle,
+}
+
+struct OtaCancellationGuard {
+    ip: String,
+    cancel: Arc<AtomicBool>,
+    active_cancellations: Arc<RwLock<HashMap<String, Arc<AtomicBool>>>>,
+}
+
+impl Drop for OtaCancellationGuard {
+    fn drop(&mut self) {
+        let ip = self.ip.clone();
+        let cancel = self.cancel.clone();
+        let active_cancellations = self.active_cancellations.clone();
+        tauri::async_runtime::spawn(async move {
+            let mut active_cancellations = active_cancellations.write().await;
+            let should_remove = active_cancellations
+                .get(&ip)
+                .map(|current| Arc::ptr_eq(current, &cancel))
+                .unwrap_or(false);
+            if should_remove {
+                active_cancellations.remove(&ip);
+            }
+        });
+    }
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -142,6 +167,23 @@ fn write_commands_from_params(params: Vec<(String, String, String)>) -> Vec<Stri
         .into_iter()
         .map(|(group, name, value)| Commands::write_param(&group, &name, &value))
         .collect()
+}
+
+async fn register_ota_cancellation(
+    active_cancellations: Arc<RwLock<HashMap<String, Arc<AtomicBool>>>>,
+    ip: &str,
+) -> (Arc<AtomicBool>, OtaCancellationGuard) {
+    let cancel = Arc::new(AtomicBool::new(false));
+    active_cancellations
+        .write()
+        .await
+        .insert(ip.to_string(), cancel.clone());
+    let guard = OtaCancellationGuard {
+        ip: ip.to_string(),
+        cancel: cancel.clone(),
+        active_cancellations,
+    };
+    (cancel, guard)
 }
 
 impl OtaProgressHandler for TauriOtaProgress {
@@ -380,16 +422,11 @@ pub async fn upload_firmware_from_file(
         .unwrap_or("firmware.bin");
 
     let progress = TauriOtaProgress { app_handle };
-    let cancel = Arc::new(AtomicBool::new(false));
-    state
-        .ota_cancellations
-        .write()
-        .await
-        .insert(ip.clone(), cancel.clone());
+    let (cancel, _cancel_guard) =
+        register_ota_cancellation(state.ota_cancellations.clone(), &ip).await;
 
     let result =
         upload_firmware_with_progress_and_cancel(&ip, data, filename, &progress, cancel).await;
-    state.ota_cancellations.write().await.remove(&ip);
 
     if let Err(error) = result {
         progress.on_error(&ip, &error.to_string());
@@ -424,15 +461,13 @@ pub async fn upload_firmware_to_devices(
         .unwrap_or("firmware.bin");
 
     let progress = TauriOtaProgress { app_handle };
-    let concurrency = concurrency.unwrap_or(1).max(1);
+    let concurrency = concurrency.unwrap_or(3).max(1);
     let mut cancel_flags = HashMap::new();
-    {
-        let mut active_cancellations = state.ota_cancellations.write().await;
-        for ip in &ips {
-            let cancel = Arc::new(AtomicBool::new(false));
-            active_cancellations.insert(ip.clone(), cancel.clone());
-            cancel_flags.insert(ip.clone(), cancel);
-        }
+    let mut cancel_guards = Vec::with_capacity(ips.len());
+    for ip in &ips {
+        let (cancel, guard) = register_ota_cancellation(state.ota_cancellations.clone(), ip).await;
+        cancel_flags.insert(ip.clone(), cancel);
+        cancel_guards.push(guard);
     }
 
     let results = upload_firmware_bulk_with_cancel(
@@ -444,12 +479,7 @@ pub async fn upload_firmware_to_devices(
         cancel_flags,
     )
     .await;
-    {
-        let mut active_cancellations = state.ota_cancellations.write().await;
-        for ip in &ips {
-            active_cancellations.remove(ip);
-        }
-    }
+    drop(cancel_guards);
 
     let json_results: Vec<serde_json::Value> = results
         .into_iter()
