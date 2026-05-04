@@ -25,6 +25,70 @@ import { open } from '@tauri-apps/plugin-dialog';
 // Default timeouts
 export const DEFAULT_COMMAND_TIMEOUT_MS = 5000;
 export const DEFAULT_WRITE_TIMEOUT_MS = 3000;
+export const DEFAULT_OTA_STALL_TIMEOUT_MS = 30_000;
+
+const OTA_CANCEL_MESSAGE =
+  'Firmware update canceled. The device may still be finishing or rebooting; wait for it to reappear before retrying.';
+
+const OTA_STALL_MESSAGE =
+  'Firmware update stalled: no upload progress was received for 30 seconds. Check Wi-Fi signal, wait for the device to reappear, then retry.';
+
+interface OtaControlOptions {
+  signal?: AbortSignal;
+  stallTimeoutMs?: number;
+}
+
+function createAbortError(message = OTA_CANCEL_MESSAGE): Error {
+  const error = new Error(message);
+  error.name = 'AbortError';
+  return error;
+}
+
+function createOtaWatchdog(
+  signal: AbortSignal | undefined,
+  stallTimeoutMs = DEFAULT_OTA_STALL_TIMEOUT_MS
+) {
+  let stallTimer: ReturnType<typeof setTimeout> | undefined;
+  let settled = false;
+  let rejectWatchdog: (error: Error) => void = () => {};
+
+  const clear = () => {
+    settled = true;
+    if (stallTimer) {
+      clearTimeout(stallTimer);
+      stallTimer = undefined;
+    }
+    signal?.removeEventListener('abort', onAbort);
+  };
+
+  const rejectOnce = (error: Error) => {
+    if (settled) return;
+    clear();
+    rejectWatchdog(error);
+  };
+
+  const onAbort = () => rejectOnce(createAbortError());
+  const promise = new Promise<never>((_, reject) => {
+    rejectWatchdog = reject;
+  });
+
+  const reset = () => {
+    if (settled || stallTimeoutMs <= 0) return;
+    if (stallTimer) clearTimeout(stallTimer);
+    stallTimer = setTimeout(() => {
+      rejectOnce(new Error(OTA_STALL_MESSAGE));
+    }, stallTimeoutMs);
+  };
+
+  if (signal?.aborted) {
+    onAbort();
+  } else {
+    signal?.addEventListener('abort', onAbort, { once: true });
+    reset();
+  }
+
+  return { promise, reset, clear };
+}
 
 /**
  * Result of a bulk command operation for a single device.
@@ -134,23 +198,26 @@ export async function uploadFirmware(
   filePath: string,
   options?: {
     onProgress?: (percent: number) => void;
-  }
+  } & OtaControlOptions
 ): Promise<void> {
-  const { onProgress } = options ?? {};
+  const { onProgress, signal, stallTimeoutMs } = options ?? {};
+  const watchdog = createOtaWatchdog(signal, stallTimeoutMs);
 
   // Listen for progress events for this specific device
   let unlistenProgress: (() => void) | undefined;
   if (onProgress) {
     unlistenProgress = await onOtaProgress((event: OtaProgressEvent) => {
       if (event.ip === deviceIp && event.totalBytes > 0) {
+        watchdog.reset();
         onProgress(Math.round((event.bytesSent / event.totalBytes) * 100));
       }
     });
   }
 
   try {
-    await uploadFirmwareFromFile(deviceIp, filePath);
+    await Promise.race([uploadFirmwareFromFile(deviceIp, filePath), watchdog.promise]);
   } finally {
+    watchdog.clear();
     unlistenProgress?.();
   }
 }
@@ -173,9 +240,17 @@ export async function uploadFirmwareBulk(
     onDeviceProgress?: (device: Device, percent: number) => void;
     onDeviceComplete?: (device: Device, success: boolean, version?: string, error?: string) => void;
     onOverallProgress?: (completed: number, total: number) => void;
-  }
+  } & OtaControlOptions
 ): Promise<FirmwareUploadResult[]> {
-  const { concurrency = 3, onDeviceProgress, onDeviceComplete, onOverallProgress } = options ?? {};
+  const {
+    concurrency = 1,
+    onDeviceProgress,
+    onDeviceComplete,
+    onOverallProgress,
+    signal,
+    stallTimeoutMs,
+  } = options ?? {};
+  const watchdog = createOtaWatchdog(signal, stallTimeoutMs);
 
   const ips = devices.map(d => d.ip);
   const ipToDevice = new Map(devices.map(d => [d.ip, d]));
@@ -189,6 +264,7 @@ export async function uploadFirmwareBulk(
     unlistenProgress = await onOtaProgress((event) => {
       const device = ipToDevice.get(event.ip);
       if (device && event.totalBytes > 0) {
+        watchdog.reset();
         onDeviceProgress(device, Math.round((event.bytesSent / event.totalBytes) * 100));
       }
     });
@@ -211,7 +287,10 @@ export async function uploadFirmwareBulk(
   }
 
   try {
-    const tauriResults = await tauriUploadBulk(ips, filePath, concurrency);
+    const tauriResults = await Promise.race([
+      tauriUploadBulk(ips, filePath, concurrency),
+      watchdog.promise,
+    ]);
 
     const results: FirmwareUploadResult[] = tauriResults.map((r: FirmwareResult) => {
       const device = ipToDevice.get(r.ip);
@@ -225,6 +304,7 @@ export async function uploadFirmwareBulk(
     onOverallProgress?.(results.length, devices.length);
     return results;
   } finally {
+    watchdog.clear();
     unlistenProgress?.();
     unlistenComplete?.();
     unlistenError?.();

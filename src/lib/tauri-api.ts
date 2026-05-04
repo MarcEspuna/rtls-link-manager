@@ -367,6 +367,10 @@ export async function uploadFirmwareBulk(
   return await invokeSafe('upload_firmware_to_devices', { ips, filePath, concurrency });
 }
 
+export async function cancelFirmwareUpload(ip: string): Promise<boolean> {
+  return await invokeSafe('cancel_firmware_upload', { ip });
+}
+
 export interface FirmwareInfo {
   [key: string]: unknown;
 }

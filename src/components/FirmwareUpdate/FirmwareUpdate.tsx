@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Device } from '@shared/types';
 import {
   uploadFirmware,
@@ -6,6 +6,7 @@ import {
   selectFirmwareFile,
   FirmwareUploadResult,
 } from '../../lib/deviceCommands';
+import { cancelFirmwareUpload } from '../../lib/tauri-api';
 import { ProgressBar } from '../common/ProgressBar';
 import styles from './FirmwareUpdate.module.css';
 
@@ -33,6 +34,7 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
   const [results, setResults] = useState<FirmwareUploadResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const activeUploadController = useRef<AbortController | null>(null);
 
   const isBulkMode = !!devices && devices.length > 0;
   const targetDevices = isBulkMode ? devices : (device ? [device] : []);
@@ -59,6 +61,8 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
   const handleUpload = async () => {
     if (!firmwarePath || targetDevices.length === 0) return;
 
+    const uploadController = new AbortController();
+    activeUploadController.current = uploadController;
     setUploading(true);
     setError(null);
     setSuccess(false);
@@ -108,6 +112,7 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
             });
             setResults(prev => [...prev, { device: dev, success: didSucceed, version, error: err }]);
           },
+          signal: uploadController.signal,
         });
 
         const allSuccess = uploadResults.every(r => r.success);
@@ -120,6 +125,7 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
       } else {
         await uploadFirmware(targetDevices[0].ip, firmwarePath, {
           onProgress: setUploadProgress,
+          signal: uploadController.signal,
         });
         setSuccess(true);
       }
@@ -128,9 +134,19 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed');
     } finally {
+      if (activeUploadController.current === uploadController) {
+        activeUploadController.current = null;
+      }
       setUploading(false);
       setDeviceStatuses(new Map());
     }
+  };
+
+  const handleCancelUpload = () => {
+    targetDevices.forEach((targetDevice) => {
+      void cancelFirmwareUpload(targetDevice.ip).catch(() => undefined);
+    });
+    activeUploadController.current?.abort();
   };
 
   return (
@@ -156,13 +172,24 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
         )}
       </div>
 
-      <button
-        className={styles.uploadBtn}
-        onClick={handleUpload}
-        disabled={!firmwarePath || uploading || targetDevices.length === 0}
-      >
-        {uploadButtonText}
-      </button>
+      <div className={styles.actions}>
+        <button
+          className={styles.uploadBtn}
+          onClick={handleUpload}
+          disabled={!firmwarePath || uploading || targetDevices.length === 0}
+        >
+          {uploadButtonText}
+        </button>
+        {uploading && (
+          <button
+            className={styles.cancelBtn}
+            onClick={handleCancelUpload}
+            type="button"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
 
       {uploading && (
         <div className={styles.progress}>

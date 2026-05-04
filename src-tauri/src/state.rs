@@ -6,7 +6,7 @@
 use crate::logging::service::LogStreamState;
 use crate::types::Device;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, Arc};
 use tokio::sync::RwLock;
 
 /// Shared application state managed by Tauri.
@@ -16,6 +16,8 @@ pub struct AppState {
     pub devices: Arc<RwLock<HashMap<String, Device>>>,
     /// State for active log streams
     pub log_streams: Arc<RwLock<LogStreamState>>,
+    /// Cooperative cancellation flags for active OTA uploads, keyed by IP address.
+    pub ota_cancellations: Arc<RwLock<HashMap<String, Arc<AtomicBool>>>>,
 }
 
 impl AppState {
@@ -24,6 +26,7 @@ impl AppState {
         Self {
             devices: Arc::new(RwLock::new(HashMap::new())),
             log_streams: Arc::new(RwLock::new(LogStreamState::default())),
+            ota_cancellations: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }

@@ -102,6 +102,7 @@ pub fn run() {
             commands::device_comm::run_antenna_calibration,
             commands::device_comm::upload_firmware_from_file,
             commands::device_comm::upload_firmware_to_devices,
+            commands::device_comm::cancel_firmware_upload,
             commands::device_comm::get_firmware_info,
             commands::logging::start_log_stream,
             commands::logging::stop_log_stream,

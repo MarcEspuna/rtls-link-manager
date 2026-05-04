@@ -1,5 +1,10 @@
 //! OTA firmware upload functionality.
 
+use std::collections::HashMap;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::Duration;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -10,6 +15,7 @@ use crate::error::{CoreError, DeviceError};
 
 const CONNECT_TIMEOUT_SECS: u64 = 10;
 const UPLOAD_TIMEOUT_SECS: u64 = 120;
+const WRITE_TIMEOUT_SECS: u64 = 10;
 const RESPONSE_TIMEOUT_SECS: u64 = 10;
 const UPLOAD_CHUNK_SIZE: usize = 4096;
 
@@ -25,7 +31,7 @@ pub trait OtaProgressHandler: Send + Sync {
 
 /// Upload firmware data to a device via HTTP multipart POST.
 pub async fn upload_firmware(ip: &str, data: Vec<u8>, filename: &str) -> Result<(), CoreError> {
-    upload_firmware_data(ip, data, filename, None).await
+    upload_firmware_data(ip, data, filename, None, None).await
 }
 
 /// Upload firmware data to a device and report transfer progress.
@@ -35,7 +41,18 @@ pub async fn upload_firmware_with_progress<P: OtaProgressHandler>(
     filename: &str,
     progress: &P,
 ) -> Result<(), CoreError> {
-    upload_firmware_data(ip, data, filename, Some(progress)).await
+    upload_firmware_data(ip, data, filename, Some(progress), None).await
+}
+
+/// Upload firmware data to a device and allow cooperative cancellation.
+pub async fn upload_firmware_with_progress_and_cancel<P: OtaProgressHandler>(
+    ip: &str,
+    data: Vec<u8>,
+    filename: &str,
+    progress: &P,
+    cancel: Arc<AtomicBool>,
+) -> Result<(), CoreError> {
+    upload_firmware_data(ip, data, filename, Some(progress), Some(cancel.as_ref())).await
 }
 
 /// Upload firmware to multiple devices concurrently.
@@ -46,17 +63,33 @@ pub async fn upload_firmware_bulk<P: OtaProgressHandler>(
     concurrency: usize,
     progress: &P,
 ) -> Vec<(String, Result<(), CoreError>)> {
+    upload_firmware_bulk_with_cancel(ips, data, filename, concurrency, progress, HashMap::new())
+        .await
+}
+
+/// Upload firmware to multiple devices concurrently with optional per-device cancellation.
+pub async fn upload_firmware_bulk_with_cancel<P: OtaProgressHandler>(
+    ips: &[String],
+    data: Vec<u8>,
+    filename: &str,
+    concurrency: usize,
+    progress: &P,
+    cancel_flags: HashMap<String, Arc<AtomicBool>>,
+) -> Vec<(String, Result<(), CoreError>)> {
     use futures::stream::{self, StreamExt};
 
     let concurrency = concurrency.max(1);
     let filename = filename.to_string();
+    let cancel_flags = Arc::new(cancel_flags);
 
     let results: Vec<_> = stream::iter(ips.iter().cloned())
         .map(|ip| {
             let data = data.clone();
             let name = filename.clone();
+            let cancel = cancel_flags.get(&ip).cloned();
             async move {
-                let result = upload_firmware_data(&ip, data, &name, Some(progress)).await;
+                let result =
+                    upload_firmware_data(&ip, data, &name, Some(progress), cancel.as_deref()).await;
                 match &result {
                     Ok(()) => {
                         progress.on_complete(&ip);
@@ -81,7 +114,10 @@ async fn upload_firmware_data(
     data: Vec<u8>,
     file_name: &str,
     progress: Option<&dyn OtaProgressHandler>,
+    cancel: Option<&AtomicBool>,
 ) -> Result<(), CoreError> {
+    check_cancelled(ip, cancel)?;
+
     let (host, port) = split_host_port(ip);
     let address = format!("{}:{}", host, port);
     let boundary = "----rtls-link-ota-boundary";
@@ -105,8 +141,15 @@ async fn upload_firmware_data(
     .map_err(|e| CoreError::Other(format!("Failed to connect to {}: {}", ip, e)))?;
 
     timeout(Duration::from_secs(UPLOAD_TIMEOUT_SECS), async {
-        stream.write_all(request_headers.as_bytes()).await?;
-        stream.write_all(prefix.as_bytes()).await?;
+        check_cancelled(ip, cancel)?;
+        write_all_with_timeout(
+            &mut stream,
+            request_headers.as_bytes(),
+            ip,
+            "request headers",
+        )
+        .await?;
+        write_all_with_timeout(&mut stream, prefix.as_bytes(), ip, "multipart header").await?;
 
         let total = data.len() as u64;
         let mut sent = 0u64;
@@ -115,7 +158,8 @@ async fn upload_firmware_data(
         }
 
         for chunk in data.chunks(UPLOAD_CHUNK_SIZE) {
-            stream.write_all(chunk).await?;
+            check_cancelled(ip, cancel)?;
+            write_all_with_timeout(&mut stream, chunk, ip, "firmware chunk").await?;
             sent += chunk.len() as u64;
             if let Some(handler) = progress {
                 handler.on_progress(ip, sent, total);
@@ -123,14 +167,12 @@ async fn upload_firmware_data(
             tokio::task::yield_now().await;
         }
 
-        stream.write_all(suffix.as_bytes()).await?;
-        stream.flush().await
+        check_cancelled(ip, cancel)?;
+        write_all_with_timeout(&mut stream, suffix.as_bytes(), ip, "multipart footer").await?;
+        flush_with_timeout(&mut stream, ip).await
     })
     .await
-    .map_err(|_| CoreError::Other(format!("Timed out uploading firmware to {}", ip)))?
-    .map_err(|e: std::io::Error| {
-        CoreError::Other(format!("HTTP upload to {} failed: {}", ip, e))
-    })?;
+    .map_err(|_| CoreError::Other(format!("Timed out uploading firmware to {}", ip)))??;
 
     let mut response = Vec::new();
     match timeout(
@@ -172,6 +214,43 @@ async fn upload_firmware_data(
     }
 
     Ok(())
+}
+
+fn check_cancelled(ip: &str, cancel: Option<&AtomicBool>) -> Result<(), CoreError> {
+    if matches!(cancel, Some(flag) if flag.load(Ordering::Relaxed)) {
+        return Err(CoreError::Other(format!(
+            "Firmware upload to {} canceled",
+            ip
+        )));
+    }
+    Ok(())
+}
+
+async fn write_all_with_timeout(
+    stream: &mut TcpStream,
+    bytes: &[u8],
+    ip: &str,
+    phase: &str,
+) -> Result<(), CoreError> {
+    timeout(
+        Duration::from_secs(WRITE_TIMEOUT_SECS),
+        stream.write_all(bytes),
+    )
+    .await
+    .map_err(|_| CoreError::Other(format!("Timed out writing {} to {}", phase, ip)))?
+    .map_err(|e| {
+        CoreError::Other(format!(
+            "HTTP upload to {} failed during {}: {}",
+            ip, phase, e
+        ))
+    })
+}
+
+async fn flush_with_timeout(stream: &mut TcpStream, ip: &str) -> Result<(), CoreError> {
+    timeout(Duration::from_secs(WRITE_TIMEOUT_SECS), stream.flush())
+        .await
+        .map_err(|_| CoreError::Other(format!("Timed out finalizing upload to {}", ip)))?
+        .map_err(|e| CoreError::Other(format!("HTTP upload to {} failed during flush: {}", ip, e)))
 }
 
 fn split_host_port(ip: &str) -> (&str, u16) {
