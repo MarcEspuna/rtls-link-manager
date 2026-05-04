@@ -36,6 +36,12 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
 
   const isBulkMode = !!devices && devices.length > 0;
   const targetDevices = isBulkMode ? devices : (device ? [device] : []);
+  const uploadButtonText =
+    uploading && !isBulkMode && uploadProgress >= 100
+      ? 'Finalizing...'
+      : uploading
+        ? 'Uploading...'
+        : 'Upload Firmware';
 
   const handleSelectFile = async () => {
     const path = await selectFirmwareFile();
@@ -155,7 +161,7 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
         onClick={handleUpload}
         disabled={!firmwarePath || uploading || targetDevices.length === 0}
       >
-        {uploading ? 'Uploading...' : 'Upload Firmware'}
+        {uploadButtonText}
       </button>
 
       {uploading && (
@@ -171,7 +177,7 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
                     </span>
                     <span className={`${styles.deviceProgressStatus} ${styles[`status${status.status.charAt(0).toUpperCase() + status.status.slice(1)}`]}`}>
                       {status.status === 'pending' && 'Waiting...'}
-                      {status.status === 'uploading' && `${status.progress}%`}
+                      {status.status === 'uploading' && (status.progress >= 100 ? 'Finalizing...' : `${status.progress}%`)}
                       {status.status === 'complete' && (status.version ? `v${status.version}` : 'Done')}
                       {status.status === 'error' && 'Failed'}
                     </span>
@@ -187,7 +193,9 @@ export function FirmwareUpdate({ device, devices, onComplete }: FirmwareUpdatePr
             // Single device mode: simple progress bar
             <>
               <ProgressBar current={uploadProgress} total={100} />
-              <div className={styles.progressText}>{uploadProgress}%</div>
+              <div className={styles.progressText}>
+                {uploadProgress >= 100 ? 'Finalizing...' : `${uploadProgress}%`}
+              </div>
             </>
           )}
         </div>

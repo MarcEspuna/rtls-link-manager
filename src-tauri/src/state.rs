@@ -73,6 +73,7 @@ mod tests {
                     log_serial_enabled: None,
                     log_udp_enabled: None,
                     dynamic_anchors: None,
+                    health: None,
                 },
             );
         }

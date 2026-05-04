@@ -4,19 +4,139 @@
 //! and uploading firmware via OTA. This routes all device communication
 //! through the Rust backend instead of direct browser connections.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::error::AppError;
-use rtls_link_core::device::ota::{upload_firmware, upload_firmware_bulk, OtaProgressHandler};
-use rtls_link_core::device::websocket::{
-    send_command_parsed, DeviceCommandResponse, DeviceConnection,
+use crate::types::{DeviceConfig, Preset, PresetType};
+use rtls_link_core::calibration::{calibrate_anchors, AnchorCalibrationConfig, CalibrationRun};
+use rtls_link_core::device::ota::{
+    upload_firmware_bulk, upload_firmware_with_progress, OtaProgressHandler,
 };
+use rtls_link_core::device::websocket::{
+    send_command_parsed, send_commands_parsed, DeviceCommandResponse, DeviceConnection,
+};
+use rtls_link_core::protocol::commands::Commands;
+use rtls_link_core::protocol::config_params::{config_to_params, location_to_params};
 use tauri::{AppHandle, Emitter};
 
 /// Progress handler that emits Tauri events for OTA progress tracking.
 struct TauriOtaProgress {
     app_handle: AppHandle,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceOperationResult {
+    pub ip: String,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+fn emit_operation_progress(
+    app_handle: &AppHandle,
+    operation_id: &str,
+    completed: usize,
+    total: usize,
+    ip: Option<&str>,
+    success: Option<bool>,
+    error: Option<&str>,
+) {
+    let _ = app_handle.emit(
+        "device-operation-progress",
+        serde_json::json!({
+            "operationId": operation_id,
+            "completed": completed,
+            "total": total,
+            "ip": ip,
+            "success": success,
+            "error": error,
+        }),
+    );
+}
+
+async fn run_device_batches(
+    ips: Vec<String>,
+    command_batches: Vec<Vec<String>>,
+    timeout: Duration,
+    concurrency: usize,
+    operation_id: String,
+    app_handle: AppHandle,
+) -> Vec<DeviceOperationResult> {
+    let total = ips.len();
+    let mut completed = 0usize;
+    let mut results = Vec::with_capacity(total);
+    let concurrency = concurrency.max(1);
+
+    let work: Vec<(String, Vec<String>)> = ips.into_iter().zip(command_batches).collect();
+
+    for chunk in work.chunks(concurrency) {
+        let mut join_set = tokio::task::JoinSet::new();
+        let mut task_ips = HashMap::new();
+        for (ip, commands) in chunk.iter().cloned() {
+            let ip_for_error = ip.clone();
+            let handle = join_set.spawn(async move {
+                let result = send_commands_parsed(&ip, &commands, timeout).await;
+                (ip, result)
+            });
+            task_ips.insert(handle.id(), ip_for_error);
+        }
+
+        while let Some(joined) = join_set.join_next_with_id().await {
+            let (ip, result) = match joined {
+                Ok((id, v)) => {
+                    task_ips.remove(&id);
+                    v
+                }
+                Err(e) => {
+                    completed += 1;
+                    let ip = task_ips
+                        .remove(&e.id())
+                        .unwrap_or_else(|| "unknown".to_string());
+                    let message = e.to_string();
+                    emit_operation_progress(
+                        &app_handle,
+                        &operation_id,
+                        completed,
+                        total,
+                        Some(&ip),
+                        Some(false),
+                        Some(&message),
+                    );
+                    results.push(DeviceOperationResult {
+                        ip,
+                        success: false,
+                        error: Some(message),
+                    });
+                    continue;
+                }
+            };
+
+            completed += 1;
+            let success = result.is_ok();
+            let error = result.err().map(|e| e.to_string());
+            emit_operation_progress(
+                &app_handle,
+                &operation_id,
+                completed,
+                total,
+                Some(&ip),
+                Some(success),
+                error.as_deref(),
+            );
+            results.push(DeviceOperationResult { ip, success, error });
+        }
+    }
+
+    results
+}
+
+fn write_commands_from_params(params: Vec<(String, String, String)>) -> Vec<String> {
+    params
+        .into_iter()
+        .map(|(group, name, value)| Commands::write_param(&group, &name, &value))
+        .collect()
 }
 
 impl OtaProgressHandler for TauriOtaProgress {
@@ -100,6 +220,141 @@ pub async fn send_device_commands(
     Ok(responses)
 }
 
+/// Execute one raw command on multiple devices with backend-owned concurrency.
+#[tauri::command]
+pub async fn run_bulk_device_command(
+    ips: Vec<String>,
+    command: String,
+    timeout_ms: Option<u64>,
+    concurrency: Option<usize>,
+    operation_id: Option<String>,
+    app_handle: AppHandle,
+) -> Result<Vec<DeviceOperationResult>, AppError> {
+    let timeout = Duration::from_millis(timeout_ms.unwrap_or(5000));
+    let operation_id = operation_id.unwrap_or_else(|| "bulk-command".to_string());
+    let command_batches = ips.iter().map(|_| vec![command.clone()]).collect();
+    Ok(run_device_batches(
+        ips,
+        command_batches,
+        timeout,
+        concurrency.unwrap_or(5),
+        operation_id,
+        app_handle,
+    )
+    .await)
+}
+
+/// Apply a full config to multiple devices and save it as a named device config.
+#[tauri::command]
+pub async fn apply_config_to_devices(
+    ips: Vec<String>,
+    config: DeviceConfig,
+    config_name: String,
+    timeout_ms: Option<u64>,
+    concurrency: Option<usize>,
+    operation_id: Option<String>,
+    app_handle: AppHandle,
+) -> Result<Vec<DeviceOperationResult>, AppError> {
+    let timeout = Duration::from_millis(timeout_ms.unwrap_or(3000));
+    let operation_id = operation_id.unwrap_or_else(|| "apply-config".to_string());
+    let mut base_commands = write_commands_from_params(config_to_params(&config));
+    base_commands.push(Commands::save_config_as(&config_name));
+    let command_batches = ips.iter().map(|_| base_commands.clone()).collect();
+
+    Ok(run_device_batches(
+        ips,
+        command_batches,
+        timeout,
+        concurrency.unwrap_or(3),
+        operation_id,
+        app_handle,
+    )
+    .await)
+}
+
+/// Activate a named config on multiple devices.
+#[tauri::command]
+pub async fn activate_config_on_devices(
+    ips: Vec<String>,
+    config_name: String,
+    timeout_ms: Option<u64>,
+    concurrency: Option<usize>,
+    operation_id: Option<String>,
+    app_handle: AppHandle,
+) -> Result<Vec<DeviceOperationResult>, AppError> {
+    let timeout = Duration::from_millis(timeout_ms.unwrap_or(5000));
+    let operation_id = operation_id.unwrap_or_else(|| "activate-config".to_string());
+    let command = Commands::load_config_named(&config_name);
+    let command_batches = ips.iter().map(|_| vec![command.clone()]).collect();
+
+    Ok(run_device_batches(
+        ips,
+        command_batches,
+        timeout,
+        concurrency.unwrap_or(5),
+        operation_id,
+        app_handle,
+    )
+    .await)
+}
+
+/// Upload a preset to multiple devices.
+#[tauri::command]
+pub async fn upload_preset_to_devices(
+    ips: Vec<String>,
+    preset: Preset,
+    timeout_ms: Option<u64>,
+    concurrency: Option<usize>,
+    operation_id: Option<String>,
+    app_handle: AppHandle,
+) -> Result<Vec<DeviceOperationResult>, AppError> {
+    let timeout = Duration::from_millis(timeout_ms.unwrap_or(3000));
+    let operation_id = operation_id.unwrap_or_else(|| "upload-preset".to_string());
+    let commands = match preset.preset_type {
+        PresetType::Full => {
+            let config = preset.config.as_ref().ok_or_else(|| {
+                AppError::Json("Full preset must include config data".to_string())
+            })?;
+            let mut commands = write_commands_from_params(config_to_params(config));
+            commands.push(Commands::save_config_as(&preset.name));
+            commands
+        }
+        PresetType::Locations => {
+            let locations = preset.locations.as_ref().ok_or_else(|| {
+                AppError::Json("Location preset must include location data".to_string())
+            })?;
+            let mut commands = write_commands_from_params(location_to_params(locations));
+            commands.push(Commands::save_config().to_string());
+            commands
+        }
+    };
+    let command_batches = ips.iter().map(|_| commands.clone()).collect();
+
+    Ok(run_device_batches(
+        ips,
+        command_batches,
+        timeout,
+        concurrency.unwrap_or(3),
+        operation_id,
+        app_handle,
+    )
+    .await)
+}
+
+/// Run antenna calibration through the shared Rust core workflow.
+#[tauri::command]
+pub async fn run_antenna_calibration(
+    config: AnchorCalibrationConfig,
+    app_handle: AppHandle,
+) -> Result<CalibrationRun, AppError> {
+    let result = calibrate_anchors(config, |event| {
+        let _ = app_handle.emit("antenna-calibration-event", &event);
+    })
+    .await
+    .map_err(AppError::from)?;
+    Ok(result)
+}
+
 /// Upload firmware from a file path to a single device.
 #[tauri::command]
 pub async fn upload_firmware_from_file(
@@ -119,11 +374,8 @@ pub async fn upload_firmware_from_file(
         .unwrap_or("firmware.bin");
 
     let progress = TauriOtaProgress { app_handle };
-    let total = data.len() as u64;
 
-    progress.on_progress(&ip, 0, total);
-
-    upload_firmware(&ip, data, filename)
+    upload_firmware_with_progress(&ip, data, filename, &progress)
         .await
         .map_err(AppError::from)?;
 

@@ -8,14 +8,14 @@ use crate::cli::{PresetArgs, PresetCommands, PresetTypeArg, RoleFilter};
 use crate::device::discovery::{discover_devices, DiscoveryOptions, DISCOVERY_PORT};
 use crate::error::CliError;
 use crate::output::get_formatter;
-use crate::types::{
-    Device, DeviceConfig, DeviceRole, GpsOrigin, LocationData, Preset, PresetInfo, PresetType,
-};
+use crate::types::{Device, DeviceRole, GpsOrigin, LocationData, Preset, PresetInfo, PresetType};
 
 use rtls_link_core::device::websocket::{send_command, DeviceConnection};
 use rtls_link_core::error::StorageError;
 use rtls_link_core::protocol::commands::Commands;
-use rtls_link_core::protocol::config_params::{config_to_params, location_to_params};
+use rtls_link_core::protocol::config_params::{
+    config_to_params, device_config_from_backup_value, location_to_params,
+};
 use rtls_link_core::protocol::response::parse_json_response;
 use rtls_link_core::storage::{default_data_dir, PresetStorage};
 
@@ -166,7 +166,9 @@ async fn run_save(
 
     let config = if let Some(ip) = from_device {
         let response = send_command(ip, Commands::backup_config(), timeout).await?;
-        parse_json_response::<DeviceConfig>(&response, ip)?
+        let json: serde_json::Value = parse_json_response(&response, ip)?;
+        device_config_from_backup_value(json)
+            .map_err(|e| CliError::Other(format!("Failed to parse config: {}", e)))?
     } else if let Some(file) = from_file {
         let content = std::fs::read_to_string(file)
             .map_err(|e| CliError::Other(format!("Failed to read file: {}", e)))?;

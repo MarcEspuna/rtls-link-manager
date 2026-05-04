@@ -11,7 +11,9 @@ use crate::error::CliError;
 use crate::output::get_formatter;
 use crate::types::{Device, DeviceRole};
 
-use rtls_link_core::device::ota::{upload_firmware, upload_firmware_bulk, OtaProgressHandler};
+use rtls_link_core::device::ota::{
+    upload_firmware_bulk, upload_firmware_with_progress, OtaProgressHandler,
+};
 
 /// CLI progress handler using indicatif
 struct CliProgress;
@@ -31,6 +33,20 @@ impl OtaProgressHandler for CliProgress {
     fn on_error(&self, ip: &str, error: &str) {
         eprintln!("Upload to {} failed: {}", ip, error);
     }
+}
+
+struct CliProgressBar {
+    progress_bar: ProgressBar,
+}
+
+impl OtaProgressHandler for CliProgressBar {
+    fn on_progress(&self, _ip: &str, bytes_sent: u64, _total_bytes: u64) {
+        self.progress_bar.set_position(bytes_sent);
+    }
+
+    fn on_complete(&self, _ip: &str) {}
+
+    fn on_error(&self, _ip: &str, _error: &str) {}
 }
 
 /// Run the OTA command
@@ -118,9 +134,16 @@ async fn run_update(
         );
         pb.set_message(format!("Uploading to {}", ip));
 
-        let result = upload_firmware(ip, firmware_data, &file_name).await;
+        let progress = CliProgressBar {
+            progress_bar: pb.clone(),
+        };
+        let result = upload_firmware_with_progress(ip, firmware_data, &file_name, &progress).await;
 
-        pb.finish_with_message(format!("Upload to {} complete", ip));
+        if result.is_ok() {
+            pb.finish_with_message(format!("Upload to {} complete", ip));
+        } else {
+            pb.abandon_with_message(format!("Upload to {} failed", ip));
+        }
 
         result?;
         println!("Firmware upload complete. Device will reboot.");

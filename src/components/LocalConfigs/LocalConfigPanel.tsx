@@ -1,29 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Device, DeviceConfig, LocalConfigInfo } from '@shared/types';
-import { Commands } from '@shared/commands';
-import { configToParams } from '@shared/configParams';
-import { flatToAnchors, normalizeUwbShortAddr } from '@shared/anchors';
-import { listConfigs, getConfig, saveConfig, deleteConfig } from '../../lib/tauri-api';
 import {
-  sendDeviceCommand as sendCommand,
-  sendDeviceCommands as sendCommands,
-} from '../../lib/deviceCommands';
+  activateConfigOnDevices,
+  applyConfigToDevices,
+  backupDeviceConfigToLocal,
+  deleteConfig,
+  getConfig,
+  listConfigs,
+  onDeviceOperationProgress,
+} from '../../lib/tauri-api';
 import { ProgressBar } from '../common/ProgressBar';
 import styles from './LocalConfigPanel.module.css';
-
-// Transform flat backup-config response to normalized DeviceConfig with anchors array
-const transformConfigResult = (result: any): DeviceConfig => {
-  const uwb = result.uwb || {};
-  const anchors = flatToAnchors(uwb, uwb.anchorCount || 0);
-  return {
-    ...result,
-    uwb: {
-      ...uwb,
-      devShortAddr: normalizeUwbShortAddr(uwb.devShortAddr),
-      anchors,
-    }
-  };
-};
 
 interface LocalConfigPanelProps {
   selectedDevices: Device[];
@@ -31,7 +18,8 @@ interface LocalConfigPanelProps {
 }
 
 interface BulkResult {
-  device: Device;
+  ip: string;
+  label: string;
   success: boolean;
   error?: string;
 }
@@ -78,27 +66,6 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
     })();
   }, [selectedConfig]);
 
-  // Upload config to a single device
-  const uploadConfigToDevice = async (
-    device: Device,
-    config: DeviceConfig,
-    configName: string,
-    onProgress?: (step: number, total: number) => void
-  ): Promise<{ success: boolean; error?: string }> => {
-    const params = configToParams(config);
-    const commands = [
-      ...params.map(([group, name, value]) => Commands.writeParam(group, name, value)),
-      Commands.saveConfigAs(configName)
-    ];
-
-    try {
-      await sendCommands(device.ip, commands, { onProgress });
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e instanceof Error ? e.message : 'Failed' };
-    }
-  };
-
   // Upload selected config to selected devices
   const handleUploadToSelected = async () => {
     if (!selectedConfig || !configPreview || selectedDevices.length === 0) return;
@@ -106,40 +73,36 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
 
     setLoading(true);
     setResults([]);
-    const totalParams = configToParams(configPreview).length + 1;
-    const totalSteps = selectedDevices.length * totalParams;
-    let completedSteps = 0;
+    const operationId = `apply-config-${Date.now()}`;
+    const deviceByIp = new Map(selectedDevices.map((device) => [device.ip, device]));
+    const unlisten = await onDeviceOperationProgress((event) => {
+      if (event.operationId === operationId) {
+        setProgress({
+          current: event.completed,
+          total: event.total,
+          label: event.ip,
+        });
+      }
+    });
 
-    const newResults: BulkResult[] = [];
-
-    // Execute with concurrency limit
-    const CONCURRENT = 3;
-    for (let i = 0; i < selectedDevices.length; i += CONCURRENT) {
-      const batch = selectedDevices.slice(i, i + CONCURRENT);
-      const batchResults = await Promise.all(
-        batch.map(async (device) => {
-          const result = await uploadConfigToDevice(
-            device,
-            configPreview,
-            selectedConfig,
-            (step) => {
-              completedSteps++;
-              setProgress({
-                current: completedSteps,
-                total: totalSteps,
-                label: `${device.id}: ${step}/${totalParams}`
-              });
-            }
-          );
-          return { device, ...result };
-        })
+    try {
+      const backendResults = await applyConfigToDevices(
+        selectedDevices.map((device) => device.ip),
+        configPreview,
+        selectedConfig,
+        { concurrency: 3, operationId }
       );
-      newResults.push(...batchResults);
+      setResults(backendResults.map((result) => ({
+        ip: result.ip,
+        label: deviceByIp.get(result.ip)?.id ?? result.ip,
+        success: result.success,
+        error: result.error,
+      })));
+    } finally {
+      unlisten();
+      setProgress(null);
+      setLoading(false);
     }
-
-    setResults(newResults);
-    setProgress(null);
-    setLoading(false);
   };
 
   // Activate config on all devices
@@ -151,32 +114,31 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
     setResults([]);
     setProgress({ current: 0, total: allDevices.length });
 
-    const newResults: BulkResult[] = [];
-    const CONCURRENT = 5;
+    const operationId = `activate-config-${Date.now()}`;
+    const deviceByIp = new Map(allDevices.map((device) => [device.ip, device]));
+    const unlisten = await onDeviceOperationProgress((event) => {
+      if (event.operationId === operationId) {
+        setProgress({ current: event.completed, total: event.total, label: event.ip });
+      }
+    });
 
-    for (let i = 0; i < allDevices.length; i += CONCURRENT) {
-      const batch = allDevices.slice(i, i + CONCURRENT);
-      const batchResults = await Promise.all(
-        batch.map(async (device) => {
-          try {
-            await sendCommand(device.ip, Commands.loadConfigNamed(selectedConfig));
-            return { device, success: true };
-          } catch (e) {
-            return {
-              device,
-              success: false,
-              error: e instanceof Error ? e.message : 'Failed'
-            };
-          }
-        })
+    try {
+      const backendResults = await activateConfigOnDevices(
+        allDevices.map((device) => device.ip),
+        selectedConfig,
+        { concurrency: 5, operationId }
       );
-      newResults.push(...batchResults);
-      setProgress({ current: newResults.length, total: allDevices.length });
+      setResults(backendResults.map((result) => ({
+        ip: result.ip,
+        label: deviceByIp.get(result.ip)?.id ?? result.ip,
+        success: result.success,
+        error: result.error,
+      })));
+    } finally {
+      unlisten();
+      setProgress(null);
+      setLoading(false);
     }
-
-    setResults(newResults);
-    setProgress(null);
-    setLoading(false);
   };
 
   // Save config from first selected device to server
@@ -199,11 +161,7 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
 
     try {
       const device = selectedDevices[0];
-      const rawConfig = await sendCommand<any>(device.ip, Commands.backupConfig());
-      const config = transformConfigResult(rawConfig);
-
-      // Save to local storage
-      const success = await saveConfig(newConfigName, config);
+      const success = await backupDeviceConfigToLocal(device.ip, newConfigName);
       if (!success) throw new Error('Failed to save config');
 
       await fetchConfigs();
@@ -311,8 +269,8 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
       {results.length > 0 && (
         <div className={styles.results}>
           {results.map((r) => (
-            <div key={r.device.ip} className={r.success ? styles.success : styles.error}>
-              {r.success ? 'OK' : 'FAIL'} {r.device.id} ({r.device.ip})
+            <div key={r.ip} className={r.success ? styles.success : styles.error}>
+              {r.success ? 'OK' : 'FAIL'} {r.label} ({r.ip})
               {r.error && <span className={styles.errorMsg}>{r.error}</span>}
             </div>
           ))}

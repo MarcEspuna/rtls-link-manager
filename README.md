@@ -6,7 +6,7 @@ Desktop application for configuring and monitoring RTLS-Link UWB devices.
 
 ## Overview
 
-RTLS-Link Manager is a cross-platform desktop application built with Tauri for managing RTLS-Link devices - ESP32S3 microcontrollers with DW1000 UWB modules that perform Time Difference of Arrival (TDoA) localization for minidrones.
+RTLS-Link Manager is a cross-platform desktop application built with Tauri for managing RTLS-Link devices: ESP32/ESP32S3 boards with DW1000 UWB modules that perform Time Difference of Arrival (TDoA) localization.
 
 The tool provides:
 - Automatic device discovery on the network
@@ -18,26 +18,11 @@ The tool provides:
 
 ## Architecture
 
+The manager repo also owns the automation CLI. Shared device behavior belongs in `rtls-link-core`, then both the desktop backend and CLI call the same implementation.
+
 ```
-+-------------------------------------------------------------+
-|                      RTLS-Link System                       |
-+-------------------------------------------------------------+
-|                                                             |
-|  +-----------------+         +-------------------------+    |
-|  |   Minidrone     | <-UWB-> |   RTLS-Link Anchors     |    |
-|  |   (Tag Mode)    |         | (ESP32S3 + DW1000 x4-6) |    |
-|  +-----------------+         +------------+------------+    |
-|                                           |                 |
-|                                      WiFi/UDP               |
-|                                           |                 |
-|                           +---------------v---------------+ |
-|                           | RTLS-Link Manager (Desktop)   | |
-|                           | +----------+   +------------+ | |
-|                           | | React UI |<->| Rust/Tauri | | |
-|                           | +----------+   +------------+ | |
-|                           +-------------------------------+ |
-|                                                             |
-+-------------------------------------------------------------+
+React UI -> Tauri IPC -> src-tauri -> rtls-link-core
+CLI -------------------------------> rtls-link-core
 ```
 
 ## Features
@@ -83,9 +68,13 @@ npm run dev
 ```bash
 # Build release packages
 npm run build
+
+# Build only the CLI
+cargo build --release -p rtls-link-cli
 ```
 
 Outputs:
+- **CLI**: `target/release/rtls-link-cli`
 - **Linux**: `src-tauri/target/release/bundle/deb/*.deb`, `*.rpm`, `*.AppImage`
 - **Windows**: `src-tauri/target/release/bundle/nsis/*.exe`
 
@@ -93,18 +82,23 @@ Outputs:
 
 ```
 rtls-link-manager/
+├── Cargo.toml                # Rust workspace manifest
 ├── package.json              # Frontend dependencies
 ├── index.html                # HTML entry point
 ├── vite.config.ts            # Vite bundler config
+├── crates/
+│   ├── rtls-link-core/       # Shared Rust discovery, device protocol, OTA, storage, calibration
+│   └── rtls-link-cli/        # CLI built on top of rtls-link-core
 ├── src/                      # React frontend
 │   ├── main.tsx              # React entry point
 │   ├── App.tsx               # Main application component
 │   ├── lib/
 │   │   └── tauri-api.ts      # Tauri IPC wrapper
 │   └── components/
-│       ├── ConfigPanel/      # Device configuration UI
+│       ├── ConfigModal/      # Per-device configuration UI
 │       ├── DeviceGrid/       # Device list display
 │       ├── LocalConfigs/     # Local config management
+│       ├── Presets/          # Local preset management
 │       └── common/           # Shared UI components
 ├── src-tauri/                # Rust backend
 │   ├── Cargo.toml            # Rust dependencies
@@ -116,7 +110,8 @@ rtls-link-manager/
 │       ├── state.rs          # Shared app state
 │       ├── error.rs          # Error handling
 │       ├── discovery/        # UDP device discovery
-│       ├── config_storage/   # Local config storage
+│       ├── config_storage/   # Tauri storage wrappers
+│       ├── preset_storage/   # Tauri storage wrappers
 │       └── commands/         # Tauri IPC commands
 └── shared/                   # Shared types and utilities
     ├── types.ts              # TypeScript interfaces
@@ -159,6 +154,11 @@ Configure up to 6 anchors with:
 
 ## Development
 
+Keep device-facing behavior in Rust:
+- `rtls-link-core` owns protocol, discovery, OTA, health, calibration, and config/preset conversion.
+- `src-tauri` exposes those workflows to the UI through Tauri commands and progress events.
+- `src` should focus on presentation and user interaction, not protocol or solver logic.
+
 ### Commands
 
 ```bash
@@ -169,10 +169,14 @@ npm run dev
 npm run build
 
 # Run frontend tests
-npm test
+npm run test:run
 
 # Run Rust tests
-cd src-tauri && cargo test
+cargo test --workspace
+
+# Build the CLI used by automation and hardware workflows
+cargo build --release -p rtls-link-cli
+./target/release/rtls-link-cli discover
 ```
 
 ### Network Ports
@@ -193,10 +197,10 @@ Configurations are stored in the OS-specific app data directory:
 
 ```bash
 # Run all Rust tests
-cd src-tauri && cargo test
+cargo test --workspace
 
 # Run frontend tests
-npm test
+npm run test:run
 ```
 
 ## Troubleshooting
