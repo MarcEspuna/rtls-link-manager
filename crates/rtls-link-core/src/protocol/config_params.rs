@@ -240,12 +240,37 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
         ));
     }
     if let Some(v) = config.uwb.output_backend {
-        params.push(("uwb".to_string(), "outputBackend".to_string(), v.to_string()));
+        params.push((
+            "uwb".to_string(),
+            "outputBackend".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.uwb.rtls_beacon_age_bias_ms {
         params.push((
             "uwb".to_string(),
             "rtlsBeaconAgeBiasMs".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.rtls_beacon_tdoa_sigma_floor_m {
+        params.push((
+            "uwb".to_string(),
+            "rtlsBeaconTdoaSigmaFloorM".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.rtls_beacon_tdoa_physical_guard_enable {
+        params.push((
+            "uwb".to_string(),
+            "rtlsBeaconTdoaPhysicalGuardEnable".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.rtls_beacon_tdoa_physical_guard_margin_m {
+        params.push((
+            "uwb".to_string(),
+            "rtlsBeaconTdoaPhysicalGuardMarginM".to_string(),
             v.to_string(),
         ));
     }
@@ -329,6 +354,13 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
         params.push((
             "uwb".to_string(),
             "tdoaSlotDurationUs".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.tdoa_matcher_policy {
+        params.push((
+            "uwb".to_string(),
+            "tdoaMatcherPolicy".to_string(),
             v.to_string(),
         ));
     }
@@ -484,6 +516,9 @@ mod tests {
                 mavlink_target_system_id: Some(1),
                 output_backend: Some(1),
                 rtls_beacon_age_bias_ms: Some(2),
+                rtls_beacon_tdoa_sigma_floor_m: Some(0.25),
+                rtls_beacon_tdoa_physical_guard_enable: Some(1),
+                rtls_beacon_tdoa_physical_guard_margin_m: Some(1.0),
                 rotation_degrees: Some(0.0),
                 z_calc_mode: Some(1),
                 rf_forward_enable: Some(1),
@@ -498,6 +533,7 @@ mod tests {
                 smart_power_enable: None,
                 tdoa_slot_count: None,
                 tdoa_slot_duration_us: None,
+                tdoa_matcher_policy: Some(1),
                 dynamic_anchor_pos_enabled: None,
                 anchor_layout: None,
                 anchor_height: None,
@@ -561,6 +597,18 @@ mod tests {
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "rmseThreshold" && v == "0.8"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "rtlsBeaconTdoaSigmaFloorM" && v == "0.25"));
+        assert!(params.iter().any(|(g, n, v)| {
+            g == "uwb" && n == "rtlsBeaconTdoaPhysicalGuardEnable" && v == "1"
+        }));
+        assert!(params.iter().any(|(g, n, v)| {
+            g == "uwb" && n == "rtlsBeaconTdoaPhysicalGuardMarginM" && v == "1"
+        }));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "tdoaMatcherPolicy" && v == "1"));
     }
 
     #[test]

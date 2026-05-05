@@ -108,6 +108,9 @@ export interface UwbConfig {
   mavlinkTargetSystemId?: number;
   outputBackend?: 0 | 1;    // 0=MAVLink, 1=RTLSLink Beacon
   rtlsBeaconAgeBiasMs?: number; // Safety bias added to RTLSLink TDoA age estimate
+  rtlsBeaconTdoaSigmaFloorM?: number; // Minimum TDoA one-sigma error reported to ArduPilot
+  rtlsBeaconTdoaPhysicalGuardEnable?: 0 | 1; // Drop physically impossible TDoA samples
+  rtlsBeaconTdoaPhysicalGuardMarginM?: number; // Extra allowed TDoA range-difference beyond anchor baseline
   rotationDegrees?: number;
   zCalcMode?: 0 | 1 | 2;  // 0=None (TDoA Z), 1=Rangefinder, 2=UWB (reserved)
   // Rangefinder forwarding settings
@@ -126,6 +129,7 @@ export interface UwbConfig {
   // TDoA TDMA schedule (TDoA anchors only, expert mode)
   tdoaSlotCount?: number;       // Active TDMA slots per frame (2-8), 0=legacy (8)
   tdoaSlotDurationUs?: number;  // Slot duration in microseconds, 0=legacy (~2ms)
+  tdoaMatcherPolicy?: 0 | 1;    // 0=Youngest, 1=Random
   // Dynamic anchor positioning (TDoA tags only)
   dynamicAnchorPosEnabled?: 0 | 1;  // 0=static (use configured positions), 1=dynamic
   anchorLayout?: AnchorLayout;      // Layout for dynamic position calculation
