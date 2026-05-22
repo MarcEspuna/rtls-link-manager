@@ -239,6 +239,16 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
+    if let Some(v) = config.uwb.output_backend {
+        params.push(("uwb".to_string(), "outputBackend".to_string(), v.to_string()));
+    }
+    if let Some(v) = config.uwb.rtls_beacon_age_bias_ms {
+        params.push((
+            "uwb".to_string(),
+            "rtlsBeaconAgeBiasMs".to_string(),
+            v.to_string(),
+        ));
+    }
     if let Some(v) = config.uwb.rotation_degrees {
         params.push((
             "uwb".to_string(),
@@ -472,6 +482,8 @@ mod tests {
                 origin_lon: Some(2.1744),
                 origin_alt: Some(100.0),
                 mavlink_target_system_id: Some(1),
+                output_backend: Some(1),
+                rtls_beacon_age_bias_ms: Some(2),
                 rotation_degrees: Some(0.0),
                 z_calc_mode: Some(1),
                 rf_forward_enable: Some(1),

@@ -6,24 +6,54 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::Duration;
 
 use crate::error::AppError;
+use crate::state::AppState;
 use crate::types::{DeviceConfig, Preset, PresetType};
 use rtls_link_core::calibration::{calibrate_anchors, AnchorCalibrationConfig, CalibrationRun};
 use rtls_link_core::device::ota::{
-    upload_firmware_bulk, upload_firmware_with_progress, OtaProgressHandler,
+    upload_firmware_bulk_with_cancel, upload_firmware_with_progress_and_cancel, OtaProgressHandler,
 };
 use rtls_link_core::device::websocket::{
     send_command_parsed, send_commands_parsed, DeviceCommandResponse, DeviceConnection,
 };
 use rtls_link_core::protocol::commands::Commands;
 use rtls_link_core::protocol::config_params::{config_to_params, location_to_params};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, State};
+use tokio::sync::RwLock;
 
 /// Progress handler that emits Tauri events for OTA progress tracking.
 struct TauriOtaProgress {
     app_handle: AppHandle,
+}
+
+struct OtaCancellationGuard {
+    ip: String,
+    cancel: Arc<AtomicBool>,
+    active_cancellations: Arc<RwLock<HashMap<String, Arc<AtomicBool>>>>,
+}
+
+impl Drop for OtaCancellationGuard {
+    fn drop(&mut self) {
+        let ip = self.ip.clone();
+        let cancel = self.cancel.clone();
+        let active_cancellations = self.active_cancellations.clone();
+        tauri::async_runtime::spawn(async move {
+            let mut active_cancellations = active_cancellations.write().await;
+            let should_remove = active_cancellations
+                .get(&ip)
+                .map(|current| Arc::ptr_eq(current, &cancel))
+                .unwrap_or(false);
+            if should_remove {
+                active_cancellations.remove(&ip);
+            }
+        });
+    }
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -137,6 +167,23 @@ fn write_commands_from_params(params: Vec<(String, String, String)>) -> Vec<Stri
         .into_iter()
         .map(|(group, name, value)| Commands::write_param(&group, &name, &value))
         .collect()
+}
+
+async fn register_ota_cancellation(
+    active_cancellations: Arc<RwLock<HashMap<String, Arc<AtomicBool>>>>,
+    ip: &str,
+) -> (Arc<AtomicBool>, OtaCancellationGuard) {
+    let cancel = Arc::new(AtomicBool::new(false));
+    active_cancellations
+        .write()
+        .await
+        .insert(ip.to_string(), cancel.clone());
+    let guard = OtaCancellationGuard {
+        ip: ip.to_string(),
+        cancel: cancel.clone(),
+        active_cancellations,
+    };
+    (cancel, guard)
 }
 
 impl OtaProgressHandler for TauriOtaProgress {
@@ -361,6 +408,7 @@ pub async fn upload_firmware_from_file(
     ip: String,
     file_path: String,
     app_handle: AppHandle,
+    state: State<'_, AppState>,
 ) -> Result<(), AppError> {
     let path = PathBuf::from(&file_path);
 
@@ -374,10 +422,16 @@ pub async fn upload_firmware_from_file(
         .unwrap_or("firmware.bin");
 
     let progress = TauriOtaProgress { app_handle };
+    let (cancel, _cancel_guard) =
+        register_ota_cancellation(state.ota_cancellations.clone(), &ip).await;
 
-    upload_firmware_with_progress(&ip, data, filename, &progress)
-        .await
-        .map_err(AppError::from)?;
+    let result =
+        upload_firmware_with_progress_and_cancel(&ip, data, filename, &progress, cancel).await;
+
+    if let Err(error) = result {
+        progress.on_error(&ip, &error.to_string());
+        return Err(AppError::from(error));
+    }
 
     progress.on_complete(&ip);
 
@@ -393,6 +447,7 @@ pub async fn upload_firmware_to_devices(
     file_path: String,
     concurrency: Option<usize>,
     app_handle: AppHandle,
+    state: State<'_, AppState>,
 ) -> Result<Vec<serde_json::Value>, AppError> {
     let path = PathBuf::from(&file_path);
 
@@ -407,8 +462,24 @@ pub async fn upload_firmware_to_devices(
 
     let progress = TauriOtaProgress { app_handle };
     let concurrency = concurrency.unwrap_or(3).max(1);
+    let mut cancel_flags = HashMap::new();
+    let mut cancel_guards = Vec::with_capacity(ips.len());
+    for ip in &ips {
+        let (cancel, guard) = register_ota_cancellation(state.ota_cancellations.clone(), ip).await;
+        cancel_flags.insert(ip.clone(), cancel);
+        cancel_guards.push(guard);
+    }
 
-    let results = upload_firmware_bulk(&ips, data, filename, concurrency, &progress).await;
+    let results = upload_firmware_bulk_with_cancel(
+        &ips,
+        data,
+        filename,
+        concurrency,
+        &progress,
+        cancel_flags,
+    )
+    .await;
+    drop(cancel_guards);
 
     let json_results: Vec<serde_json::Value> = results
         .into_iter()
@@ -422,6 +493,20 @@ pub async fn upload_firmware_to_devices(
         .collect();
 
     Ok(json_results)
+}
+
+/// Request cancellation for an active firmware upload.
+#[tauri::command]
+pub async fn cancel_firmware_upload(
+    ip: String,
+    state: State<'_, AppState>,
+) -> Result<bool, AppError> {
+    let active_cancellations = state.ota_cancellations.read().await;
+    if let Some(cancel) = active_cancellations.get(&ip) {
+        cancel.store(true, Ordering::Relaxed);
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 /// Get firmware info from a device.
