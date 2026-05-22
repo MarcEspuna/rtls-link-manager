@@ -241,6 +241,15 @@ pub struct UwbConfig {
     /// Safety bias added to RTLSLink TDoA age estimates, in milliseconds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rtls_beacon_age_bias_ms: Option<u8>,
+    /// Minimum TDoA one-sigma error reported to ArduPilot, in meters
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rtls_beacon_tdoa_sigma_floor_m: Option<f64>,
+    /// Drop physically impossible TDoA samples (0=disabled, 1=enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rtls_beacon_tdoa_physical_guard_enable: Option<u8>,
+    /// Extra allowed TDoA range-difference beyond anchor baseline, in meters
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rtls_beacon_tdoa_physical_guard_margin_m: Option<f64>,
     /// Coordinate rotation in degrees
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rotation_degrees: Option<f64>,
@@ -283,6 +292,9 @@ pub struct UwbConfig {
     /// TDoA TDMA slot duration in microseconds, 0=legacy (~2ms)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tdoa_slot_duration_us: Option<u16>,
+    /// TDoA tag matcher policy: 0=Youngest, 1=Random
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_matcher_policy: Option<u8>,
     /// Dynamic anchor positioning enable (0=static, 1=dynamic)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dynamic_anchor_pos_enabled: Option<u8>,
@@ -633,6 +645,9 @@ mod tests {
                 mavlink_target_system_id: Some(1),
                 output_backend: Some(1),
                 rtls_beacon_age_bias_ms: Some(2),
+                rtls_beacon_tdoa_sigma_floor_m: Some(0.25),
+                rtls_beacon_tdoa_physical_guard_enable: Some(1),
+                rtls_beacon_tdoa_physical_guard_margin_m: Some(1.0),
                 rotation_degrees: Some(0.0),
                 z_calc_mode: Some(1),
                 rf_forward_enable: Some(1),
@@ -647,6 +662,7 @@ mod tests {
                 smart_power_enable: None,
                 tdoa_slot_count: None,
                 tdoa_slot_duration_us: None,
+                tdoa_matcher_policy: Some(1),
                 dynamic_anchor_pos_enabled: None,
                 anchor_layout: None,
                 anchor_height: None,

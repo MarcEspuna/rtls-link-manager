@@ -90,6 +90,32 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       }
     }
 
+    if (config.uwb.rtlsBeaconTdoaSigmaFloorM !== undefined) {
+      const v = Number(config.uwb.rtlsBeaconTdoaSigmaFloorM);
+      if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
+        errors.push('RTLSLink beacon TDoA sigma floor must be >= 0 m');
+      }
+    }
+
+    if (config.uwb.rtlsBeaconTdoaPhysicalGuardEnable !== undefined &&
+      config.uwb.rtlsBeaconTdoaPhysicalGuardEnable !== 0 &&
+      config.uwb.rtlsBeaconTdoaPhysicalGuardEnable !== 1) {
+      errors.push('RTLSLink beacon TDoA physical guard enable must be 0 or 1');
+    }
+
+    if (config.uwb.rtlsBeaconTdoaPhysicalGuardMarginM !== undefined) {
+      const v = Number(config.uwb.rtlsBeaconTdoaPhysicalGuardMarginM);
+      if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
+        errors.push('RTLSLink beacon TDoA physical guard margin must be >= 0 m');
+      }
+    }
+
+    if (config.uwb.tdoaMatcherPolicy !== undefined &&
+      config.uwb.tdoaMatcherPolicy !== 0 &&
+      config.uwb.tdoaMatcherPolicy !== 1) {
+      errors.push('TDoA matcher policy must be 0 or 1');
+    }
+
     if (config.uwb.rmseThreshold !== undefined) {
       const v = Number(config.uwb.rmseThreshold);
       if (Number.isNaN(v) || !Number.isFinite(v) || v <= 0) {

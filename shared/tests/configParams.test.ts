@@ -18,6 +18,10 @@ describe('configToParams', () => {
         rmseThreshold: 0.8,
         outputBackend: 1,
         rtlsBeaconAgeBiasMs: 2,
+        rtlsBeaconTdoaSigmaFloorM: 0.25,
+        rtlsBeaconTdoaPhysicalGuardEnable: 1,
+        rtlsBeaconTdoaPhysicalGuardMarginM: 1,
+        tdoaMatcherPolicy: 1,
       },
       app: {},
     };
@@ -34,5 +38,9 @@ describe('configToParams', () => {
     expect(params).toContainEqual(['uwb', 'rmseThreshold', '0.8']);
     expect(params).toContainEqual(['uwb', 'outputBackend', '1']);
     expect(params).toContainEqual(['uwb', 'rtlsBeaconAgeBiasMs', '2']);
+    expect(params).toContainEqual(['uwb', 'rtlsBeaconTdoaSigmaFloorM', '0.25']);
+    expect(params).toContainEqual(['uwb', 'rtlsBeaconTdoaPhysicalGuardEnable', '1']);
+    expect(params).toContainEqual(['uwb', 'rtlsBeaconTdoaPhysicalGuardMarginM', '1']);
+    expect(params).toContainEqual(['uwb', 'tdoaMatcherPolicy', '1']);
   });
 });

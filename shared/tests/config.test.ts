@@ -64,4 +64,24 @@ describe('validateConfig', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('RTLSLink beacon age bias must be an integer in 0-20 ms');
   });
+
+  it('validates RTLSLink beacon TDoA physical guard settings', () => {
+    const result = validateConfig({
+      uwb: {
+        rtlsBeaconTdoaPhysicalGuardEnable: 2,
+        rtlsBeaconTdoaPhysicalGuardMarginM: -1,
+      } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('RTLSLink beacon TDoA physical guard enable must be 0 or 1');
+    expect(result.errors).toContain('RTLSLink beacon TDoA physical guard margin must be >= 0 m');
+  });
+
+  it('validates TDoA matcher policy', () => {
+    const result = validateConfig({
+      uwb: { tdoaMatcherPolicy: 3 } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('TDoA matcher policy must be 0 or 1');
+  });
 });
