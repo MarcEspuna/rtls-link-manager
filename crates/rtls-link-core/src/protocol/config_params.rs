@@ -18,60 +18,86 @@ pub fn device_config_from_backup_value(
     value: serde_json::Value,
 ) -> serde_json::Result<DeviceConfig> {
     let mut config: DeviceConfig = serde_json::from_value(value.clone())?;
-    rebuild_flat_anchors(&mut config, &value);
+    rebuild_flat_anchors(&mut config, &value).map_err(backup_parse_error)?;
     Ok(config)
 }
 
-fn rebuild_flat_anchors(config: &mut DeviceConfig, value: &serde_json::Value) {
-    if config
+fn backup_parse_error(message: String) -> serde_json::Error {
+    <serde_json::Error as serde::de::Error>::custom(message)
+}
+
+fn rebuild_flat_anchors(
+    config: &mut DeviceConfig,
+    value: &serde_json::Value,
+) -> Result<(), String> {
+    if let Some(anchors) = config
         .uwb
         .anchors
         .as_ref()
-        .is_some_and(|anchors| !anchors.is_empty())
+        .filter(|anchors| !anchors.is_empty())
     {
-        return;
+        if let Some(count) = config.uwb.anchor_count {
+            if count as usize > MAX_CONFIGURABLE_ANCHORS {
+                return Err(format!(
+                    "Maximum {} anchors supported",
+                    MAX_CONFIGURABLE_ANCHORS
+                ));
+            }
+            if count > 0 && anchors.len() != count as usize {
+                return Err("Anchor geometry required when anchorCount is set".to_string());
+            }
+        }
+        valid_anchor_entries(anchors)?;
+        return Ok(());
     }
 
     let Some(uwb) = value.get("uwb").and_then(|v| v.as_object()) else {
-        return;
+        return Ok(());
     };
 
     let count = config
         .uwb
         .anchor_count
-        .or_else(|| value_to_u8(uwb.get("anchorCount")))
-        .unwrap_or(0)
-        .min(MAX_CONFIGURABLE_ANCHORS as u8);
-
-    if count == 0 {
-        return;
+        .map(usize::from)
+        .or_else(|| value_to_usize(uwb.get("anchorCount")))
+        .unwrap_or(0);
+    if count > MAX_CONFIGURABLE_ANCHORS {
+        return Err(format!(
+            "Maximum {} anchors supported",
+            MAX_CONFIGURABLE_ANCHORS
+        ));
     }
 
-    let mut anchors = Vec::with_capacity(count as usize);
+    if count == 0 {
+        return Ok(());
+    }
+
+    let mut anchors = Vec::with_capacity(count);
     for idx in 1..=count {
-        let Some(id) = normalize_anchor_config_id_value(uwb.get(&format!("devId{}", idx))) else {
-            return;
-        };
-        let Some(x) = value_to_f64(uwb.get(&format!("x{}", idx))).filter(|v| v.is_finite()) else {
-            return;
-        };
-        let Some(y) = value_to_f64(uwb.get(&format!("y{}", idx))).filter(|v| v.is_finite()) else {
-            return;
-        };
-        let Some(z) = value_to_f64(uwb.get(&format!("z{}", idx))).filter(|v| v.is_finite()) else {
-            return;
-        };
+        let id = normalize_anchor_config_id_value(uwb.get(&format!("devId{}", idx)))
+            .ok_or_else(|| format!("Invalid or missing anchor id devId{}", idx))?;
+        let x = value_to_f64(uwb.get(&format!("x{}", idx)))
+            .filter(|v| v.is_finite())
+            .ok_or_else(|| format!("Invalid or missing anchor coordinate x{}", idx))?;
+        let y = value_to_f64(uwb.get(&format!("y{}", idx)))
+            .filter(|v| v.is_finite())
+            .ok_or_else(|| format!("Invalid or missing anchor coordinate y{}", idx))?;
+        let z = value_to_f64(uwb.get(&format!("z{}", idx)))
+            .filter(|v| v.is_finite())
+            .ok_or_else(|| format!("Invalid or missing anchor coordinate z{}", idx))?;
 
         anchors.push(AnchorConfig { id, x, y, z });
     }
 
+    valid_anchor_entries(&anchors)?;
     config.uwb.anchors = Some(anchors);
+    Ok(())
 }
 
-fn value_to_u8(value: Option<&serde_json::Value>) -> Option<u8> {
+fn value_to_usize(value: Option<&serde_json::Value>) -> Option<usize> {
     value
         .and_then(|v| v.as_u64().or_else(|| v.as_str()?.trim().parse().ok()))
-        .and_then(|v| u8::try_from(v).ok())
+        .and_then(|v| usize::try_from(v).ok())
 }
 
 fn value_to_f64(value: Option<&serde_json::Value>) -> Option<f64> {
@@ -328,7 +354,11 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
         ));
     }
     if let Some(v) = config.uwb.output_backend {
-        params.push(("uwb".to_string(), "outputBackend".to_string(), v.to_string()));
+        params.push((
+            "uwb".to_string(),
+            "outputBackend".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.uwb.rtls_beacon_age_bias_ms {
         params.push((
@@ -732,7 +762,7 @@ mod tests {
                 "mode": 4,
                 "devShortAddr": "7",
                 "anchorCount": 1,
-                "anchors": [{ "id": "9", "x": 9.0, "y": 8.0, "z": 7.0 }],
+                "anchors": [{ "id": "0", "x": 9.0, "y": 8.0, "z": 7.0 }],
                 "devId1": "1",
                 "x1": 1.0,
                 "y1": 2.0,
@@ -745,12 +775,12 @@ mod tests {
         let anchors = config.uwb.anchors.as_ref().unwrap();
 
         assert_eq!(anchors.len(), 1);
-        assert_eq!(anchors[0].id, "9");
+        assert_eq!(anchors[0].id, "0");
         assert_eq!(anchors[0].x, 9.0);
     }
 
     #[test]
-    fn device_config_from_backup_value_does_not_rebuild_incomplete_flat_anchors() {
+    fn device_config_from_backup_value_rejects_incomplete_flat_anchors() {
         let raw = serde_json::json!({
             "wifi": { "mode": 1 },
             "uwb": {
@@ -768,13 +798,84 @@ mod tests {
             "app": {}
         });
 
-        let config = device_config_from_backup_value(raw).unwrap();
+        let err = device_config_from_backup_value(raw)
+            .unwrap_err()
+            .to_string();
 
-        assert!(config.uwb.anchors.is_none());
-        assert_eq!(
-            config_to_params(&config).unwrap_err(),
-            "Anchor geometry required when anchorCount is set"
-        );
+        assert!(err.contains("Invalid or missing anchor coordinate z2"));
+    }
+
+    #[test]
+    fn device_config_from_backup_value_rejects_malformed_flat_anchors() {
+        let raw = serde_json::json!({
+            "wifi": { "mode": 1 },
+            "uwb": {
+                "mode": 4,
+                "devShortAddr": "7",
+                "anchorCount": 2,
+                "devId1": "0",
+                "x1": 1.0,
+                "y1": 2.0,
+                "z1": 3.0,
+                "devId2": "0",
+                "x2": "NaN",
+                "y2": 5.0,
+                "z2": 6.0
+            },
+            "app": {}
+        });
+
+        let err = device_config_from_backup_value(raw)
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains("Invalid or missing anchor coordinate x2"));
+    }
+
+    #[test]
+    fn device_config_from_backup_value_rejects_duplicate_flat_anchor_ids() {
+        let raw = serde_json::json!({
+            "wifi": { "mode": 1 },
+            "uwb": {
+                "mode": 4,
+                "devShortAddr": "7",
+                "anchorCount": 2,
+                "devId1": "0",
+                "x1": 1.0,
+                "y1": 2.0,
+                "z1": 3.0,
+                "devId2": "0",
+                "x2": 4.0,
+                "y2": 5.0,
+                "z2": 6.0
+            },
+            "app": {}
+        });
+
+        let err = device_config_from_backup_value(raw)
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains("Anchor IDs must be unique"));
+    }
+
+    #[test]
+    fn device_config_from_backup_value_rejects_too_many_flat_anchors() {
+        let raw = serde_json::json!({
+            "wifi": { "mode": 1 },
+            "uwb": {
+                "mode": 4,
+                "devShortAddr": "7",
+                "anchorCount": 9
+            },
+            "app": {}
+        });
+
+        let err = device_config_from_backup_value(raw)
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains("Maximum 8 anchors supported"));
     }
 
     #[test]
