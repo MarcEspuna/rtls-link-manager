@@ -43,6 +43,26 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       }
     }
 
+    if (config.uwb.tdoaAnchorTelemetryEnable !== undefined &&
+      config.uwb.tdoaAnchorTelemetryEnable !== 0 &&
+      config.uwb.tdoaAnchorTelemetryEnable !== 1) {
+      errors.push('TDoA anchor telemetry enable must be 0 or 1');
+    }
+
+    if (config.uwb.tdoaAnchorTelemetryIntervalMs !== undefined) {
+      const v = Number(config.uwb.tdoaAnchorTelemetryIntervalMs);
+      if (Number.isNaN(v) || !Number.isInteger(v) || v < 250 || v > 60000) {
+        errors.push('TDoA anchor telemetry interval must be an integer in 250-60000 ms');
+      }
+    }
+
+    if (config.uwb.tdoaAnchorTelemetryPort !== undefined) {
+      const v = Number(config.uwb.tdoaAnchorTelemetryPort);
+      if (Number.isNaN(v) || !Number.isInteger(v) || v < 1 || v > 65535) {
+        errors.push('TDoA anchor telemetry port must be an integer in 1-65535');
+      }
+    }
+
     if (config.uwb.rfForwardEnable !== undefined && config.uwb.rfForwardEnable !== 0 && config.uwb.rfForwardEnable !== 1) {
       errors.push('Rangefinder forwarding enable must be 0 or 1');
     }

@@ -1,7 +1,7 @@
 //! Heartbeat parsing and device pruning utilities.
 
-use crate::protocol::binary::decode_heartbeat;
 use crate::health::calculate_device_health;
+use crate::protocol::binary::decode_heartbeat;
 use crate::types::{Device, DeviceRole, DynamicAnchorPosition};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

@@ -377,6 +377,73 @@ export function UWBSection({ config, onChange, onApply, isExpertMode = false }: 
           </div>
         </div>
       )}
+
+      {/* TDoA Anchor Telemetry - Expert Mode + TDoA Anchor only */}
+      {isExpertMode && config.uwb.mode === 3 && (
+        <div className={styles.section}>
+          <h3>TDoA Anchor Telemetry</h3>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label>Telemetry</label>
+              <select
+                value={config.uwb.tdoaAnchorTelemetryEnable ?? 0}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  onChange('uwb', 'tdoaAnchorTelemetryEnable', val);
+                  onApply('uwb', 'tdoaAnchorTelemetryEnable', val);
+                }}
+              >
+                <option value={0}>Disabled</option>
+                <option value={1}>Enabled</option>
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label>Interval (ms)</label>
+              <input
+                type="number"
+                min={250}
+                max={60000}
+                step={250}
+                value={config.uwb.tdoaAnchorTelemetryIntervalMs ?? 1000}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 1000 : Number(raw);
+                  onChange('uwb', 'tdoaAnchorTelemetryIntervalMs', val);
+                }}
+                onBlur={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 1000 : Number(raw);
+                  if (!Number.isFinite(val) || !Number.isInteger(val) || val < 250 || val > 60000) return;
+                  onChange('uwb', 'tdoaAnchorTelemetryIntervalMs', val);
+                  onApply('uwb', 'tdoaAnchorTelemetryIntervalMs', val);
+                }}
+              />
+            </div>
+            <div className={styles.field}>
+              <label>Port</label>
+              <input
+                type="number"
+                min={1}
+                max={65535}
+                step={1}
+                value={config.uwb.tdoaAnchorTelemetryPort ?? 3335}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 3335 : Number(raw);
+                  onChange('uwb', 'tdoaAnchorTelemetryPort', val);
+                }}
+                onBlur={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 3335 : Number(raw);
+                  if (!Number.isFinite(val) || !Number.isInteger(val) || val < 1 || val > 65535) return;
+                  onChange('uwb', 'tdoaAnchorTelemetryPort', val);
+                  onApply('uwb', 'tdoaAnchorTelemetryPort', val);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
