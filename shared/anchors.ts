@@ -92,6 +92,9 @@ export function validateAnchorList(anchors: AnchorConfig[]): string | null {
 
   const seen = new Set<number>();
   for (const anchor of anchors) {
+    if (anchor.id === null || anchor.id === undefined || String(anchor.id).trim() === '') {
+      return `Anchor IDs must be 0-${MAX_CONFIGURABLE_ANCHORS - 1}`;
+    }
     const normalizedId = normalizeShortAddr(anchor.id);
     if (!/^\d+$/.test(normalizedId)) {
       return `Anchor IDs must be 0-${MAX_CONFIGURABLE_ANCHORS - 1}`;

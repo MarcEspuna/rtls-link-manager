@@ -62,6 +62,18 @@ describe('validateConfig', () => {
     expect(result.errors).toContain('Anchor IDs must be 0-7');
   });
 
+  it('rejects blank configured anchor IDs', () => {
+    const result = validateConfig({
+      uwb: {
+        anchors: [
+          { id: '', x: 0, y: 0, z: 0 },
+        ],
+      } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Anchor IDs must be 0-7');
+  });
+
   it('rejects non-contiguous configured anchor IDs', () => {
     const result = validateConfig({
       uwb: {

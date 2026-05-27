@@ -61,6 +61,10 @@ describe('configToParams', () => {
     ])).toThrow('Anchor IDs must be 0-7');
 
     expect(() => getAnchorWriteCommands([
+      { id: '', x: 0, y: 0, z: 0 },
+    ])).toThrow('Anchor IDs must be 0-7');
+
+    expect(() => getAnchorWriteCommands([
       { id: '0', x: 0, y: 0, z: 0 },
       { id: '2', x: 1, y: 0, z: 0 },
     ])).toThrow('Anchor IDs must be contiguous from 0');
