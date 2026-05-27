@@ -340,14 +340,14 @@ async fn upload_preset_to_device(
     let params = match preset.preset_type {
         PresetType::Full => {
             if let Some(ref config) = preset.config {
-                config_to_params(config)
+                config_to_params(config).map_err(CliError::Other)?
             } else {
                 return Err(CliError::Other("Preset has no config data".to_string()));
             }
         }
         PresetType::Locations => {
             if let Some(ref locations) = preset.locations {
-                location_to_params(locations)
+                location_to_params(locations).map_err(CliError::Other)?
             } else {
                 return Err(CliError::Other("Preset has no location data".to_string()));
             }

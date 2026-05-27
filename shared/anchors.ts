@@ -22,6 +22,13 @@ const normalizeShortAddr = (raw: unknown): string => {
   return value;
 };
 
+const parseAnchorCoordinate = (raw: unknown): number => {
+  if (raw === null || raw === undefined) return Number.NaN;
+  const value = String(raw).trim();
+  if (!value) return Number.NaN;
+  return Number(value);
+};
+
 /**
  * Transform flat anchor fields from firmware backup to an anchors array.
  * Firmware stores: devId1, x1, y1, z1, devId2, x2, y2, z2, etc.
@@ -32,11 +39,14 @@ export function flatToAnchors(uwb: Record<string, any>, anchorCount: number): An
   const count = Math.min(anchorCount || 0, MAX_CONFIGURABLE_ANCHORS);
 
   for (let i = 1; i <= count; i++) {
+    const rawId = uwb[`devId${i}`];
     anchors.push({
-      id: normalizeShortAddr(uwb[`devId${i}`]),
-      x: parseFloat(uwb[`x${i}`]) || 0,
-      y: parseFloat(uwb[`y${i}`]) || 0,
-      z: parseFloat(uwb[`z${i}`]) || 0,
+      id: rawId === null || rawId === undefined || String(rawId).trim() === ''
+        ? ''
+        : normalizeShortAddr(rawId),
+      x: parseAnchorCoordinate(uwb[`x${i}`]),
+      y: parseAnchorCoordinate(uwb[`y${i}`]),
+      z: parseAnchorCoordinate(uwb[`z${i}`]),
     });
   }
 
@@ -48,6 +58,11 @@ export function flatToAnchors(uwb: Record<string, any>, anchorCount: number): An
  * Returns array of {name, value} pairs to write to device.
  */
 export function getAnchorWriteCommands(anchors: AnchorConfig[]): Array<{ name: string; value: string | number }> {
+  const validationError = validateAnchorList(anchors);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
   const commands: Array<{ name: string; value: string | number }> = [];
 
   // Write each anchor's fields
@@ -59,7 +74,8 @@ export function getAnchorWriteCommands(anchors: AnchorConfig[]): Array<{ name: s
     commands.push({ name: `z${n}`, value: anchors[i].z });
   }
 
-  // Update anchor count to the number supported by the firmware parameter layout.
+  // Firmware applies live static geometry when anchorCount is written, so keep
+  // anchorCount last after the per-anchor fields are stored.
   commands.push({ name: 'anchorCount', value: Math.min(anchors.length, MAX_CONFIGURABLE_ANCHORS) });
 
   return commands;
@@ -67,4 +83,39 @@ export function getAnchorWriteCommands(anchors: AnchorConfig[]): Array<{ name: s
 
 export function normalizeUwbShortAddr(raw: unknown): string {
   return normalizeShortAddr(raw);
+}
+
+export function validateAnchorList(anchors: AnchorConfig[]): string | null {
+  if (anchors.length > MAX_CONFIGURABLE_ANCHORS) {
+    return `Maximum ${MAX_CONFIGURABLE_ANCHORS} anchors supported`;
+  }
+
+  const seen = new Set<number>();
+  for (const anchor of anchors) {
+    const normalizedId = normalizeShortAddr(anchor.id);
+    if (!/^\d+$/.test(normalizedId)) {
+      return `Anchor IDs must be 0-${MAX_CONFIGURABLE_ANCHORS - 1}`;
+    }
+
+    const id = Number(normalizedId);
+    if (!Number.isInteger(id) || id < 0 || id >= MAX_CONFIGURABLE_ANCHORS) {
+      return `Anchor IDs must be 0-${MAX_CONFIGURABLE_ANCHORS - 1}`;
+    }
+
+    if (seen.has(id)) {
+      return 'Anchor IDs must be unique';
+    }
+    if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y) || !Number.isFinite(anchor.z)) {
+      return 'Anchor coordinates must be finite numbers';
+    }
+    seen.add(id);
+  }
+
+  for (let expected = 0; expected < anchors.length; expected++) {
+    if (!seen.has(expected)) {
+      return 'Anchor IDs must be contiguous from 0';
+    }
+  }
+
+  return null;
 }

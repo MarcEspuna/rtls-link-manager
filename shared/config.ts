@@ -1,5 +1,5 @@
 import { DeviceConfig } from './types.js';
-import { MAX_CONFIGURABLE_ANCHORS } from './anchors.js';
+import { MAX_CONFIGURABLE_ANCHORS, validateAnchorList } from './anchors.js';
 
 export interface ConfigValidationResult {
   valid: boolean;
@@ -24,6 +24,18 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
   if (config.uwb) {
     if (config.uwb.anchorCount && config.uwb.anchorCount > MAX_CONFIGURABLE_ANCHORS) {
       errors.push(`Maximum ${MAX_CONFIGURABLE_ANCHORS} anchors supported`);
+    }
+
+    if (config.uwb.anchorCount
+      && (!config.uwb.anchors || config.uwb.anchors.length !== config.uwb.anchorCount)) {
+      errors.push('Anchor geometry required when anchorCount is set');
+    }
+
+    if (config.uwb.anchors) {
+      const anchorError = validateAnchorList(config.uwb.anchors);
+      if (anchorError) {
+        errors.push(anchorError);
+      }
     }
 
     if (config.uwb.tdoaSlotCount !== undefined) {

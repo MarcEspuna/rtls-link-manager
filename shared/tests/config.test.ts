@@ -18,6 +18,75 @@ describe('validateConfig', () => {
     expect(result.errors).toContain('Maximum 8 anchors supported');
   });
 
+  it('requires geometry when anchorCount is positive', () => {
+    const result = validateConfig({
+      uwb: { anchorCount: 5 } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Anchor geometry required when anchorCount is set');
+  });
+
+  it('rejects anchorCount that does not match provided geometry', () => {
+    const result = validateConfig({
+      uwb: {
+        anchorCount: 5,
+        anchors: [],
+      } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Anchor geometry required when anchorCount is set');
+  });
+
+  it('rejects duplicate configured anchor IDs', () => {
+    const result = validateConfig({
+      uwb: {
+        anchors: [
+          { id: '1', x: 0, y: 0, z: 0 },
+          { id: '01', x: 1, y: 0, z: 0 },
+        ],
+      } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Anchor IDs must be unique');
+  });
+
+  it('rejects anchor IDs outside firmware range', () => {
+    const result = validateConfig({
+      uwb: {
+        anchors: [
+          { id: '8', x: 0, y: 0, z: 0 },
+        ],
+      } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Anchor IDs must be 0-7');
+  });
+
+  it('rejects non-contiguous configured anchor IDs', () => {
+    const result = validateConfig({
+      uwb: {
+        anchors: [
+          { id: '0', x: 0, y: 0, z: 0 },
+          { id: '2', x: 1, y: 0, z: 0 },
+        ],
+      } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Anchor IDs must be contiguous from 0');
+  });
+
+  it('rejects missing configured anchor coordinates', () => {
+    const result = validateConfig({
+      uwb: {
+        anchors: [
+          { id: '0', x: Number.NaN, y: 0, z: 0 },
+        ],
+      } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Anchor coordinates must be finite numbers');
+  });
+
   it('validates rangefinder forwarding sensor ID byte range', () => {
     const result = validateConfig({
       uwb: { rfForwardSensorId: 300 } as any

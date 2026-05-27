@@ -1,4 +1,5 @@
 import { DeviceConfig } from './types.js';
+import { MAX_CONFIGURABLE_ANCHORS, normalizeUwbShortAddr, validateAnchorList } from './anchors.js';
 
 /**
  * Converts a DeviceConfig to an array of [group, paramName, value] tuples.
@@ -35,17 +36,30 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     // NOTE: devShortAddr intentionally skipped - preserved per-device
 
     // Flatten anchors array to devId1/x1/y1/z1, devId2/x2/y2/z2, etc.
-    if (config.uwb.anchors && config.uwb.anchors.length > 0) {
-      params.push(['uwb', 'anchorCount', String(config.uwb.anchors.length)]);
-      config.uwb.anchors.forEach((anchor, i) => {
+    if (config.uwb.anchors !== undefined) {
+      if (config.uwb.anchorCount && config.uwb.anchors.length !== config.uwb.anchorCount) {
+        throw new Error('Anchor geometry required when anchorCount is set');
+      }
+      const validationError = validateAnchorList(config.uwb.anchors);
+      if (validationError) {
+        throw new Error(validationError);
+      }
+      const anchors = config.uwb.anchors.slice(0, MAX_CONFIGURABLE_ANCHORS);
+      anchors.forEach((anchor, i) => {
         const idx = i + 1; // 1-indexed in firmware
-        params.push(['uwb', `devId${idx}`, anchor.id]);
+        params.push(['uwb', `devId${idx}`, normalizeUwbShortAddr(anchor.id)]);
         params.push(['uwb', `x${idx}`, String(anchor.x)]);
         params.push(['uwb', `y${idx}`, String(anchor.y)]);
         params.push(['uwb', `z${idx}`, String(anchor.z)]);
       });
+      params.push(['uwb', 'anchorCount', String(anchors.length)]);
     } else if (config.uwb.anchorCount !== undefined) {
-      params.push(['uwb', 'anchorCount', String(config.uwb.anchorCount)]);
+      const count = Number(config.uwb.anchorCount);
+      if (count === 0) {
+        params.push(['uwb', 'anchorCount', '0']);
+      } else {
+        throw new Error('Anchor geometry required when anchorCount is set');
+      }
     }
 
     if (config.uwb.originLat !== undefined) params.push(['uwb', 'originLat', String(config.uwb.originLat)]);

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { AnchorConfig } from '@shared/types';
 import { MAX_CONFIGURABLE_ANCHORS } from '@shared/anchors';
 import styles from './AnchorListEditor.module.css';
@@ -18,9 +17,9 @@ const safeParseFloat = (value: string, fallback: number = 0): number => {
   return isNaN(parsed) ? fallback : parsed;
 };
 
-export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, onLockChange }: AnchorListEditorProps) {
-  const [idErrors, setIdErrors] = useState<Record<number, string>>({});
+const numberInputValue = (value: number): number | string => Number.isFinite(value) ? value : '';
 
+export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, onLockChange }: AnchorListEditorProps) {
   // Check if lock functionality is enabled
   const showLockButtons = anchorPosLocked !== undefined && onLockChange !== undefined;
 
@@ -35,33 +34,49 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
     onLockChange(newMask);
   };
 
-  const validateAnchorId = (value: string): string => {
+  const validateAnchorId = (value: string, index: number, nextAnchors: AnchorConfig[]): string => {
     if (!value) return 'ID is required';
     if (!/^\d+$/.test(value)) return 'Use anchor IDs 0-7';
     const id = Number(value);
     if (!Number.isInteger(id) || id < 0 || id >= MAX_CONFIGURABLE_ANCHORS) return 'Use anchor IDs 0-7';
+    if (nextAnchors.some((anchor, anchorIndex) => anchorIndex !== index && Number(anchor.id) === id)) {
+      return 'Anchor ID must be unique';
+    }
     return '';
   };
 
-  const setIdError = (index: number, error: string) => {
-    setIdErrors((prev) => {
-      const next = { ...prev };
+  const getIdErrors = (nextAnchors: AnchorConfig[]): Record<number, string> => {
+    const errors = nextAnchors.reduce<Record<number, string>>((acc, anchor, index) => {
+      const error = validateAnchorId(String(anchor.id), index, nextAnchors);
       if (error) {
-        next[index] = error;
-      } else {
-        delete next[index];
+        acc[index] = error;
       }
-      return next;
-    });
+      return acc;
+    }, {});
+
+    if (Object.keys(errors).length > 0) {
+      return errors;
+    }
+
+    const ids = new Set(nextAnchors.map((anchor) => Number(anchor.id)));
+    for (let expected = 0; expected < nextAnchors.length; expected++) {
+      if (!ids.has(expected)) {
+        nextAnchors.forEach((_, index) => {
+          errors[index] = 'Use contiguous IDs from 0';
+        });
+        break;
+      }
+    }
+
+    return errors;
   };
+
+  const hasIdErrors = (nextAnchors: AnchorConfig[]): boolean => Object.keys(getIdErrors(nextAnchors)).length > 0;
 
   const handleUpdate = (index: number, field: keyof AnchorConfig, value: string | number) => {
     const newAnchors = [...anchors];
     newAnchors[index] = { ...newAnchors[index], [field]: value };
     onChange(newAnchors);
-    if (field === 'id') {
-      setIdError(index, validateAnchorId(String(value)));
-    }
   };
 
   const handleBlur = (index: number, field: keyof AnchorConfig, rawValue: string) => {
@@ -71,13 +86,14 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
       const newAnchors = [...anchors];
       newAnchors[index] = { ...newAnchors[index], [field]: value };
       onChange(newAnchors);
-      onApply(newAnchors);
+      if (!hasIdErrors(newAnchors)) {
+        onApply(newAnchors);
+      }
     } else {
-      const error = validateAnchorId(rawValue);
-      setIdError(index, error);
-      if (error) return;
       const newAnchors = [...anchors];
-      newAnchors[index] = { ...newAnchors[index], id: rawValue };
+      const normalizedId = String(Number(rawValue));
+      newAnchors[index] = { ...newAnchors[index], id: normalizedId };
+      if (Object.keys(getIdErrors(newAnchors)).length > 0) return;
       onChange(newAnchors);
       onApply(newAnchors);
     }
@@ -85,7 +101,19 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
 
   const handleAdd = () => {
     if (anchors.length >= MAX_CONFIGURABLE_ANCHORS) return;
-    const newAnchors = [...anchors, { id: '0', x: 0, y: 0, z: 0 }];
+    if (hasIdErrors(anchors)) return;
+    const usedIds = new Set(
+      anchors
+        .map((anchor) => Number(anchor.id))
+        .filter((id) => Number.isInteger(id) && id >= 0 && id < MAX_CONFIGURABLE_ANCHORS)
+        .map(String)
+    );
+    let nextId = 0;
+    while (usedIds.has(String(nextId)) && nextId < MAX_CONFIGURABLE_ANCHORS) {
+      nextId++;
+    }
+    if (nextId >= MAX_CONFIGURABLE_ANCHORS) return;
+    const newAnchors = [...anchors, { id: String(nextId), x: 0, y: 0, z: 0 }];
     onChange(newAnchors);
     onApply(newAnchors);
   };
@@ -93,10 +121,16 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
   const handleRemove = (index: number) => {
     const newAnchors = anchors.filter((_, i) => i !== index);
     onChange(newAnchors);
-    onApply(newAnchors);
+    if (!hasIdErrors(newAnchors)) {
+      onApply(newAnchors);
+    }
   };
 
-  const canAdd = anchors.length < MAX_CONFIGURABLE_ANCHORS;
+  const idErrors = getIdErrors(anchors);
+  const canAdd = anchors.length < MAX_CONFIGURABLE_ANCHORS && Object.keys(idErrors).length === 0;
+  const addButtonLabel = anchors.length >= MAX_CONFIGURABLE_ANCHORS
+    ? `Maximum ${MAX_CONFIGURABLE_ANCHORS} anchors`
+    : canAdd ? '+ Add Anchor' : 'Fix anchor IDs';
 
   const headerClass = showLockButtons ? styles.anchorHeaderWithLock : styles.anchorHeader;
   const rowClass = showLockButtons ? styles.anchorRowWithLock : styles.anchorRow;
@@ -128,7 +162,7 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
               <input
                 type="number"
                 step="0.01"
-                value={anchor.x}
+                value={numberInputValue(anchor.x)}
                 onChange={(e) => handleUpdate(index, 'x', safeParseFloat(e.target.value, anchor.x))}
                 onBlur={(e) => handleBlur(index, 'x', e.target.value)}
                 className={styles.anchorInput}
@@ -136,7 +170,7 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
               <input
                 type="number"
                 step="0.01"
-                value={anchor.y}
+                value={numberInputValue(anchor.y)}
                 onChange={(e) => handleUpdate(index, 'y', safeParseFloat(e.target.value, anchor.y))}
                 onBlur={(e) => handleBlur(index, 'y', e.target.value)}
                 className={styles.anchorInput}
@@ -144,7 +178,7 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
               <input
                 type="number"
                 step="0.01"
-                value={anchor.z}
+                value={numberInputValue(anchor.z)}
                 onChange={(e) => handleUpdate(index, 'z', safeParseFloat(e.target.value, anchor.z))}
                 onBlur={(e) => handleBlur(index, 'z', e.target.value)}
                 className={styles.anchorInput}
@@ -165,7 +199,7 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
         );
       })}
       <button onClick={handleAdd} disabled={!canAdd} className={styles.addBtn}>
-        {canAdd ? '+ Add Anchor' : `Maximum ${MAX_CONFIGURABLE_ANCHORS} anchors`}
+        {addButtonLabel}
       </button>
     </div>
   );

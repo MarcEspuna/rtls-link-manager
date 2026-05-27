@@ -107,7 +107,7 @@ async fn run_apply(
     let config: DeviceConfig =
         serde_json::from_str(&config_content).map_err(ConfigError::ParseError)?;
 
-    let params = config_to_params(&config);
+    let params = config_to_params(&config).map_err(CliError::Other)?;
 
     let ips = if target.to_lowercase() == "all" {
         let options = DiscoveryOptions {

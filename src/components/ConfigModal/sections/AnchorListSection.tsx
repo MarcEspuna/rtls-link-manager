@@ -55,9 +55,9 @@ export function AnchorListSection({
       while (pendingAnchorsRef.current) {
         const anchorsToApply = pendingAnchorsRef.current;
         pendingAnchorsRef.current = null;
-        const commands = getAnchorWriteCommands(anchorsToApply);
-        const batch = commands.map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
         try {
+          const commands = getAnchorWriteCommands(anchorsToApply);
+          const batch = commands.map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
           await onApplyBatch(batch);
         } catch (e) {
           onError(e instanceof Error ? e.message : 'Failed to write anchors');
