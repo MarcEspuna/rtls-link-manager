@@ -10,11 +10,12 @@ describe('validateConfig', () => {
     expect(result.errors).toContain('Station mode requires ssidST');
   });
 
-  it('limits anchor count to 6', () => {
+  it('limits anchor count to 8', () => {
     const result = validateConfig({
-      uwb: { anchorCount: 8 } as any
+      uwb: { anchorCount: 9 } as any
     });
     expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Maximum 8 anchors supported');
   });
 
   it('validates rangefinder forwarding sensor ID byte range', () => {

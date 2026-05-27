@@ -7,6 +7,8 @@
 
 use crate::types::{AnchorConfig, DeviceConfig, LocationData};
 
+const MAX_CONFIGURABLE_ANCHORS: usize = 8;
+
 /// Parse a firmware `backup-config` payload into a DeviceConfig.
 ///
 /// Firmware stores anchor geometry as flat `uwb.devIdN/xN/yN/zN` fields.
@@ -39,7 +41,7 @@ fn rebuild_flat_anchors(config: &mut DeviceConfig, value: &serde_json::Value) {
         .anchor_count
         .or_else(|| value_to_u8(uwb.get("anchorCount")))
         .unwrap_or(0)
-        .min(6);
+        .min(MAX_CONFIGURABLE_ANCHORS as u8);
 
     if count == 0 {
         return;
@@ -205,9 +207,9 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             params.push((
                 "uwb".to_string(),
                 "anchorCount".to_string(),
-                anchors.len().to_string(),
+                anchors.len().min(MAX_CONFIGURABLE_ANCHORS).to_string(),
             ));
-            for (i, anchor) in anchors.iter().enumerate() {
+            for (i, anchor) in anchors.iter().take(MAX_CONFIGURABLE_ANCHORS).enumerate() {
                 let idx = i + 1; // 1-indexed in firmware
                 params.push((
                     "uwb".to_string(),
@@ -417,9 +419,18 @@ pub fn location_to_params(location: &LocationData) -> Vec<(String, String, Strin
         params.push((
             "uwb".to_string(),
             "anchorCount".to_string(),
-            location.anchors.len().to_string(),
+            location
+                .anchors
+                .len()
+                .min(MAX_CONFIGURABLE_ANCHORS)
+                .to_string(),
         ));
-        for (i, anchor) in location.anchors.iter().enumerate() {
+        for (i, anchor) in location
+            .anchors
+            .iter()
+            .take(MAX_CONFIGURABLE_ANCHORS)
+            .enumerate()
+        {
             let idx = i + 1;
             params.push((
                 "uwb".to_string(),
@@ -606,6 +617,48 @@ mod tests {
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "x2" && v == "3"));
+    }
+
+    #[test]
+    fn device_config_from_backup_value_rebuilds_eight_flat_anchors() {
+        let mut uwb = serde_json::json!({
+            "mode": 4,
+            "devShortAddr": "7",
+            "anchorCount": 8
+        });
+        let map = uwb.as_object_mut().unwrap();
+        for idx in 1..=8 {
+            map.insert(
+                format!("devId{}", idx),
+                serde_json::json!((idx - 1).to_string()),
+            );
+            map.insert(format!("x{}", idx), serde_json::json!(idx as f64));
+            map.insert(format!("y{}", idx), serde_json::json!((idx as f64) + 0.5));
+            map.insert(format!("z{}", idx), serde_json::json!(-(idx as f64)));
+        }
+
+        let raw = serde_json::json!({
+            "wifi": { "mode": 1 },
+            "uwb": uwb,
+            "app": {}
+        });
+
+        let config = device_config_from_backup_value(raw).unwrap();
+        let anchors = config.uwb.anchors.as_ref().unwrap();
+
+        assert_eq!(anchors.len(), 8);
+        assert_eq!(anchors[7].id, "7");
+        assert_eq!(anchors[7].x, 8.0);
+        assert_eq!(anchors[7].y, 8.5);
+        assert_eq!(anchors[7].z, -8.0);
+
+        let params = config_to_params(&config);
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "8"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "devId8" && v == "7"));
     }
 
     #[test]

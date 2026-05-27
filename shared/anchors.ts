@@ -1,5 +1,7 @@
 import { AnchorConfig } from './types';
 
+export const MAX_CONFIGURABLE_ANCHORS = 8;
+
 const normalizeShortAddr = (raw: unknown): string => {
   if (raw === null || raw === undefined) return '0';
   const value = String(raw).trim();
@@ -27,7 +29,7 @@ const normalizeShortAddr = (raw: unknown): string => {
  */
 export function flatToAnchors(uwb: Record<string, any>, anchorCount: number): AnchorConfig[] {
   const anchors: AnchorConfig[] = [];
-  const count = Math.min(anchorCount || 0, 6);
+  const count = Math.min(anchorCount || 0, MAX_CONFIGURABLE_ANCHORS);
 
   for (let i = 1; i <= count; i++) {
     anchors.push({
@@ -49,7 +51,7 @@ export function getAnchorWriteCommands(anchors: AnchorConfig[]): Array<{ name: s
   const commands: Array<{ name: string; value: string | number }> = [];
 
   // Write each anchor's fields
-  for (let i = 0; i < anchors.length && i < 6; i++) {
+  for (let i = 0; i < anchors.length && i < MAX_CONFIGURABLE_ANCHORS; i++) {
     const n = i + 1;
     commands.push({ name: `devId${n}`, value: normalizeShortAddr(anchors[i].id) });
     commands.push({ name: `x${n}`, value: anchors[i].x });
@@ -57,8 +59,8 @@ export function getAnchorWriteCommands(anchors: AnchorConfig[]): Array<{ name: s
     commands.push({ name: `z${n}`, value: anchors[i].z });
   }
 
-  // Update anchor count (cap at 6)
-  commands.push({ name: 'anchorCount', value: Math.min(anchors.length, 6) });
+  // Update anchor count to the number supported by the firmware parameter layout.
+  commands.push({ name: 'anchorCount', value: Math.min(anchors.length, MAX_CONFIGURABLE_ANCHORS) });
 
   return commands;
 }

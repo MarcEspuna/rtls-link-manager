@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AnchorConfig } from '@shared/types';
+import { MAX_CONFIGURABLE_ANCHORS } from '@shared/anchors';
 import styles from './AnchorListEditor.module.css';
 
 interface AnchorListEditorProps {
@@ -11,8 +12,6 @@ interface AnchorListEditorProps {
   /** Optional: callback when lock state changes */
   onLockChange?: (newLockedMask: number) => void;
 }
-
-const MAX_ANCHORS = 6;
 
 const safeParseFloat = (value: string, fallback: number = 0): number => {
   const parsed = parseFloat(value);
@@ -38,7 +37,9 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
 
   const validateAnchorId = (value: string): string => {
     if (!value) return 'ID is required';
-    if (!/^\d{1,2}$/.test(value)) return 'Use 1-2 digits (0-99)';
+    if (!/^\d+$/.test(value)) return 'Use anchor IDs 0-7';
+    const id = Number(value);
+    if (!Number.isInteger(id) || id < 0 || id >= MAX_CONFIGURABLE_ANCHORS) return 'Use anchor IDs 0-7';
     return '';
   };
 
@@ -83,7 +84,7 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
   };
 
   const handleAdd = () => {
-    if (anchors.length >= MAX_ANCHORS) return;
+    if (anchors.length >= MAX_CONFIGURABLE_ANCHORS) return;
     const newAnchors = [...anchors, { id: '0', x: 0, y: 0, z: 0 }];
     onChange(newAnchors);
     onApply(newAnchors);
@@ -95,7 +96,7 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
     onApply(newAnchors);
   };
 
-  const canAdd = anchors.length < MAX_ANCHORS;
+  const canAdd = anchors.length < MAX_CONFIGURABLE_ANCHORS;
 
   const headerClass = showLockButtons ? styles.anchorHeaderWithLock : styles.anchorHeader;
   const rowClass = showLockButtons ? styles.anchorRowWithLock : styles.anchorRow;
@@ -164,7 +165,7 @@ export function AnchorListEditor({ anchors, onChange, onApply, anchorPosLocked, 
         );
       })}
       <button onClick={handleAdd} disabled={!canAdd} className={styles.addBtn}>
-        {canAdd ? '+ Add Anchor' : `Maximum ${MAX_ANCHORS} anchors`}
+        {canAdd ? '+ Add Anchor' : `Maximum ${MAX_CONFIGURABLE_ANCHORS} anchors`}
       </button>
     </div>
   );
