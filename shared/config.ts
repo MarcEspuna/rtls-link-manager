@@ -22,12 +22,22 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
   }
 
   if (config.uwb) {
-    if (config.uwb.anchorCount && config.uwb.anchorCount > MAX_CONFIGURABLE_ANCHORS) {
-      errors.push(`Maximum ${MAX_CONFIGURABLE_ANCHORS} anchors supported`);
+    const anchorCount = config.uwb.anchorCount;
+    let validAnchorCount: number | null = null;
+    if (anchorCount !== undefined) {
+      const count = Number(anchorCount);
+      if (!Number.isInteger(count) || count <= 0) {
+        errors.push('Anchor count must be positive when set');
+      } else {
+        validAnchorCount = count;
+        if (count > MAX_CONFIGURABLE_ANCHORS) {
+          errors.push(`Maximum ${MAX_CONFIGURABLE_ANCHORS} anchors supported`);
+        }
+      }
     }
 
-    if (config.uwb.anchorCount
-      && (!config.uwb.anchors || config.uwb.anchors.length !== config.uwb.anchorCount)) {
+    if (validAnchorCount !== null
+      && (!config.uwb.anchors || config.uwb.anchors.length !== validAnchorCount)) {
       errors.push('Anchor geometry required when anchorCount is set');
     }
 

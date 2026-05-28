@@ -37,6 +37,9 @@ fn rebuild_flat_anchors(
         .filter(|anchors| !anchors.is_empty())
     {
         if let Some(count) = config.uwb.anchor_count {
+            if count == 0 {
+                return Err("Anchor count must be positive when set".to_string());
+            }
             if count as usize > MAX_CONFIGURABLE_ANCHORS {
                 return Err(format!(
                     "Maximum {} anchors supported",
@@ -55,12 +58,16 @@ fn rebuild_flat_anchors(
         return Ok(());
     };
 
-    let count = config
+    let explicit_count = config
         .uwb
         .anchor_count
         .map(usize::from)
-        .or_else(|| value_to_usize(uwb.get("anchorCount")))
-        .unwrap_or(0);
+        .or_else(|| value_to_usize(uwb.get("anchorCount")));
+    if explicit_count == Some(0) {
+        return Err("Anchor count must be positive when set".to_string());
+    }
+
+    let count = explicit_count.unwrap_or(0);
     if count > MAX_CONFIGURABLE_ANCHORS {
         return Err(format!(
             "Maximum {} anchors supported",
@@ -69,6 +76,9 @@ fn rebuild_flat_anchors(
     }
 
     if count == 0 {
+        if has_flat_anchor_fields(uwb) {
+            return Err("Anchor count required when anchor geometry is present".to_string());
+        }
         return Ok(());
     }
 
@@ -98,6 +108,15 @@ fn value_to_usize(value: Option<&serde_json::Value>) -> Option<usize> {
     value
         .and_then(|v| v.as_u64().or_else(|| v.as_str()?.trim().parse().ok()))
         .and_then(|v| usize::try_from(v).ok())
+}
+
+fn has_flat_anchor_fields(uwb: &serde_json::Map<String, serde_json::Value>) -> bool {
+    (1..=MAX_CONFIGURABLE_ANCHORS).any(|idx| {
+        uwb.contains_key(&format!("devId{}", idx))
+            || uwb.contains_key(&format!("x{}", idx))
+            || uwb.contains_key(&format!("y{}", idx))
+            || uwb.contains_key(&format!("z{}", idx))
+    })
 }
 
 fn value_to_f64(value: Option<&serde_json::Value>) -> Option<f64> {
@@ -199,12 +218,7 @@ fn append_anchor_params(
 ) -> Result<(), String> {
     let anchors = valid_anchor_entries(anchors)?;
     if anchors.is_empty() {
-        params.push((
-            "uwb".to_string(),
-            "anchorCount".to_string(),
-            "0".to_string(),
-        ));
-        return Ok(());
+        return Err("Anchor geometry required when anchorCount is set".to_string());
     }
 
     for (i, (anchor_id, anchor)) in anchors.iter().enumerate() {
@@ -327,14 +341,9 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
         append_anchor_params(&mut params, anchors)?;
     } else if let Some(v) = config.uwb.anchor_count {
         if v == 0 {
-            params.push((
-                "uwb".to_string(),
-                "anchorCount".to_string(),
-                "0".to_string(),
-            ));
-        } else {
-            return Err("Anchor geometry required when anchorCount is set".to_string());
+            return Err("Anchor count must be positive when set".to_string());
         }
+        return Err("Anchor geometry required when anchorCount is set".to_string());
     }
 
     if let Some(v) = config.uwb.origin_lat {
@@ -543,6 +552,67 @@ pub fn location_to_params(location: &LocationData) -> Result<Vec<ParamTuple>, St
 mod tests {
     use super::*;
     use crate::types::{AnchorConfig, AppConfig, GpsOrigin, UwbConfig, WifiConfig};
+
+    fn minimal_device_config(
+        anchor_count: Option<u8>,
+        anchors: Option<Vec<AnchorConfig>>,
+    ) -> DeviceConfig {
+        DeviceConfig {
+            wifi: WifiConfig {
+                mode: 1,
+                ssid_a_p: None,
+                pswd_a_p: None,
+                ssid_s_t: None,
+                pswd_s_t: None,
+                gcs_ip: None,
+                udp_port: None,
+                enable_web_server: None,
+                enable_uart_bridge: None,
+                enable_discovery: None,
+                discovery_port: None,
+                log_udp_port: None,
+                log_serial_enabled: None,
+                log_udp_enabled: None,
+            },
+            uwb: UwbConfig {
+                mode: 4,
+                uwb_enable: None,
+                dev_short_addr: "1".to_string(),
+                anchor_count,
+                anchors,
+                origin_lat: None,
+                origin_lon: None,
+                origin_alt: None,
+                mavlink_target_system_id: None,
+                output_backend: None,
+                rtls_beacon_age_bias_ms: None,
+                rotation_degrees: None,
+                z_calc_mode: None,
+                rf_forward_enable: None,
+                rf_forward_sensor_id: None,
+                rf_forward_orientation: None,
+                rf_forward_preserve_src_ids: None,
+                enable_cov_matrix: None,
+                rmse_threshold: None,
+                channel: None,
+                dw_mode: None,
+                tx_power_level: None,
+                smart_power_enable: None,
+                tdoa_slot_count: None,
+                tdoa_slot_duration_us: None,
+                dynamic_anchor_pos_enabled: None,
+                anchor_layout: None,
+                anchor_height: None,
+                anchor_pos_locked: None,
+                distance_avg_samples: None,
+                use_2d_estimator: None,
+            },
+            app: AppConfig {
+                led2_pin: None,
+                led2_state: None,
+            },
+        }
+    }
 
     #[test]
     fn test_config_to_params_basic() {
@@ -879,6 +949,47 @@ mod tests {
     }
 
     #[test]
+    fn device_config_from_backup_value_rejects_zero_anchor_count() {
+        let raw = serde_json::json!({
+            "wifi": { "mode": 1 },
+            "uwb": {
+                "mode": 4,
+                "devShortAddr": "7",
+                "anchorCount": 0
+            },
+            "app": {}
+        });
+
+        let err = device_config_from_backup_value(raw)
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains("Anchor count must be positive when set"));
+    }
+
+    #[test]
+    fn device_config_from_backup_value_rejects_flat_anchors_without_count() {
+        let raw = serde_json::json!({
+            "wifi": { "mode": 1 },
+            "uwb": {
+                "mode": 4,
+                "devShortAddr": "7",
+                "devId1": "0",
+                "x1": 1.0,
+                "y1": 2.0,
+                "z1": 3.0
+            },
+            "app": {}
+        });
+
+        let err = device_config_from_backup_value(raw)
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains("Anchor count required when anchor geometry is present"));
+    }
+
+    #[test]
     fn config_to_params_normalizes_contiguous_anchor_ids_before_writing() {
         let config = DeviceConfig {
             wifi: WifiConfig {
@@ -1075,6 +1186,26 @@ mod tests {
                 led2_state: None,
             },
         };
+
+        assert_eq!(
+            config_to_params(&config).unwrap_err(),
+            "Anchor geometry required when anchorCount is set"
+        );
+    }
+
+    #[test]
+    fn config_to_params_rejects_zero_count_without_geometry() {
+        let config = minimal_device_config(Some(0), None);
+
+        assert_eq!(
+            config_to_params(&config).unwrap_err(),
+            "Anchor count must be positive when set"
+        );
+    }
+
+    #[test]
+    fn config_to_params_rejects_empty_anchor_geometry() {
+        let config = minimal_device_config(None, Some(vec![]));
 
         assert_eq!(
             config_to_params(&config).unwrap_err(),

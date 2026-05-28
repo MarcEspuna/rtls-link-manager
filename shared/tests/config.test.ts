@@ -26,6 +26,14 @@ describe('validateConfig', () => {
     expect(result.errors).toContain('Anchor geometry required when anchorCount is set');
   });
 
+  it('rejects zero anchorCount', () => {
+    const result = validateConfig({
+      uwb: { anchorCount: 0 } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Anchor count must be positive when set');
+  });
+
   it('rejects anchorCount that does not match provided geometry', () => {
     const result = validateConfig({
       uwb: {

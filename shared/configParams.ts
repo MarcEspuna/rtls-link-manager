@@ -37,7 +37,16 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
 
     // Flatten anchors array to devId1/x1/y1/z1, devId2/x2/y2/z2, etc.
     if (config.uwb.anchors !== undefined) {
-      if (config.uwb.anchorCount && config.uwb.anchors.length !== config.uwb.anchorCount) {
+      if (config.uwb.anchorCount !== undefined) {
+        const count = Number(config.uwb.anchorCount);
+        if (!Number.isInteger(count) || count <= 0) {
+          throw new Error('Anchor count must be positive when set');
+        }
+        if (config.uwb.anchors.length !== count) {
+          throw new Error('Anchor geometry required when anchorCount is set');
+        }
+      }
+      if (config.uwb.anchors.length === 0) {
         throw new Error('Anchor geometry required when anchorCount is set');
       }
       const validationError = validateAnchorList(config.uwb.anchors);
@@ -55,11 +64,10 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
       params.push(['uwb', 'anchorCount', String(anchors.length)]);
     } else if (config.uwb.anchorCount !== undefined) {
       const count = Number(config.uwb.anchorCount);
-      if (count === 0) {
-        params.push(['uwb', 'anchorCount', '0']);
-      } else {
-        throw new Error('Anchor geometry required when anchorCount is set');
+      if (!Number.isInteger(count) || count <= 0) {
+        throw new Error('Anchor count must be positive when set');
       }
+      throw new Error('Anchor geometry required when anchorCount is set');
     }
 
     if (config.uwb.originLat !== undefined) params.push(['uwb', 'originLat', String(config.uwb.originLat)]);

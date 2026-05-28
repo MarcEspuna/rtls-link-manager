@@ -86,6 +86,10 @@ export function normalizeUwbShortAddr(raw: unknown): string {
 }
 
 export function validateAnchorList(anchors: AnchorConfig[]): string | null {
+  if (anchors.length === 0) {
+    return 'Anchor geometry required when anchorCount is set';
+  }
+
   if (anchors.length > MAX_CONFIGURABLE_ANCHORS) {
     return `Maximum ${MAX_CONFIGURABLE_ANCHORS} anchors supported`;
   }

@@ -93,11 +93,11 @@ describe('configToParams', () => {
       app: {},
     })).toThrow('Anchor geometry required when anchorCount is set');
 
-    expect(configToParams({
+    expect(() => configToParams({
       wifi: {},
       uwb: { mode: 4, anchorCount: 0 },
       app: {},
-    })).toContainEqual(['uwb', 'anchorCount', '0']);
+    })).toThrow('Anchor count must be positive when set');
   });
 
   it('rejects anchorCount that does not match provided geometry', () => {
