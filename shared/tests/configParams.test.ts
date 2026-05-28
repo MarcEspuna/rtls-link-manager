@@ -47,6 +47,6 @@ describe('configToParams', () => {
     expect(params).toContainEqual(['uwb', 'tdoaAnchorTelemetryEnable', '1']);
     expect(params).toContainEqual(['uwb', 'tdoaAnchorTelemetryIntervalMs', '1000']);
     expect(params).toContainEqual(['uwb', 'tdoaAnchorTelemetryPort', '3335']);
-    expect(params).toContainEqual(['uwb', 'tdoaMatcherPolicy', '1']);
+    expect(params).not.toContainEqual(['uwb', 'tdoaMatcherPolicy', '1']);
   });
 });

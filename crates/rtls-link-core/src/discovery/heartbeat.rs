@@ -14,56 +14,8 @@ use std::time::{Duration, Instant};
 pub const DEVICE_TTL: Duration = Duration::from_secs(5);
 
 /// Parse a heartbeat packet into a Device struct.
-pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Error> {
-    if let Ok(device) = parse_mavlink_status(data, &ip) {
-        return Ok(device);
-    }
-
-    let json: serde_json::Value = serde_json::from_slice(data)?;
-
-    // Parse optional dynamic anchor positions
-    let dynamic_anchors = json["dyn_anchors"].as_array().map(|arr| {
-        arr.iter()
-            .filter_map(|v| {
-                Some(DynamicAnchorPosition {
-                    id: v["id"].as_u64()? as u8,
-                    x: v["x"].as_f64()?,
-                    y: v["y"].as_f64()?,
-                    z: v["z"].as_f64()?,
-                })
-            })
-            .collect()
-    });
-
-    let mut device = Device {
-        ip,
-        id: json["id"].as_str().unwrap_or("").to_string(),
-        role: DeviceRole::from_str(json["role"].as_str().unwrap_or("")),
-        mac: json["mac"].as_str().unwrap_or("").to_string(),
-        uwb_short: json["uwb_short"].as_str().unwrap_or("0").to_string(),
-        mav_sys_id: json["mav_sysid"].as_u64().unwrap_or(0) as u8,
-        firmware: json["fw"].as_str().unwrap_or("").to_string(),
-        online: Some(true),
-        last_seen: Some(chrono::Utc::now()),
-        sending_pos: json["sending_pos"].as_bool(),
-        anchors_seen: json["anchors_seen"].as_u64().map(|v| v as u8),
-        origin_sent: json["origin_sent"].as_bool(),
-        uwb_enabled: json["uwb_enabled"].as_bool(),
-        rf_forward_enabled: json["rf_forward_enabled"].as_bool(),
-        rf_enabled: json["rf_enabled"].as_bool(),
-        rf_healthy: json["rf_healthy"].as_bool(),
-        avg_rate_c_hz: json["avg_rate_cHz"].as_u64().map(|v| v as u16),
-        min_rate_c_hz: json["min_rate_cHz"].as_u64().map(|v| v as u16),
-        max_rate_c_hz: json["max_rate_cHz"].as_u64().map(|v| v as u16),
-        log_level: json["log_level"].as_u64().map(|v| v as u8),
-        log_udp_port: json["log_udp_port"].as_u64().map(|v| v as u16),
-        log_serial_enabled: json["log_serial_enabled"].as_bool(),
-        log_udp_enabled: json["log_udp_enabled"].as_bool(),
-        dynamic_anchors,
-        health: None,
-    };
-    device.health = Some(calculate_device_health(&device));
-    Ok(device)
+pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, String> {
+    parse_mavlink_status(data, &ip)
 }
 
 fn parse_mavlink_status(data: &[u8], source_ip: &str) -> Result<Device, String> {
@@ -186,59 +138,91 @@ pub fn prune_stale_devices(devices: &mut HashMap<String, (Device, Instant)>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mavlink::rtlslink::RTLS_DEVICE_STATUS_DATA;
+    use crate::mavlink::types::CharArray;
+    use crate::mavlink::{write_v2_msg, MavHeader};
+
+    fn status_packet(mut status: RTLS_DEVICE_STATUS_DATA) -> Vec<u8> {
+        if status.device_type.to_str().unwrap_or("").is_empty() {
+            status.device_type = CharArray::<16>::from("rtls-link");
+        }
+        let message = MavMessage::RTLS_DEVICE_STATUS(status);
+        let mut bytes = Vec::new();
+        write_v2_msg(
+            &mut bytes,
+            MavHeader {
+                system_id: 1,
+                component_id: 191,
+                sequence: 0,
+            },
+            &message,
+        )
+        .unwrap();
+        bytes
+    }
 
     #[test]
-    fn test_parse_heartbeat() {
-        let json = r#"{
-            "id": "device1",
-            "role": "tag_tdoa",
-            "mac": "AA:BB:CC:DD:EE:FF",
-            "uwb_short": "1",
-            "mav_sysid": 1,
-            "fw": "1.0.0",
-            "sending_pos": true,
-            "anchors_seen": 3
-        }"#;
+    fn test_parse_mavlink_status() {
+        let packet = status_packet(RTLS_DEVICE_STATUS_DATA {
+            role: RtlsDeviceRole::RTLS_DEVICE_ROLE_TAG_TDOA,
+            flags: RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_SENDING_POSITION
+                | RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_UWB_ENABLED,
+            anchors_seen: 3,
+            mavlink_target_system: 42,
+            mac: [0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF],
+            short_addr: CharArray::<8>::from("1"),
+            firmware_version: CharArray::<16>::from("1.0.0"),
+            ..Default::default()
+        });
 
-        let device = parse_heartbeat(json.as_bytes(), "192.168.1.100".to_string()).unwrap();
+        let device = parse_heartbeat(&packet, "192.168.1.100".to_string()).unwrap();
 
         assert_eq!(device.ip, "192.168.1.100");
-        assert_eq!(device.id, "device1");
+        assert_eq!(device.id, "1");
         assert_eq!(device.role, DeviceRole::TagTdoa);
+        assert_eq!(device.mac, "AA:BB:CC:DD:EE:FF");
+        assert_eq!(device.uwb_short, "1");
+        assert_eq!(device.mav_sys_id, 42);
+        assert_eq!(device.firmware, "1.0.0");
         assert_eq!(device.sending_pos, Some(true));
         assert_eq!(device.anchors_seen, Some(3));
+        assert_eq!(device.uwb_enabled, Some(true));
     }
 
     #[test]
-    fn test_parse_minimal_heartbeat() {
-        let json = r#"{"id": "test", "role": "anchor_tdoa"}"#;
-        let device = parse_heartbeat(json.as_bytes(), "10.0.0.1".to_string()).unwrap();
+    fn test_parse_minimal_mavlink_status() {
+        let packet = status_packet(RTLS_DEVICE_STATUS_DATA {
+            role: RtlsDeviceRole::RTLS_DEVICE_ROLE_ANCHOR_TDOA,
+            flags: RtlsDeviceStatusFlags::empty(),
+            short_addr: CharArray::<8>::from("2"),
+            ..Default::default()
+        });
+        let device = parse_heartbeat(&packet, "10.0.0.1".to_string()).unwrap();
 
         assert_eq!(device.ip, "10.0.0.1");
-        assert_eq!(device.id, "test");
+        assert_eq!(device.id, "2");
         assert_eq!(device.role, DeviceRole::AnchorTdoa);
-        assert_eq!(device.sending_pos, None);
+        assert_eq!(device.sending_pos, Some(false));
     }
 
     #[test]
-    fn test_parse_heartbeat_invalid_json() {
+    fn test_parse_heartbeat_rejects_non_mavlink() {
         let invalid = b"not valid json";
         let result = parse_heartbeat(invalid, "1.2.3.4".to_string());
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_parse_heartbeat_with_log_fields() {
-        let json = r#"{
-            "id": "device1",
-            "role": "tag_tdoa",
-            "log_level": 3,
-            "log_udp_port": 3334,
-            "log_serial_enabled": true,
-            "log_udp_enabled": false
-        }"#;
+    fn test_parse_mavlink_status_with_log_fields() {
+        let packet = status_packet(RTLS_DEVICE_STATUS_DATA {
+            flags: RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_LOG_SERIAL_ENABLED,
+            log_level: 3,
+            log_udp_port: 3334,
+            short_addr: CharArray::<8>::from("1"),
+            ..Default::default()
+        });
 
-        let device = parse_heartbeat(json.as_bytes(), "10.0.0.1".to_string()).unwrap();
+        let device = parse_heartbeat(&packet, "10.0.0.1".to_string()).unwrap();
         assert_eq!(device.log_level, Some(3));
         assert_eq!(device.log_udp_port, Some(3334));
         assert_eq!(device.log_serial_enabled, Some(true));
@@ -297,41 +281,32 @@ mod tests {
     }
 
     #[test]
-    fn test_all_device_roles() {
-        let roles = [
-            ("anchor", DeviceRole::Unknown),
-            ("tag", DeviceRole::Unknown),
-            ("anchor_tdoa", DeviceRole::AnchorTdoa),
-            ("tag_tdoa", DeviceRole::TagTdoa),
-            ("calibration", DeviceRole::Unknown),
-            ("unknown_role", DeviceRole::Unknown),
-        ];
-
-        for (role_str, expected_role) in roles {
-            let json = format!(r#"{{"id": "test", "role": "{}"}}"#, role_str);
-            let device = parse_heartbeat(json.as_bytes(), "1.1.1.1".to_string()).unwrap();
-            assert_eq!(device.role, expected_role, "Failed for role: {}", role_str);
-        }
+    fn test_unknown_device_role() {
+        let packet = status_packet(RTLS_DEVICE_STATUS_DATA {
+            role: RtlsDeviceRole::RTLS_DEVICE_ROLE_UNKNOWN,
+            flags: RtlsDeviceStatusFlags::empty(),
+            short_addr: CharArray::<8>::from("0"),
+            ..Default::default()
+        });
+        let device = parse_heartbeat(&packet, "1.1.1.1".to_string()).unwrap();
+        assert_eq!(device.role, DeviceRole::Unknown);
     }
 
     #[test]
-    fn test_parse_heartbeat_with_dynamic_anchors() {
-        let json = r#"{
-            "id": "tag1",
-            "role": "tag_tdoa",
-            "mac": "AA:BB:CC:DD:EE:FF",
-            "uwb_short": "1",
-            "mav_sysid": 1,
-            "fw": "1.0.0",
-            "dyn_anchors": [
-                {"id": 0, "x": 0.00, "y": 0.00, "z": -2.00},
-                {"id": 1, "x": 5.00, "y": 0.00, "z": -2.00},
-                {"id": 2, "x": 5.00, "y": 3.00, "z": -2.00},
-                {"id": 3, "x": 0.00, "y": 3.00, "z": -2.00}
-            ]
-        }"#;
+    fn test_parse_mavlink_status_with_dynamic_anchors() {
+        let packet = status_packet(RTLS_DEVICE_STATUS_DATA {
+            role: RtlsDeviceRole::RTLS_DEVICE_ROLE_TAG_TDOA,
+            flags: RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_DYNAMIC_ANCHORS_ENABLED,
+            dynamic_anchor_count: 4,
+            dynamic_anchor_id: [0, 1, 2, 3],
+            dynamic_anchor_x_mm: [0, 5000, 5000, 0],
+            dynamic_anchor_y_mm: [0, 0, 3000, 3000],
+            dynamic_anchor_z_mm: [-2000, -2000, -2000, -2000],
+            short_addr: CharArray::<8>::from("1"),
+            ..Default::default()
+        });
 
-        let device = parse_heartbeat(json.as_bytes(), "192.168.1.100".to_string()).unwrap();
+        let device = parse_heartbeat(&packet, "192.168.1.100".to_string()).unwrap();
 
         assert_eq!(device.role, DeviceRole::TagTdoa);
         assert!(device.dynamic_anchors.is_some());
@@ -349,10 +324,15 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_heartbeat_without_dynamic_anchors() {
-        let json = r#"{"id": "anchor1", "role": "anchor_tdoa"}"#;
+    fn test_parse_mavlink_status_without_dynamic_anchors() {
+        let packet = status_packet(RTLS_DEVICE_STATUS_DATA {
+            role: RtlsDeviceRole::RTLS_DEVICE_ROLE_ANCHOR_TDOA,
+            flags: RtlsDeviceStatusFlags::empty(),
+            short_addr: CharArray::<8>::from("2"),
+            ..Default::default()
+        });
 
-        let device = parse_heartbeat(json.as_bytes(), "10.0.0.1".to_string()).unwrap();
+        let device = parse_heartbeat(&packet, "10.0.0.1".to_string()).unwrap();
 
         assert_eq!(device.role, DeviceRole::AnchorTdoa);
         assert!(device.dynamic_anchors.is_none());

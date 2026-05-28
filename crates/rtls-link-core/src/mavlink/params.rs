@@ -52,16 +52,6 @@ pub const PARAMS: &[ParamEntry] = &[
         name: "enableUartBridge",
     },
     ParamEntry {
-        id: "WIFI_MGMT_EN",
-        group: "wifi",
-        name: "enableMavlinkManagement",
-    },
-    ParamEntry {
-        id: "WIFI_MGMT_PORT",
-        group: "wifi",
-        name: "mavlinkManagementPort",
-    },
-    ParamEntry {
         id: "WIFI_LOG_PORT",
         group: "wifi",
         name: "logUdpPort",

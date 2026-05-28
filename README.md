@@ -209,12 +209,12 @@ npm run test:run
 
 - Verify devices and manager are on the same network
 - Check that UDP port 3333 is not blocked by firewall
-- Ensure MAVLink management is enabled in device WiFi settings
+- Ensure the firmware was built with `USE_WIFI_MAVLINK_MANAGEMENT`
 
 ### MAVLink command connection fails
 
 - Confirm device IP is reachable from manager host
-- Check that MAVLink management is enabled in device WiFi settings
+- Ensure the firmware was built with `USE_WIFI_MAVLINK_MANAGEMENT`
 - Verify no firewall blocking UDP port 3333
 
 ### Configuration not saving

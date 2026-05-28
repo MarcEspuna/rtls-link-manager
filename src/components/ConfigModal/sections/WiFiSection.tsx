@@ -131,29 +131,6 @@ export function WiFiSection({ config, onChange, onApply }: WiFiSectionProps) {
               <option value={0}>Disabled</option>
             </select>
           </div>
-          <div className={styles.field}>
-            <label>MAVLink Management</label>
-            <select
-              value={config.wifi.enableMavlinkManagement ?? 1}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                onChange('wifi', 'enableMavlinkManagement', val);
-                onApply('wifi', 'enableMavlinkManagement', val);
-              }}
-            >
-              <option value={1}>Enabled</option>
-              <option value={0}>Disabled</option>
-            </select>
-          </div>
-          <div className={styles.field}>
-            <label>Management Port</label>
-            <input
-              type="number"
-              value={config.wifi.mavlinkManagementPort || 3333}
-              onChange={(e) => onChange('wifi', 'mavlinkManagementPort', Number(e.target.value))}
-              onBlur={(e) => onApply('wifi', 'mavlinkManagementPort', Number(e.target.value))}
-            />
-          </div>
         </div>
       </div>
     </div>

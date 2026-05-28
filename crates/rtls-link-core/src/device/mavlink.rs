@@ -69,7 +69,15 @@ pub struct DeviceConnection {
 
 impl DeviceConnection {
     pub async fn connect(ip: &str, cmd_timeout: Duration) -> Result<Self, CoreError> {
-        let target: SocketAddr = format!("{ip}:{MAVLINK_MANAGEMENT_PORT}")
+        Self::connect_to_port(ip, MAVLINK_MANAGEMENT_PORT, cmd_timeout).await
+    }
+
+    async fn connect_to_port(
+        ip: &str,
+        port: u16,
+        cmd_timeout: Duration,
+    ) -> Result<Self, CoreError> {
+        let target: SocketAddr = format!("{ip}:{port}")
             .parse()
             .map_err(|e| CoreError::Other(format!("Invalid MAVLink target {ip}: {e}")))?;
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
@@ -254,6 +262,30 @@ impl DeviceConnection {
         }
     }
 
+    async fn request_param_index(&mut self, index: u16) -> Result<ParamValue, CoreError> {
+        self.send_message(MavMessage::PARAM_EXT_REQUEST_READ(
+            PARAM_EXT_REQUEST_READ_DATA {
+                target_system: TARGET_SYSTEM_BROADCAST,
+                target_component: TARGET_COMPONENT_BROADCAST,
+                param_id: CharArray::<16>::from(""),
+                param_index: i16::try_from(index).map_err(|_| {
+                    CoreError::Other(format!("Parameter index {index} exceeds MAVLink range"))
+                })?,
+            },
+        ))
+        .await?;
+
+        let deadline = Instant::now() + self.timeout;
+        loop {
+            let message = self.recv_until(deadline).await?;
+            if let MavMessage::PARAM_EXT_VALUE(value) = message {
+                if value.param_index == index {
+                    return Ok(ParamValue::from(value));
+                }
+            }
+        }
+    }
+
     async fn request_param_list(&mut self) -> Result<Vec<ParamValue>, CoreError> {
         self.send_message(MavMessage::PARAM_EXT_REQUEST_LIST(
             PARAM_EXT_REQUEST_LIST_DATA {
@@ -292,6 +324,41 @@ impl DeviceConnection {
                 Err(CoreError::Other(message)) if message.contains("timed out") => break,
                 Err(err) => return Err(err),
             }
+        }
+
+        let expected_count = expected_count.ok_or_else(|| {
+            CoreError::Device(DeviceError::InvalidResponse {
+                ip: self.ip.clone(),
+                message: "Parameter list response did not advertise a count".to_string(),
+            })
+        })?;
+
+        if values.len() < expected_count {
+            let missing_indices = (0..expected_count)
+                .filter_map(|index| {
+                    let index = u16::try_from(index).ok()?;
+                    (!values.contains_key(&index)).then_some(index)
+                })
+                .collect::<Vec<_>>();
+
+            for index in missing_indices {
+                let value = self.request_param_index(index).await?;
+                values.insert(index, value);
+            }
+        }
+
+        if values.len() < expected_count {
+            let missing = (0..expected_count)
+                .filter_map(|index| {
+                    let index = u16::try_from(index).ok()?;
+                    (!values.contains_key(&index)).then_some(index.to_string())
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(CoreError::Device(DeviceError::InvalidResponse {
+                ip: self.ip.clone(),
+                message: format!("Incomplete parameter list; missing indices: {missing}"),
+            }));
         }
 
         Ok(values.into_values().collect())
@@ -635,4 +702,103 @@ fn token_after<'a>(tokens: &'a [String], key: &str) -> Option<&'a str> {
 
 fn char_array_to_string<const N: usize>(value: &CharArray<N>) -> String {
     value.to_str().unwrap_or("").to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn encode_message(message: MavMessage) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        write_v2_msg(
+            &mut bytes,
+            MavHeader {
+                system_id: 1,
+                component_id: 1,
+                sequence: 0,
+            },
+            &message,
+        )
+        .unwrap();
+        bytes
+    }
+
+    fn param_value(index: u16, count: u16, id: &str, value: &str) -> MavMessage {
+        MavMessage::PARAM_EXT_VALUE(PARAM_EXT_VALUE_DATA {
+            param_count: count,
+            param_index: index,
+            param_id: CharArray::<16>::from(id),
+            param_value: CharArray::<128>::from(value),
+            param_type: MavParamExtType::MAV_PARAM_EXT_TYPE_CUSTOM,
+        })
+    }
+
+    #[test]
+    fn parse_datagram_decodes_mavlink_frame() {
+        let bytes = encode_message(param_value(7, 8, "WIFI_GCS_IP", "192.168.100.100"));
+        let message = parse_datagram(&bytes).unwrap();
+
+        let MavMessage::PARAM_EXT_VALUE(value) = message else {
+            panic!("expected PARAM_EXT_VALUE");
+        };
+        assert_eq!(value.param_index, 7);
+        assert_eq!(char_array_to_string(&value.param_id), "WIFI_GCS_IP");
+        assert_eq!(char_array_to_string(&value.param_value), "192.168.100.100");
+    }
+
+    #[tokio::test]
+    async fn request_param_list_fetches_missing_indices() {
+        let server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let port = server.local_addr().unwrap().port();
+
+        let server_task = tokio::spawn(async move {
+            let mut buf = [0u8; 1500];
+            let (len, peer) = server.recv_from(&mut buf).await.unwrap();
+            assert!(matches!(
+                parse_datagram(&buf[..len]).unwrap(),
+                MavMessage::PARAM_EXT_REQUEST_LIST(_)
+            ));
+
+            server
+                .send_to(&encode_message(param_value(0, 3, "WIFI_MODE", "1")), peer)
+                .await
+                .unwrap();
+            server
+                .send_to(
+                    &encode_message(param_value(2, 3, "WIFI_SSID_ST", "lab")),
+                    peer,
+                )
+                .await
+                .unwrap();
+
+            let (len, peer) = server.recv_from(&mut buf).await.unwrap();
+            match parse_datagram(&buf[..len]).unwrap() {
+                MavMessage::PARAM_EXT_REQUEST_READ(request) => {
+                    assert_eq!(request.param_index, 1);
+                }
+                other => panic!("expected PARAM_EXT_REQUEST_READ, got {other:?}"),
+            }
+
+            server
+                .send_to(
+                    &encode_message(param_value(1, 3, "WIFI_SSID_AP", "rtls")),
+                    peer,
+                )
+                .await
+                .unwrap();
+        });
+
+        let mut conn =
+            DeviceConnection::connect_to_port("127.0.0.1", port, Duration::from_millis(1500))
+                .await
+                .unwrap();
+        let values = conn.request_param_list().await.unwrap();
+        let ids = values
+            .iter()
+            .map(|value| value.id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec!["WIFI_MODE", "WIFI_SSID_AP", "WIFI_SSID_ST"]);
+
+        server_task.await.unwrap();
+    }
 }

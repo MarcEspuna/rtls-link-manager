@@ -95,51 +95,6 @@ mod tests {
     use crate::types::DeviceRole;
 
     #[test]
-    fn test_parse_heartbeat() {
-        let json = r#"{
-            "id": "device1",
-            "role": "tag_tdoa",
-            "mac": "AA:BB:CC:DD:EE:FF",
-            "uwb_short": "1",
-            "mav_sysid": 1,
-            "fw": "1.0.0",
-            "sending_pos": true,
-            "anchors_seen": 3
-        }"#;
-
-        let device = parse_heartbeat(json.as_bytes(), "192.168.1.100".to_string()).unwrap();
-
-        assert_eq!(device.ip, "192.168.1.100");
-        assert_eq!(device.id, "device1");
-        assert_eq!(device.role, DeviceRole::TagTdoa);
-        assert_eq!(device.mac, "AA:BB:CC:DD:EE:FF");
-        assert_eq!(device.uwb_short, "1");
-        assert_eq!(device.mav_sys_id, 1);
-        assert_eq!(device.firmware, "1.0.0");
-        assert_eq!(device.sending_pos, Some(true));
-        assert_eq!(device.anchors_seen, Some(3));
-    }
-
-    #[test]
-    fn test_parse_minimal_heartbeat() {
-        let json = r#"{"id": "test", "role": "anchor_tdoa"}"#;
-
-        let device = parse_heartbeat(json.as_bytes(), "10.0.0.1".to_string()).unwrap();
-
-        assert_eq!(device.ip, "10.0.0.1");
-        assert_eq!(device.id, "test");
-        assert_eq!(device.role, DeviceRole::AnchorTdoa);
-        assert_eq!(device.sending_pos, None);
-    }
-
-    #[test]
-    fn test_parse_heartbeat_invalid_json() {
-        let invalid = b"not valid json";
-        let result = parse_heartbeat(invalid, "1.2.3.4".to_string());
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_prune_stale_devices() {
         let mut devices: HashMap<String, (Device, Instant)> = HashMap::new();
 
@@ -216,67 +171,5 @@ mod tests {
         assert_eq!(devices.len(), 1);
         assert!(devices.contains_key("192.168.1.1"));
         assert!(!devices.contains_key("192.168.1.2"));
-    }
-
-    #[test]
-    fn test_all_device_roles() {
-        let roles = [
-            ("anchor", DeviceRole::Unknown),
-            ("tag", DeviceRole::Unknown),
-            ("anchor_tdoa", DeviceRole::AnchorTdoa),
-            ("tag_tdoa", DeviceRole::TagTdoa),
-            ("calibration", DeviceRole::Unknown),
-            ("unknown_role", DeviceRole::Unknown),
-        ];
-
-        for (role_str, expected_role) in roles {
-            let json = format!(r#"{{"id": "test", "role": "{}"}}"#, role_str);
-            let device = parse_heartbeat(json.as_bytes(), "1.1.1.1".to_string()).unwrap();
-            assert_eq!(device.role, expected_role, "Failed for role: {}", role_str);
-        }
-    }
-
-    #[test]
-    fn test_parse_heartbeat_with_dynamic_anchors() {
-        let json = r#"{
-            "id": "tag1",
-            "role": "tag_tdoa",
-            "mac": "AA:BB:CC:DD:EE:FF",
-            "uwb_short": "1",
-            "mav_sysid": 1,
-            "fw": "1.0.0",
-            "dyn_anchors": [
-                {"id": 0, "x": 0.00, "y": 0.00, "z": -2.00},
-                {"id": 1, "x": 5.00, "y": 0.00, "z": -2.00},
-                {"id": 2, "x": 5.00, "y": 3.00, "z": -2.00},
-                {"id": 3, "x": 0.00, "y": 3.00, "z": -2.00}
-            ]
-        }"#;
-
-        let device = parse_heartbeat(json.as_bytes(), "192.168.1.100".to_string()).unwrap();
-
-        assert_eq!(device.role, DeviceRole::TagTdoa);
-        assert!(device.dynamic_anchors.is_some());
-
-        let anchors = device.dynamic_anchors.unwrap();
-        assert_eq!(anchors.len(), 4);
-        assert_eq!(anchors[0].id, 0);
-        assert_eq!(anchors[0].x, 0.0);
-        assert_eq!(anchors[0].y, 0.0);
-        assert_eq!(anchors[0].z, -2.0);
-        assert_eq!(anchors[1].id, 1);
-        assert_eq!(anchors[1].x, 5.0);
-        assert_eq!(anchors[3].id, 3);
-        assert_eq!(anchors[3].y, 3.0);
-    }
-
-    #[test]
-    fn test_parse_heartbeat_without_dynamic_anchors() {
-        let json = r#"{"id": "anchor1", "role": "anchor_tdoa"}"#;
-
-        let device = parse_heartbeat(json.as_bytes(), "10.0.0.1".to_string()).unwrap();
-
-        assert_eq!(device.role, DeviceRole::AnchorTdoa);
-        assert!(device.dynamic_anchors.is_none());
     }
 }

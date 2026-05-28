@@ -156,20 +156,6 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
-    if let Some(v) = config.wifi.enable_mavlink_management {
-        params.push((
-            "wifi".to_string(),
-            "enableMavlinkManagement".to_string(),
-            v.to_string(),
-        ));
-    }
-    if let Some(v) = config.wifi.mavlink_management_port {
-        params.push((
-            "wifi".to_string(),
-            "mavlinkManagementPort".to_string(),
-            v.to_string(),
-        ));
-    }
     if let Some(v) = config.wifi.log_udp_port {
         params.push(("wifi".to_string(), "logUdpPort".to_string(), v.to_string()));
     }
@@ -378,13 +364,8 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
-    if let Some(v) = config.uwb.tdoa_matcher_policy {
-        params.push((
-            "uwb".to_string(),
-            "tdoaMatcherPolicy".to_string(),
-            v.to_string(),
-        ));
-    }
+    // ESP32S3-only; direct edits may still use it, but bulk config uploads must
+    // not fail on ESP32 devices that do not advertise this parameter.
     // Dynamic anchor positioning (TDoA tags only)
     if let Some(v) = config.uwb.dynamic_anchor_pos_enabled {
         params.push((
@@ -506,8 +487,6 @@ mod tests {
                 udp_port: Some(14550),
                 enable_web_server: Some(1),
                 enable_uart_bridge: Some(1),
-                enable_mavlink_management: Some(1),
-                mavlink_management_port: Some(3333),
                 log_udp_port: None,
                 log_serial_enabled: None,
                 log_udp_enabled: None,
@@ -630,9 +609,9 @@ mod tests {
         assert!(params.iter().any(|(g, n, v)| {
             g == "uwb" && n == "rtlsBeaconTdoaPhysicalGuardMarginM" && v == "1"
         }));
-        assert!(params
+        assert!(!params
             .iter()
-            .any(|(g, n, v)| g == "uwb" && n == "tdoaMatcherPolicy" && v == "1"));
+            .any(|(g, n, _)| g == "uwb" && n == "tdoaMatcherPolicy"));
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "tdoaAnchorTelemetryEnable" && v == "1"));

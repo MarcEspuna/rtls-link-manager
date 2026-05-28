@@ -25,7 +25,7 @@ export const Commands = {
   toggleLed: () => 'toggle-led2',
   getLedState: () => 'get-led2-state',
   reboot: () => 'reboot',
-  start: () => 'start',
+  start: () => 'write -group uwb -name uwbEnable -data "1"',
 
   // System info
   getVersion: () => 'version',

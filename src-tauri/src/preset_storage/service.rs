@@ -87,8 +87,6 @@ mod tests {
                     udp_port: None,
                     enable_web_server: None,
                     enable_uart_bridge: None,
-                    enable_mavlink_management: None,
-                    mavlink_management_port: None,
                     log_udp_port: None,
                     log_serial_enabled: None,
                     log_udp_enabled: None,

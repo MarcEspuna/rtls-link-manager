@@ -119,7 +119,7 @@ impl Commands {
 
     /// Start positioning
     pub fn start() -> &'static str {
-        "start"
+        "write -group uwb -name uwbEnable -data \"1\""
     }
 
     // ==================== System info commands ====================
