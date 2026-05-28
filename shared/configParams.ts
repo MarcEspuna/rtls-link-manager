@@ -54,6 +54,9 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.uwb.mavlinkTargetSystemId !== undefined) params.push(['uwb', 'mavlinkTargetSystemId', String(config.uwb.mavlinkTargetSystemId)]);
     if (config.uwb.outputBackend !== undefined) params.push(['uwb', 'outputBackend', String(config.uwb.outputBackend)]);
     if (config.uwb.rtlsBeaconAgeBiasMs !== undefined) params.push(['uwb', 'rtlsBeaconAgeBiasMs', String(config.uwb.rtlsBeaconAgeBiasMs)]);
+    if (config.uwb.rtlsBeaconTdoaSigmaFloorM !== undefined) params.push(['uwb', 'rtlsBeaconTdoaSigmaFloorM', String(config.uwb.rtlsBeaconTdoaSigmaFloorM)]);
+    if (config.uwb.rtlsBeaconTdoaPhysicalGuardEnable !== undefined) params.push(['uwb', 'rtlsBeaconTdoaPhysicalGuardEnable', String(config.uwb.rtlsBeaconTdoaPhysicalGuardEnable)]);
+    if (config.uwb.rtlsBeaconTdoaPhysicalGuardMarginM !== undefined) params.push(['uwb', 'rtlsBeaconTdoaPhysicalGuardMarginM', String(config.uwb.rtlsBeaconTdoaPhysicalGuardMarginM)]);
     if (config.uwb.rotationDegrees !== undefined) params.push(['uwb', 'rotationDegrees', String(config.uwb.rotationDegrees)]);
     if (config.uwb.zCalcMode !== undefined) params.push(['uwb', 'zCalcMode', String(config.uwb.zCalcMode)]);
     if (config.uwb.rfForwardEnable !== undefined) params.push(['uwb', 'rfForwardEnable', String(config.uwb.rfForwardEnable)]);
@@ -70,6 +73,10 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     // TDoA TDMA schedule (TDoA anchors only, expert mode)
     if (config.uwb.tdoaSlotCount !== undefined) params.push(['uwb', 'tdoaSlotCount', String(config.uwb.tdoaSlotCount)]);
     if (config.uwb.tdoaSlotDurationUs !== undefined) params.push(['uwb', 'tdoaSlotDurationUs', String(config.uwb.tdoaSlotDurationUs)]);
+    if (config.uwb.tdoaAnchorTelemetryEnable !== undefined) params.push(['uwb', 'tdoaAnchorTelemetryEnable', String(config.uwb.tdoaAnchorTelemetryEnable)]);
+    if (config.uwb.tdoaAnchorTelemetryIntervalMs !== undefined) params.push(['uwb', 'tdoaAnchorTelemetryIntervalMs', String(config.uwb.tdoaAnchorTelemetryIntervalMs)]);
+    if (config.uwb.tdoaAnchorTelemetryPort !== undefined) params.push(['uwb', 'tdoaAnchorTelemetryPort', String(config.uwb.tdoaAnchorTelemetryPort)]);
+    if (config.uwb.tdoaMatcherPolicy !== undefined) params.push(['uwb', 'tdoaMatcherPolicy', String(config.uwb.tdoaMatcherPolicy)]);
     // Dynamic anchor positioning (TDoA tags only)
     if (config.uwb.dynamicAnchorPosEnabled !== undefined) params.push(['uwb', 'dynamicAnchorPosEnabled', String(config.uwb.dynamicAnchorPosEnabled)]);
     if (config.uwb.anchorLayout !== undefined) params.push(['uwb', 'anchorLayout', String(config.uwb.anchorLayout)]);

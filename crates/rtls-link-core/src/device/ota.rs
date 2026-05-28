@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 
 use crate::error::{CoreError, DeviceError};
 
@@ -17,7 +17,8 @@ const CONNECT_TIMEOUT_SECS: u64 = 10;
 const UPLOAD_TIMEOUT_SECS: u64 = 120;
 const WRITE_TIMEOUT_SECS: u64 = 20;
 const RESPONSE_TIMEOUT_SECS: u64 = 10;
-const UPLOAD_CHUNK_SIZE: usize = 4096;
+const UPLOAD_CHUNK_SIZE: usize = 1024;
+const UPLOAD_CHUNK_PAUSE_MS: u64 = 2;
 
 /// Trait for receiving OTA progress updates.
 ///
@@ -164,6 +165,7 @@ async fn upload_firmware_data(
             if let Some(handler) = progress {
                 handler.on_progress(ip, sent, total);
             }
+            sleep(Duration::from_millis(UPLOAD_CHUNK_PAUSE_MS)).await;
             tokio::task::yield_now().await;
         }
 

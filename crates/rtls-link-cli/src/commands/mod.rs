@@ -1,5 +1,6 @@
 //! Command implementations.
 
+pub mod anchor_telemetry;
 pub mod bulk;
 pub mod calibrate;
 pub mod cmd;
@@ -10,6 +11,7 @@ pub mod ota;
 pub mod preset;
 pub mod status;
 
+pub use anchor_telemetry::run_anchor_telemetry;
 pub use bulk::run_bulk;
 pub use calibrate::run_calibrate;
 pub use cmd::run_cmd;

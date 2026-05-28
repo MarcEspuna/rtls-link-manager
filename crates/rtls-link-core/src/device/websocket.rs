@@ -10,7 +10,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, Web
 
 use crate::error::{CoreError, DeviceError};
 use crate::protocol::binary::decode_command_frame;
-use crate::protocol::commands::is_json_command;
+use crate::protocol::commands::is_structured_response_command;
 use crate::protocol::response::is_error_response;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,7 +26,7 @@ fn parse_command_response(
     raw: String,
     device_ip: &str,
 ) -> Result<DeviceCommandResponse, CoreError> {
-    if is_json_command(command) {
+    if is_structured_response_command(command) {
         let json: serde_json::Value =
             crate::protocol::response::parse_json_response(&raw, device_ip)
                 .map_err(CoreError::from)?;

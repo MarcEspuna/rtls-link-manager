@@ -3,7 +3,11 @@
 //! These commands are sent over WebSocket to devices at ws://<ip>/ws
 
 /// Commands that return structured responses.
-pub const JSON_COMMANDS: &[&str] = &[
+///
+/// These commands may be returned by device-side binary frames and decoded into
+/// JSON by the host. The name intentionally describes the host-facing behavior
+/// without implying that the firmware builds JSON strings.
+pub const STRUCTURED_RESPONSE_COMMANDS: &[&str] = &[
     "backup-config",
     "list-configs",
     "save-config-as",
@@ -14,11 +18,14 @@ pub const JSON_COMMANDS: &[&str] = &[
     "get-led2-state",
     "firmware-info",
     "tdoa-distances",
+    "tdoa-anchor-stats",
 ];
 
 /// Check if a command is expected to return a structured response.
-pub fn is_json_command(cmd: &str) -> bool {
-    JSON_COMMANDS.iter().any(|c| cmd.starts_with(c))
+pub fn is_structured_response_command(cmd: &str) -> bool {
+    STRUCTURED_RESPONSE_COMMANDS
+        .iter()
+        .any(|c| cmd.starts_with(c))
 }
 
 /// Command builders for device protocol
@@ -133,6 +140,11 @@ impl Commands {
     pub fn tdoa_distances() -> &'static str {
         "tdoa-distances"
     }
+
+    /// Get TDoA anchor TDMA health and scheduling counters.
+    pub fn tdoa_anchor_stats() -> &'static str {
+        "tdoa-anchor-stats"
+    }
 }
 
 #[cfg(test)]
@@ -174,13 +186,14 @@ mod tests {
     }
 
     #[test]
-    fn test_is_json_command() {
-        assert!(is_json_command("backup-config"));
-        assert!(is_json_command("list-configs"));
-        assert!(is_json_command("save-config-as -name test"));
-        assert!(is_json_command("tdoa-distances"));
-        assert!(!is_json_command("version"));
-        assert!(!is_json_command("reboot"));
-        assert!(!is_json_command("save-config"));
+    fn test_is_structured_response_command() {
+        assert!(is_structured_response_command("backup-config"));
+        assert!(is_structured_response_command("list-configs"));
+        assert!(is_structured_response_command("save-config-as -name test"));
+        assert!(is_structured_response_command("tdoa-distances"));
+        assert!(is_structured_response_command("tdoa-anchor-stats"));
+        assert!(!is_structured_response_command("version"));
+        assert!(!is_structured_response_command("reboot"));
+        assert!(!is_structured_response_command("save-config"));
     }
 }

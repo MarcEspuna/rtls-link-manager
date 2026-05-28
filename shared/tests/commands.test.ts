@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Commands, isJsonCommand } from '../commands.js';
+import { Commands, isStructuredResponseCommand } from '../commands.js';
 
 describe('Commands', () => {
   it('builds readParam command correctly', () => {
@@ -16,12 +16,17 @@ describe('Commands', () => {
     expect(Commands.writeParam('uwb', 'mode', 4))
       .toBe('write -group uwb -name mode -data "4"');
   });
+
+  it('builds anchor stats command', () => {
+    expect(Commands.tdoaAnchorStats()).toBe('tdoa-anchor-stats');
+  });
 });
 
-describe('isJsonCommand', () => {
-  it('identifies JSON commands', () => {
-    expect(isJsonCommand('backup-config')).toBe(true);
-    expect(isJsonCommand('toggle-led2')).toBe(true);
-    expect(isJsonCommand('readall all')).toBe(false);
+describe('isStructuredResponseCommand', () => {
+  it('identifies structured response commands', () => {
+    expect(isStructuredResponseCommand('backup-config')).toBe(true);
+    expect(isStructuredResponseCommand('toggle-led2')).toBe(true);
+    expect(isStructuredResponseCommand('tdoa-anchor-stats')).toBe(true);
+    expect(isStructuredResponseCommand('readall all')).toBe(false);
   });
 });

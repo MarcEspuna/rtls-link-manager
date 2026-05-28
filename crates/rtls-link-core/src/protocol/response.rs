@@ -92,24 +92,8 @@ impl ParsedResponse {
 pub fn is_error_response(response: &str) -> Option<String> {
     let lower = response.to_lowercase();
 
-    if lower.contains("error:") {
-        if let Some(pos) = lower.find("error:") {
-            let msg = response[pos + 6..].trim();
-            return Some(msg.to_string());
-        }
-    }
-
-    let looks_like_text_error = (lower.contains("error")
-        || lower.contains("fail")
-        || lower.contains("invalid")
-        || lower.contains("not found"))
-        && !lower.contains("success");
-
-    if looks_like_text_error {
-        return Some(response.trim().to_string());
-    }
-
-    // Check for JSON error response
+    // Check structured responses before text heuristics. Decoded binary frames
+    // can contain benign field names like `invalidDistance` or `rxFailed`.
     let obj_start = response.find('{');
     let arr_start = response.find('[');
     let start = match (obj_start, arr_start) {
@@ -130,9 +114,29 @@ pub fn is_error_response(response: &str) -> Option<String> {
                 }
             }
             if let Some(error) = json.get("error") {
-                return Some(error.as_str().unwrap_or("Unknown error").to_string());
+                if !error.is_null() {
+                    return Some(error.as_str().unwrap_or("Unknown error").to_string());
+                }
             }
+            return None;
         }
+    }
+
+    if lower.contains("error:") {
+        if let Some(pos) = lower.find("error:") {
+            let msg = response[pos + 6..].trim();
+            return Some(msg.to_string());
+        }
+    }
+
+    let looks_like_text_error = (lower.contains("error")
+        || lower.contains("fail")
+        || lower.contains("invalid")
+        || lower.contains("not found"))
+        && !lower.contains("success");
+
+    if looks_like_text_error {
+        return Some(response.trim().to_string());
     }
 
     None
@@ -213,6 +217,8 @@ mod tests {
         assert!(is_error_response("Fail to write parameter").is_some());
         assert!(is_error_response("Not found").is_some());
         assert!(is_error_response(r#"{"success": false, "message": "Invalid param"}"#).is_some());
+        assert!(is_error_response(r#"{"success": true, "error": null}"#).is_none());
+        assert!(is_error_response(r#"{"invalidDistance": 1, "rxFailed": 2}"#).is_none());
         assert!(is_error_response("OK - success").is_none());
         assert!(is_error_response(r#"{"success": true}"#).is_none());
     }

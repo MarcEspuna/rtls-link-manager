@@ -43,6 +43,26 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       }
     }
 
+    if (config.uwb.tdoaAnchorTelemetryEnable !== undefined &&
+      config.uwb.tdoaAnchorTelemetryEnable !== 0 &&
+      config.uwb.tdoaAnchorTelemetryEnable !== 1) {
+      errors.push('TDoA anchor telemetry enable must be 0 or 1');
+    }
+
+    if (config.uwb.tdoaAnchorTelemetryIntervalMs !== undefined) {
+      const v = Number(config.uwb.tdoaAnchorTelemetryIntervalMs);
+      if (Number.isNaN(v) || !Number.isInteger(v) || v < 250 || v > 60000) {
+        errors.push('TDoA anchor telemetry interval must be an integer in 250-60000 ms');
+      }
+    }
+
+    if (config.uwb.tdoaAnchorTelemetryPort !== undefined) {
+      const v = Number(config.uwb.tdoaAnchorTelemetryPort);
+      if (Number.isNaN(v) || !Number.isInteger(v) || v < 1 || v > 65535) {
+        errors.push('TDoA anchor telemetry port must be an integer in 1-65535');
+      }
+    }
+
     if (config.uwb.rfForwardEnable !== undefined && config.uwb.rfForwardEnable !== 0 && config.uwb.rfForwardEnable !== 1) {
       errors.push('Rangefinder forwarding enable must be 0 or 1');
     }
@@ -88,6 +108,32 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       if (Number.isNaN(v) || !Number.isInteger(v) || v < 0 || v > 20) {
         errors.push('RTLSLink beacon age bias must be an integer in 0-20 ms');
       }
+    }
+
+    if (config.uwb.rtlsBeaconTdoaSigmaFloorM !== undefined) {
+      const v = Number(config.uwb.rtlsBeaconTdoaSigmaFloorM);
+      if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
+        errors.push('RTLSLink beacon TDoA sigma floor must be >= 0 m');
+      }
+    }
+
+    if (config.uwb.rtlsBeaconTdoaPhysicalGuardEnable !== undefined &&
+      config.uwb.rtlsBeaconTdoaPhysicalGuardEnable !== 0 &&
+      config.uwb.rtlsBeaconTdoaPhysicalGuardEnable !== 1) {
+      errors.push('RTLSLink beacon TDoA physical guard enable must be 0 or 1');
+    }
+
+    if (config.uwb.rtlsBeaconTdoaPhysicalGuardMarginM !== undefined) {
+      const v = Number(config.uwb.rtlsBeaconTdoaPhysicalGuardMarginM);
+      if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
+        errors.push('RTLSLink beacon TDoA physical guard margin must be >= 0 m');
+      }
+    }
+
+    if (config.uwb.tdoaMatcherPolicy !== undefined &&
+      config.uwb.tdoaMatcherPolicy !== 0 &&
+      config.uwb.tdoaMatcherPolicy !== 1) {
+      errors.push('TDoA matcher policy must be 0 or 1');
     }
 
     if (config.uwb.rmseThreshold !== undefined) {

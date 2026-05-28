@@ -33,10 +33,13 @@ export const Commands = {
 
   // Diagnostics / calibration
   tdoaDistances: () => 'tdoa-distances',
+  tdoaAnchorStats: () => 'tdoa-anchor-stats',
 } as const;
 
 // Commands that return structured responses.
-export const JSON_COMMANDS = [
+// Device firmware may answer these with binary frames; the host decodes them
+// into structured values for the UI/CLI.
+export const STRUCTURED_RESPONSE_COMMANDS = [
   'backup-config',
   'list-configs',
   'save-config-as',
@@ -47,8 +50,9 @@ export const JSON_COMMANDS = [
   'get-led2-state',
   'firmware-info',
   'tdoa-distances',
+  'tdoa-anchor-stats',
 ];
 
-export function isJsonCommand(cmd: string): boolean {
-  return JSON_COMMANDS.some(c => cmd.startsWith(c));
+export function isStructuredResponseCommand(cmd: string): boolean {
+  return STRUCTURED_RESPONSE_COMMANDS.some(c => cmd.startsWith(c));
 }
