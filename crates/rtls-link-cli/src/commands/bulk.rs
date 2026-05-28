@@ -8,7 +8,7 @@ use crate::error::CliError;
 use crate::output::get_formatter;
 use crate::types::{Device, DeviceRole};
 
-use rtls_link_core::device::websocket::BatchSender;
+use rtls_link_core::device::mavlink::BatchSender;
 use rtls_link_core::protocol::commands::Commands;
 
 /// Run bulk command
@@ -59,13 +59,7 @@ async fn run_bulk_command(
         .map(|(ip, result)| {
             let success = result.is_ok();
             let message = match result {
-                Ok(response) => {
-                    if response.len() > 100 {
-                        format!("{}...", &response[..100])
-                    } else {
-                        response.trim().to_string()
-                    }
-                }
+                Ok(response) => format_bulk_message(&response, json),
                 Err(e) => e.to_string(),
             };
             (ip, success, message)
@@ -117,13 +111,7 @@ async fn run_bulk_raw_command(
         .map(|(ip, result)| {
             let success = result.is_ok();
             let message = match result {
-                Ok(response) => {
-                    if response.len() > 100 {
-                        format!("{}...", &response[..100])
-                    } else {
-                        response.trim().to_string()
-                    }
-                }
+                Ok(response) => format_bulk_message(&response, json),
                 Err(e) => e.to_string(),
             };
             (ip, success, message)
@@ -141,6 +129,14 @@ async fn run_bulk_raw_command(
     }
 
     Ok(())
+}
+
+fn format_bulk_message(response: &str, json: bool) -> String {
+    if json || response.len() <= 100 {
+        return response.trim().to_string();
+    }
+    let preview: String = response.chars().take(100).collect();
+    format!("{}...", preview)
 }
 
 async fn get_target_ips(target: &BulkTargetArgs) -> Result<Vec<String>, CliError> {

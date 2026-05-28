@@ -8,7 +8,7 @@ use crate::error::{CliError, ConfigError};
 use crate::output::get_formatter;
 use crate::types::{Device, DeviceConfig, DeviceRole};
 
-use rtls_link_core::device::websocket::{send_command, DeviceConnection};
+use rtls_link_core::device::mavlink::{send_command, DeviceConnection};
 use rtls_link_core::protocol::commands::Commands;
 use rtls_link_core::protocol::config_params::{config_to_params, device_config_from_backup_value};
 use rtls_link_core::protocol::response::parse_json_response;

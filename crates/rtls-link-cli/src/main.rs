@@ -45,6 +45,9 @@ async fn run(cli: Cli) -> Result<(), CliError> {
         }
         Commands::Ota(args) => commands::run_ota(args, cli.json, cli.strict).await,
         Commands::Logs(args) => commands::run_logs(args, cli.json).await,
+        Commands::AnchorTelemetry(args) => {
+            commands::run_anchor_telemetry(args, cli.timeout, cli.json, cli.strict).await
+        }
         Commands::Cmd(args) => commands::run_cmd(args, cli.timeout, cli.json).await,
         Commands::Bulk(args) => commands::run_bulk(args, cli.timeout, cli.json, cli.strict).await,
         Commands::Calibrate(args) => commands::run_calibrate(args, cli.timeout, cli.json).await,

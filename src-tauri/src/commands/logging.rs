@@ -37,9 +37,7 @@ pub async fn stop_log_stream(
 
 /// Get list of devices currently being streamed
 #[tauri::command]
-pub async fn get_active_log_streams(
-    state: State<'_, AppState>,
-) -> Result<Vec<String>, AppError> {
+pub async fn get_active_log_streams(state: State<'_, AppState>) -> Result<Vec<String>, AppError> {
     let streams = state.log_streams.read().await;
     let active: Vec<String> = streams
         .active_streams

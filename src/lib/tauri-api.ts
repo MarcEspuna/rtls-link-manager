@@ -185,7 +185,7 @@ export interface DeviceCommandResponse {
 }
 
 /**
- * Send a single WebSocket command to a device and return the response.
+ * Send a single UDP MAVLink command to a device and return the response.
  */
 export async function sendDeviceCommand(
   ip: string,
@@ -196,7 +196,7 @@ export async function sendDeviceCommand(
 }
 
 /**
- * Send multiple WebSocket commands to a device sequentially.
+ * Send multiple UDP MAVLink commands to a device sequentially.
  */
 export async function sendDeviceCommands(
   ip: string,

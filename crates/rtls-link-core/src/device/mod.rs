@@ -1,6 +1,6 @@
 //! Device communication layer.
 //!
-//! Provides WebSocket command sending and OTA firmware upload.
+//! Provides UDP MAVLink command sending and HTTP OTA firmware upload.
 
+pub mod mavlink;
 pub mod ota;
-pub mod websocket;

@@ -156,20 +156,6 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
-    if let Some(v) = config.wifi.enable_discovery {
-        params.push((
-            "wifi".to_string(),
-            "enableDiscovery".to_string(),
-            v.to_string(),
-        ));
-    }
-    if let Some(v) = config.wifi.discovery_port {
-        params.push((
-            "wifi".to_string(),
-            "discoveryPort".to_string(),
-            v.to_string(),
-        ));
-    }
     if let Some(v) = config.wifi.log_udp_port {
         params.push(("wifi".to_string(), "logUdpPort".to_string(), v.to_string()));
     }
@@ -240,12 +226,37 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
         ));
     }
     if let Some(v) = config.uwb.output_backend {
-        params.push(("uwb".to_string(), "outputBackend".to_string(), v.to_string()));
+        params.push((
+            "uwb".to_string(),
+            "outputBackend".to_string(),
+            v.to_string(),
+        ));
     }
     if let Some(v) = config.uwb.rtls_beacon_age_bias_ms {
         params.push((
             "uwb".to_string(),
             "rtlsBeaconAgeBiasMs".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.rtls_beacon_tdoa_sigma_floor_m {
+        params.push((
+            "uwb".to_string(),
+            "rtlsBeaconTdoaSigmaFloorM".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.rtls_beacon_tdoa_physical_guard_enable {
+        params.push((
+            "uwb".to_string(),
+            "rtlsBeaconTdoaPhysicalGuardEnable".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.rtls_beacon_tdoa_physical_guard_margin_m {
+        params.push((
+            "uwb".to_string(),
+            "rtlsBeaconTdoaPhysicalGuardMarginM".to_string(),
             v.to_string(),
         ));
     }
@@ -332,6 +343,29 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
+    if let Some(v) = config.uwb.tdoa_anchor_telemetry_enable {
+        params.push((
+            "uwb".to_string(),
+            "tdoaAnchorTelemetryEnable".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.tdoa_anchor_telemetry_interval_ms {
+        params.push((
+            "uwb".to_string(),
+            "tdoaAnchorTelemetryIntervalMs".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.tdoa_anchor_telemetry_port {
+        params.push((
+            "uwb".to_string(),
+            "tdoaAnchorTelemetryPort".to_string(),
+            v.to_string(),
+        ));
+    }
+    // ESP32S3-only; direct edits may still use it, but bulk config uploads must
+    // not fail on ESP32 devices that do not advertise this parameter.
     // Dynamic anchor positioning (TDoA tags only)
     if let Some(v) = config.uwb.dynamic_anchor_pos_enabled {
         params.push((
@@ -453,8 +487,6 @@ mod tests {
                 udp_port: Some(14550),
                 enable_web_server: Some(1),
                 enable_uart_bridge: Some(1),
-                enable_discovery: Some(1),
-                discovery_port: Some(3333),
                 log_udp_port: None,
                 log_serial_enabled: None,
                 log_udp_enabled: None,
@@ -484,6 +516,9 @@ mod tests {
                 mavlink_target_system_id: Some(1),
                 output_backend: Some(1),
                 rtls_beacon_age_bias_ms: Some(2),
+                rtls_beacon_tdoa_sigma_floor_m: Some(0.25),
+                rtls_beacon_tdoa_physical_guard_enable: Some(1),
+                rtls_beacon_tdoa_physical_guard_margin_m: Some(1.0),
                 rotation_degrees: Some(0.0),
                 z_calc_mode: Some(1),
                 rf_forward_enable: Some(1),
@@ -498,6 +533,10 @@ mod tests {
                 smart_power_enable: None,
                 tdoa_slot_count: None,
                 tdoa_slot_duration_us: None,
+                tdoa_anchor_telemetry_enable: Some(1),
+                tdoa_anchor_telemetry_interval_ms: Some(1000),
+                tdoa_anchor_telemetry_port: Some(3335),
+                tdoa_matcher_policy: Some(1),
                 dynamic_anchor_pos_enabled: None,
                 anchor_layout: None,
                 anchor_height: None,
@@ -561,6 +600,27 @@ mod tests {
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "rmseThreshold" && v == "0.8"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "rtlsBeaconTdoaSigmaFloorM" && v == "0.25"));
+        assert!(params.iter().any(|(g, n, v)| {
+            g == "uwb" && n == "rtlsBeaconTdoaPhysicalGuardEnable" && v == "1"
+        }));
+        assert!(params.iter().any(|(g, n, v)| {
+            g == "uwb" && n == "rtlsBeaconTdoaPhysicalGuardMarginM" && v == "1"
+        }));
+        assert!(!params
+            .iter()
+            .any(|(g, n, _)| g == "uwb" && n == "tdoaMatcherPolicy"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "tdoaAnchorTelemetryEnable" && v == "1"));
+        assert!(params.iter().any(|(g, n, v)| {
+            g == "uwb" && n == "tdoaAnchorTelemetryIntervalMs" && v == "1000"
+        }));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "tdoaAnchorTelemetryPort" && v == "3335"));
     }
 
     #[test]

@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use tokio::time::sleep;
 
-use crate::device::websocket::{send_command_with_retry, BatchSender};
+use crate::device::mavlink::{send_command_with_retry, BatchSender};
 use crate::discovery::service::{DiscoveryService, DISCOVERY_PORT};
 use crate::error::{CoreError, Result};
 use crate::protocol::commands::Commands;
