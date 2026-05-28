@@ -90,8 +90,43 @@ impl ParsedResponse {
 
 /// Check if a command response indicates an error
 pub fn is_error_response(response: &str) -> Option<String> {
-    let lower = response.to_lowercase();
+    // Check JSON first so successful ACKs like {"success":true,"error":null}
+    // are not misclassified by the text-level "error" checks below.
+    let obj_start = response.find('{');
+    let arr_start = response.find('[');
+    let start = match (obj_start, arr_start) {
+        (Some(o), Some(a)) => Some(o.min(a)),
+        (Some(o), None) => Some(o),
+        (None, Some(a)) => Some(a),
+        (None, None) => None,
+    };
 
+    if let Some(start) = start {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response[start..]) {
+            if json.get("success").and_then(|v| v.as_bool()) == Some(true) {
+                return None;
+            }
+            if json.get("success").and_then(|v| v.as_bool()) == Some(false) {
+                if let Some(msg) = json.get("message").or_else(|| json.get("error")) {
+                    return Some(msg.as_str().unwrap_or("Command failed").to_string());
+                }
+                return Some("Command failed".to_string());
+            }
+            if let Some(error) = json.get("error") {
+                if !error.is_null() {
+                    if let Some(message) = error.as_str() {
+                        if !message.trim().is_empty() {
+                            return Some(message.to_string());
+                        }
+                    } else {
+                        return Some(error.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    let lower = response.to_lowercase();
     if lower.contains("error:") {
         if let Some(pos) = lower.find("error:") {
             let msg = response[pos + 6..].trim();
@@ -107,32 +142,6 @@ pub fn is_error_response(response: &str) -> Option<String> {
 
     if looks_like_text_error {
         return Some(response.trim().to_string());
-    }
-
-    // Check for JSON error response
-    let obj_start = response.find('{');
-    let arr_start = response.find('[');
-    let start = match (obj_start, arr_start) {
-        (Some(o), Some(a)) => Some(o.min(a)),
-        (Some(o), None) => Some(o),
-        (None, Some(a)) => Some(a),
-        (None, None) => None,
-    };
-
-    if let Some(start) = start {
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&response[start..]) {
-            if let Some(success) = json.get("success") {
-                if success == false {
-                    if let Some(msg) = json.get("message").or_else(|| json.get("error")) {
-                        return Some(msg.as_str().unwrap_or("Unknown error").to_string());
-                    }
-                    return Some("Command failed".to_string());
-                }
-            }
-            if let Some(error) = json.get("error") {
-                return Some(error.as_str().unwrap_or("Unknown error").to_string());
-            }
-        }
     }
 
     None
@@ -215,6 +224,9 @@ mod tests {
         assert!(is_error_response(r#"{"success": false, "message": "Invalid param"}"#).is_some());
         assert!(is_error_response("OK - success").is_none());
         assert!(is_error_response(r#"{"success": true}"#).is_none());
+        assert!(
+            is_error_response(r#"{"success": true, "error": null, "message": "OK"}"#).is_none()
+        );
     }
 
     #[test]

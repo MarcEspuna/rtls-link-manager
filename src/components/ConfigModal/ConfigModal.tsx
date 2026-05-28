@@ -59,6 +59,23 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
   const findCommandError = (responses: string[] | null): string | null => {
     if (!responses) return 'No response from device';
     for (const response of responses) {
+      const jsonStart = response.search(/[\{\[]/);
+      if (jsonStart >= 0) {
+        try {
+          const parsed = JSON.parse(response.slice(jsonStart));
+          if (parsed?.success === true) {
+            continue;
+          }
+          if (parsed?.success === false) {
+            return parsed.message || parsed.error || 'Command failed';
+          }
+          if (parsed?.error !== undefined && parsed.error !== null && parsed.error !== '') {
+            return typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
+          }
+        } catch {
+          // Fall through to text matching for non-JSON command responses.
+        }
+      }
       if (/error|fail|invalid|not found/i.test(response)) {
         return response;
       }
