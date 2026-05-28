@@ -345,6 +345,8 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
             return Err("Anchor count must be positive when set".to_string());
         }
         return Err("Anchor geometry required when anchorCount is set".to_string());
+    } else if config.uwb.mode == 4 {
+        return Err("Anchor geometry required for TAG_TDOA configs".to_string());
     }
 
     if let Some(v) = config.uwb.origin_lat {
@@ -1202,6 +1204,29 @@ mod tests {
             config_to_params(&config).unwrap_err(),
             "Anchor count must be positive when set"
         );
+    }
+
+    #[test]
+    fn config_to_params_rejects_tag_config_without_anchor_geometry() {
+        let config = minimal_device_config(None, None);
+
+        assert_eq!(
+            config_to_params(&config).unwrap_err(),
+            "Anchor geometry required for TAG_TDOA configs"
+        );
+    }
+
+    #[test]
+    fn config_to_params_allows_anchor_mode_without_tag_geometry() {
+        let mut config = minimal_device_config(None, None);
+        config.uwb.mode = 3;
+
+        let params = config_to_params(&config).unwrap();
+
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "mode" && v == "3"));
+        assert!(!params.iter().any(|(_, n, _)| n == "anchorCount"));
     }
 
     #[test]

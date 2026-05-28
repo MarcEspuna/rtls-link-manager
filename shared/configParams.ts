@@ -68,6 +68,8 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
         throw new Error('Anchor count must be positive when set');
       }
       throw new Error('Anchor geometry required when anchorCount is set');
+    } else if (config.uwb.mode === 4) {
+      throw new Error('Anchor geometry required for TAG_TDOA configs');
     }
 
     if (config.uwb.originLat !== undefined) params.push(['uwb', 'originLat', String(config.uwb.originLat)]);

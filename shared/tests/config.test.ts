@@ -34,6 +34,21 @@ describe('validateConfig', () => {
     expect(result.errors).toContain('Anchor count must be positive when set');
   });
 
+  it('requires anchor geometry for TAG_TDOA configs', () => {
+    const result = validateConfig({
+      uwb: { mode: 4 } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Anchor geometry required for TAG_TDOA configs');
+  });
+
+  it('allows anchor-mode configs without tag anchor geometry', () => {
+    const result = validateConfig({
+      uwb: { mode: 3 } as any
+    });
+    expect(result.valid).toBe(true);
+  });
+
   it('rejects anchorCount that does not match provided geometry', () => {
     const result = validateConfig({
       uwb: {

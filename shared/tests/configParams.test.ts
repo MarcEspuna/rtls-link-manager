@@ -11,6 +11,10 @@ describe('configToParams', () => {
         mode: 4,
         uwbEnable: 0,
         devShortAddr: '1',
+        anchors: [
+          { id: '0', x: 0, y: 0, z: 0 },
+          { id: '1', x: 1, y: 0, z: 0 },
+        ],
         rfForwardEnable: 1,
         rfForwardSensorId: 7,
         rfForwardOrientation: 25,
@@ -98,6 +102,25 @@ describe('configToParams', () => {
       uwb: { mode: 4, anchorCount: 0 },
       app: {},
     })).toThrow('Anchor count must be positive when set');
+  });
+
+  it('requires anchor geometry for TAG_TDOA configs', () => {
+    expect(() => configToParams({
+      wifi: {},
+      uwb: { mode: 4 },
+      app: {},
+    })).toThrow('Anchor geometry required for TAG_TDOA configs');
+  });
+
+  it('allows anchor-mode configs without tag anchor geometry', () => {
+    const params = configToParams({
+      wifi: {},
+      uwb: { mode: 3 },
+      app: {},
+    });
+
+    expect(params).toContainEqual(['uwb', 'mode', '3']);
+    expect(params.some(([, name]) => name === 'anchorCount')).toBe(false);
   });
 
   it('rejects anchorCount that does not match provided geometry', () => {

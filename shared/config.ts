@@ -41,6 +41,10 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       errors.push('Anchor geometry required when anchorCount is set');
     }
 
+    if (config.uwb.mode === 4 && !config.uwb.anchors) {
+      errors.push('Anchor geometry required for TAG_TDOA configs');
+    }
+
     if (config.uwb.anchors) {
       const anchorError = validateAnchorList(config.uwb.anchors);
       if (anchorError) {
