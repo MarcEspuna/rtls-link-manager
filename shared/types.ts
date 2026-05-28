@@ -88,8 +88,8 @@ export interface WifiConfig {
   udpPort?: number;
   enableWebServer?: 0 | 1;
   enableUartBridge?: 0 | 1;
-  enableDiscovery?: 0 | 1;
-  discoveryPort?: number;
+  enableMavlinkManagement?: 0 | 1;
+  mavlinkManagementPort?: number;
   // Logging parameters
   logUdpPort?: number;      // UDP port for log streaming (default: 3334)
   logSerialEnabled?: 0 | 1; // Runtime: Serial logging enabled

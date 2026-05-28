@@ -6,7 +6,7 @@ use crate::cli::CmdArgs;
 use crate::error::CliError;
 use crate::output::get_formatter;
 
-use rtls_link_core::device::websocket::send_command;
+use rtls_link_core::device::mavlink::send_command;
 use rtls_link_core::protocol::commands::is_structured_response_command;
 
 /// Run the cmd command

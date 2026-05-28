@@ -184,8 +184,8 @@ cargo build --release -p rtls-link-cli
 | Service | Port | Description |
 |---------|------|-------------|
 | Vite Dev Server | 1420 | Development UI with HMR |
-| Device Discovery | 3333 | UDP broadcast listening |
-| Device WebSocket | 80 | Device communication (ws://{ip}/ws) |
+| MAVLink Management | 3333 | UDP discovery, parameters, telemetry, and commands |
+| HTTP OTA | 80 | Temporary firmware update endpoint |
 
 ### Config Storage Location
 
@@ -209,13 +209,13 @@ npm run test:run
 
 - Verify devices and manager are on the same network
 - Check that UDP port 3333 is not blocked by firewall
-- Ensure device discovery is enabled in device WiFi settings
+- Ensure MAVLink management is enabled in device WiFi settings
 
-### WebSocket connection fails
+### MAVLink command connection fails
 
 - Confirm device IP is reachable from manager host
-- Check that device web server is enabled
-- Verify no firewall blocking port 80
+- Check that MAVLink management is enabled in device WiFi settings
+- Verify no firewall blocking UDP port 3333
 
 ### Configuration not saving
 

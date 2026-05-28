@@ -9,8 +9,8 @@ interface UseDeviceCommandOptions {
 /**
  * React hook for sending commands to devices via the Tauri backend.
  *
- * Replaces useDeviceWebSocket — all device communication now goes through
- * the Rust backend instead of direct browser WebSocket connections.
+ * Replaces useDeviceUDP MAVLink — all device communication now goes through
+ * the Rust backend instead of direct browser UDP MAVLink connections.
  */
 export function useDeviceCommand(deviceIp: string, options: UseDeviceCommandOptions = {}) {
   const [loading, setLoading] = useState(false);
@@ -49,7 +49,7 @@ export function useDeviceCommand(deviceIp: string, options: UseDeviceCommandOpti
     }
   }, [deviceIp, timeoutMs]);
 
-  // No-op close for API compatibility with useDeviceWebSocket
+  // No-op close for API compatibility with useDeviceUDP MAVLink
   const close = useCallback(() => {}, []);
 
   return { sendCommand, sendCommands: sendCommandsBatch, loading, error, close };

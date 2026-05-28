@@ -1,9 +1,13 @@
 //! Heartbeat parsing and device pruning utilities.
 
 use crate::health::calculate_device_health;
-use crate::protocol::binary::decode_heartbeat;
+use crate::mavlink::rtlslink::{
+    MavMessage, RtlsDeviceRole, RtlsDeviceStatusFlags, RTLS_DEVICE_STATUS_DATA,
+};
+use crate::mavlink::{peek_reader::PeekReader, read_v2_msg};
 use crate::types::{Device, DeviceRole, DynamicAnchorPosition};
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::time::{Duration, Instant};
 
 /// Default TTL for devices (pruned if no heartbeat for this duration)
@@ -11,10 +15,11 @@ pub const DEVICE_TTL: Duration = Duration::from_secs(5);
 
 /// Parse a heartbeat packet into a Device struct.
 pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Error> {
-    let json: serde_json::Value = match decode_heartbeat(data) {
-        Ok(value) => value,
-        Err(_) => serde_json::from_slice(data)?,
-    };
+    if let Ok(device) = parse_mavlink_status(data, &ip) {
+        return Ok(device);
+    }
+
+    let json: serde_json::Value = serde_json::from_slice(data)?;
 
     // Parse optional dynamic anchor positions
     let dynamic_anchors = json["dyn_anchors"].as_array().map(|arr| {
@@ -59,6 +64,117 @@ pub fn parse_heartbeat(data: &[u8], ip: String) -> Result<Device, serde_json::Er
     };
     device.health = Some(calculate_device_health(&device));
     Ok(device)
+}
+
+fn parse_mavlink_status(data: &[u8], source_ip: &str) -> Result<Device, String> {
+    let cursor = Cursor::new(data);
+    let mut reader = PeekReader::new(cursor);
+    let (_, message) = read_v2_msg::<MavMessage, _>(&mut reader).map_err(|err| err.to_string())?;
+
+    match message {
+        MavMessage::RTLS_DEVICE_STATUS(status) => Ok(device_from_status(status, source_ip)),
+        _ => Err("Not an RTLS device status frame".to_string()),
+    }
+}
+
+fn device_from_status(status: RTLS_DEVICE_STATUS_DATA, source_ip: &str) -> Device {
+    let short_addr = status.short_addr.to_str().unwrap_or("0").to_string();
+    let device_type = status.device_type.to_str().unwrap_or("").to_string();
+    let dynamic_anchors = if status
+        .flags
+        .contains(RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_DYNAMIC_ANCHORS_ENABLED)
+    {
+        let count = usize::from(status.dynamic_anchor_count.min(4));
+        let anchors = (0..count)
+            .map(|index| DynamicAnchorPosition {
+                id: status.dynamic_anchor_id[index],
+                x: f64::from(status.dynamic_anchor_x_mm[index]) / 1000.0,
+                y: f64::from(status.dynamic_anchor_y_mm[index]) / 1000.0,
+                z: f64::from(status.dynamic_anchor_z_mm[index]) / 1000.0,
+            })
+            .collect::<Vec<_>>();
+        Some(anchors)
+    } else {
+        None
+    };
+
+    let mut device = Device {
+        ip: source_ip.to_string(),
+        id: if short_addr.is_empty() {
+            device_type
+        } else {
+            short_addr.clone()
+        },
+        role: match status.role {
+            RtlsDeviceRole::RTLS_DEVICE_ROLE_ANCHOR_TDOA => DeviceRole::AnchorTdoa,
+            RtlsDeviceRole::RTLS_DEVICE_ROLE_TAG_TDOA => DeviceRole::TagTdoa,
+            _ => DeviceRole::Unknown,
+        },
+        mac: format!(
+            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+            status.mac[0],
+            status.mac[1],
+            status.mac[2],
+            status.mac[3],
+            status.mac[4],
+            status.mac[5]
+        ),
+        uwb_short: short_addr,
+        mav_sys_id: status.mavlink_target_system,
+        firmware: status.firmware_version.to_str().unwrap_or("").to_string(),
+        online: Some(true),
+        last_seen: Some(chrono::Utc::now()),
+        sending_pos: Some(
+            status
+                .flags
+                .contains(RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_SENDING_POSITION),
+        ),
+        anchors_seen: Some(status.anchors_seen),
+        origin_sent: Some(
+            status
+                .flags
+                .contains(RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_ORIGIN_SENT),
+        ),
+        uwb_enabled: Some(
+            status
+                .flags
+                .contains(RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_UWB_ENABLED),
+        ),
+        rf_forward_enabled: Some(
+            status
+                .flags
+                .contains(RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_RF_FORWARD_ENABLED),
+        ),
+        rf_enabled: Some(
+            status
+                .flags
+                .contains(RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_RANGEFINDER_ENABLED),
+        ),
+        rf_healthy: Some(
+            status
+                .flags
+                .contains(RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_RANGEFINDER_HEALTHY),
+        ),
+        avg_rate_c_hz: Some(status.avg_rate_chz),
+        min_rate_c_hz: Some(status.min_rate_chz),
+        max_rate_c_hz: Some(status.max_rate_chz),
+        log_level: Some(status.log_level),
+        log_udp_port: Some(status.log_udp_port),
+        log_serial_enabled: Some(
+            status
+                .flags
+                .contains(RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_LOG_SERIAL_ENABLED),
+        ),
+        log_udp_enabled: Some(
+            status
+                .flags
+                .contains(RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_LOG_UDP_ENABLED),
+        ),
+        dynamic_anchors,
+        health: None,
+    };
+    device.health = Some(calculate_device_health(&device));
+    device
 }
 
 /// Prune stale devices from a device map based on TTL.

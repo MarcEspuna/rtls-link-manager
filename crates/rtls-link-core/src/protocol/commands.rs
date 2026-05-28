@@ -1,6 +1,6 @@
 //! Command string builders for RTLS-Link device protocol.
 //!
-//! These commands are sent over WebSocket to devices at ws://<ip>/ws
+//! These commands are sent over the MAVLink UDP management endpoint.
 
 /// Commands that return structured responses.
 ///

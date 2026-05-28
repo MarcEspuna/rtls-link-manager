@@ -156,17 +156,17 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
-    if let Some(v) = config.wifi.enable_discovery {
+    if let Some(v) = config.wifi.enable_mavlink_management {
         params.push((
             "wifi".to_string(),
-            "enableDiscovery".to_string(),
+            "enableMavlinkManagement".to_string(),
             v.to_string(),
         ));
     }
-    if let Some(v) = config.wifi.discovery_port {
+    if let Some(v) = config.wifi.mavlink_management_port {
         params.push((
             "wifi".to_string(),
-            "discoveryPort".to_string(),
+            "mavlinkManagementPort".to_string(),
             v.to_string(),
         ));
     }
@@ -506,8 +506,8 @@ mod tests {
                 udp_port: Some(14550),
                 enable_web_server: Some(1),
                 enable_uart_bridge: Some(1),
-                enable_discovery: Some(1),
-                discovery_port: Some(3333),
+                enable_mavlink_management: Some(1),
+                mavlink_management_port: Some(3333),
                 log_udp_port: None,
                 log_serial_enabled: None,
                 log_udp_enabled: None,

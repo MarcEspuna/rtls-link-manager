@@ -104,7 +104,7 @@ export function WiFiSection({ config, onChange, onApply }: WiFiSectionProps) {
         <h3>Services</h3>
         <div className={styles.fieldRow}>
           <div className={styles.field}>
-            <label>Web Server</label>
+            <label>HTTP OTA</label>
             <select
               value={config.wifi.enableWebServer ?? 1}
               onChange={(e) => {
@@ -132,13 +132,13 @@ export function WiFiSection({ config, onChange, onApply }: WiFiSectionProps) {
             </select>
           </div>
           <div className={styles.field}>
-            <label>Discovery</label>
+            <label>MAVLink Management</label>
             <select
-              value={config.wifi.enableDiscovery ?? 1}
+              value={config.wifi.enableMavlinkManagement ?? 1}
               onChange={(e) => {
                 const val = Number(e.target.value);
-                onChange('wifi', 'enableDiscovery', val);
-                onApply('wifi', 'enableDiscovery', val);
+                onChange('wifi', 'enableMavlinkManagement', val);
+                onApply('wifi', 'enableMavlinkManagement', val);
               }}
             >
               <option value={1}>Enabled</option>
@@ -146,12 +146,12 @@ export function WiFiSection({ config, onChange, onApply }: WiFiSectionProps) {
             </select>
           </div>
           <div className={styles.field}>
-            <label>Discovery Port</label>
+            <label>Management Port</label>
             <input
               type="number"
-              value={config.wifi.discoveryPort || 3333}
-              onChange={(e) => onChange('wifi', 'discoveryPort', Number(e.target.value))}
-              onBlur={(e) => onApply('wifi', 'discoveryPort', Number(e.target.value))}
+              value={config.wifi.mavlinkManagementPort || 3333}
+              onChange={(e) => onChange('wifi', 'mavlinkManagementPort', Number(e.target.value))}
+              onBlur={(e) => onApply('wifi', 'mavlinkManagementPort', Number(e.target.value))}
             />
           </div>
         </div>

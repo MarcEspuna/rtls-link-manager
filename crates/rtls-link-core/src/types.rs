@@ -189,12 +189,12 @@ pub struct WifiConfig {
     /// Enable UART bridge (0 or 1)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_uart_bridge: Option<u8>,
-    /// Enable UDP discovery (0 or 1)
+    /// Enable MAVLink management endpoint (0 or 1)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub enable_discovery: Option<u8>,
-    /// UDP discovery port
+    pub enable_mavlink_management: Option<u8>,
+    /// MAVLink management UDP port
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub discovery_port: Option<u16>,
+    pub mavlink_management_port: Option<u16>,
     /// UDP port for log streaming
     #[serde(skip_serializing_if = "Option::is_none")]
     pub log_udp_port: Option<u16>,
@@ -617,8 +617,8 @@ mod tests {
                 udp_port: Some(14550),
                 enable_web_server: Some(1),
                 enable_uart_bridge: Some(1),
-                enable_discovery: Some(1),
-                discovery_port: Some(3333),
+                enable_mavlink_management: Some(1),
+                mavlink_management_port: Some(3333),
                 log_udp_port: None,
                 log_serial_enabled: None,
                 log_udp_enabled: None,

@@ -5,20 +5,33 @@ edition = "2021"
 description = "Shared core library for RTLS-Link device management"
 license = "MIT"
 
+[features]
+default = ["dialect-rtlslink"]
+dialect-rtlslink = []
+serde-generated = []
+serde = []
+arbitrary = []
+ts-rs = []
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"
 tokio = { version = "1", features = ["net", "time", "sync", "macros", "fs", "io-util"] }
-tokio-tungstenite = "0.21"
-futures-util = "0.3"
 futures = "0.3"
 reqwest = { version = "0.11", default-features = false, features = ["multipart", "stream", "rustls-tls"] }
 bytes = "1"
 socket2 = { version = "0.5", features = ["all"] }
 regex = "1"
 directories = "5"
+mavlink-core = { version = "0.18.0", default-features = false, features = ["std"] }
+bitflags = "2.9.1"
+num-derive = "0.4"
+num-traits = "0.2"
+
+[build-dependencies]
+mavlink-bindgen = "0.18.0"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "macros", "net", "time", "sync"] }

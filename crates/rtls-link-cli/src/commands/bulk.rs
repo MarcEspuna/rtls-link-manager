@@ -8,7 +8,7 @@ use crate::error::CliError;
 use crate::output::get_formatter;
 use crate::types::{Device, DeviceRole};
 
-use rtls_link_core::device::websocket::BatchSender;
+use rtls_link_core::device::mavlink::BatchSender;
 use rtls_link_core::protocol::commands::Commands;
 
 /// Run bulk command

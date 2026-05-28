@@ -78,7 +78,7 @@ CLI -------------------------------> rtls-link-core
 Current ownership:
 
 - Discovery and heartbeat parsing: `rtls-link-core/src/discovery/`
-- WebSocket commands and OTA: `rtls-link-core/src/device/`
+- MAVLink UDP commands and HTTP OTA: `rtls-link-core/src/device/`
 - Protocol command strings and config-to-parameter conversion: `rtls-link-core/src/protocol/`
 - Health calculation: `rtls-link-core/src/health.rs`
 - Antenna calibration: `rtls-link-core/src/calibration.rs`
@@ -87,8 +87,8 @@ Current ownership:
 
 ## Protocol Notes
 
-- Devices communicate over WebSocket at `ws://<device-ip>/ws`.
-- Discovery uses UDP port `3333`.
+- Devices communicate over MAVLink UDP on port `3333`.
+- Discovery uses MAVLink heartbeat and status messages on UDP port `3333`.
 - Device logs use UDP port `3334` by default.
 - OTA uploads use HTTP POST multipart at `http://<device-ip>/update`.
 - Parameter names are camelCase, matching firmware names: `ssidST`, `devShortAddr`, `logUdpPort`, etc.

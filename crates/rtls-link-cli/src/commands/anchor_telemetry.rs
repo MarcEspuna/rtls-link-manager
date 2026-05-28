@@ -16,7 +16,7 @@ use crate::error::CliError;
 use crate::output::get_formatter;
 use crate::types::{Device, DeviceRole};
 
-use rtls_link_core::device::websocket::DeviceConnection;
+use rtls_link_core::device::mavlink::DeviceConnection;
 use rtls_link_core::protocol::binary::decode_command_frame;
 use rtls_link_core::protocol::commands::Commands;
 
