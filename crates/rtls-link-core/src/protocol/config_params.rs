@@ -30,12 +30,17 @@ fn rebuild_flat_anchors(
     config: &mut DeviceConfig,
     value: &serde_json::Value,
 ) -> Result<(), String> {
+    let tag_tdoa_mode = config.uwb.mode == 4;
+
     if let Some(anchors) = config
         .uwb
         .anchors
         .as_ref()
         .filter(|anchors| !anchors.is_empty())
     {
+        if !tag_tdoa_mode {
+            return Ok(());
+        }
         if let Some(count) = config.uwb.anchor_count {
             if count == 0 {
                 return Err("Anchor count must be positive when set".to_string());
@@ -64,7 +69,10 @@ fn rebuild_flat_anchors(
         .map(usize::from)
         .or_else(|| value_to_usize(uwb.get("anchorCount")));
     if explicit_count == Some(0) {
-        return Err("Anchor count must be positive when set".to_string());
+        if tag_tdoa_mode {
+            return Err("Anchor count must be positive when set".to_string());
+        }
+        return Ok(());
     }
 
     let count = explicit_count.unwrap_or(0);
@@ -77,8 +85,15 @@ fn rebuild_flat_anchors(
 
     if count == 0 {
         if has_flat_anchor_fields(uwb) {
-            return Err("Anchor count required when anchor geometry is present".to_string());
+            if tag_tdoa_mode {
+                return Err("Anchor count required when anchor geometry is present".to_string());
+            }
+            return Ok(());
         }
+        return Ok(());
+    }
+
+    if !tag_tdoa_mode {
         return Ok(());
     }
 
@@ -974,6 +989,24 @@ mod tests {
             .to_string();
 
         assert!(err.contains("Anchor count must be positive when set"));
+    }
+
+    #[test]
+    fn device_config_from_backup_value_allows_anchor_mode_zero_anchor_count() {
+        let raw = serde_json::json!({
+            "wifi": { "mode": 1 },
+            "uwb": {
+                "mode": 3,
+                "devShortAddr": "7",
+                "anchorCount": 0
+            },
+            "app": {}
+        });
+
+        let config = device_config_from_backup_value(raw).unwrap();
+
+        assert_eq!(config.uwb.mode, 3);
+        assert!(config.uwb.anchors.is_none());
     }
 
     #[test]

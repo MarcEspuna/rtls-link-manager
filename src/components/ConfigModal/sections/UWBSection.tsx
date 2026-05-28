@@ -22,29 +22,32 @@ export function UWBSection({ config, onChange, onApply, onApplyBatch, isExpertMo
     return null;
   };
 
-  const applyMode = async (value: number) => {
+  const applyMode = async (value: number): Promise<boolean> => {
     setModeApplyError(null);
     if (value === 4) {
       const anchors = config.uwb.anchors || [];
       const anchorError = validateAnchorList(anchors);
       if (anchorError) {
         setModeApplyError('Configure valid anchors before applying TDoA Tag mode');
-        return;
+        return false;
       }
       try {
         const anchorCommands = getAnchorWriteCommands(anchors)
           .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
         await onApplyBatch([...anchorCommands, Commands.writeParam('uwb', 'mode', value)]);
+        return true;
       } catch (e) {
         setModeApplyError(e instanceof Error ? e.message : 'Failed to apply UWB mode');
+        return false;
       }
-      return;
     }
 
     try {
       await onApply('uwb', 'mode', value);
+      return true;
     } catch (e) {
       setModeApplyError(e instanceof Error ? e.message : 'Failed to apply UWB mode');
+      return false;
     }
   };
 
@@ -75,8 +78,11 @@ export function UWBSection({ config, onChange, onApply, onApplyBatch, isExpertMo
             value={config.uwb.mode}
             onChange={(e) => {
               const val = Number(e.target.value);
-              onChange('uwb', 'mode', val);
-              void applyMode(val);
+              void applyMode(val).then((applied) => {
+                if (applied) {
+                  onChange('uwb', 'mode', val);
+                }
+              });
             }}
           >
             <option value={3}>TDoA Anchor</option>
