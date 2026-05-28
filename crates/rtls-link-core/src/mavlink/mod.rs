@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 pub mod params;
 
 include!(concat!(env!("OUT_DIR"), "/mod.rs"));

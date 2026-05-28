@@ -8,10 +8,6 @@ license = "MIT"
 [features]
 default = ["dialect-rtlslink"]
 dialect-rtlslink = []
-serde-generated = []
-serde = []
-arbitrary = []
-ts-rs = []
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
