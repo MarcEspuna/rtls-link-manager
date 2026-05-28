@@ -99,7 +99,7 @@ async fn run_apply(
     _concurrency: usize,
     timeout: Duration,
     json_output: bool,
-    strict: bool,
+    _strict: bool,
 ) -> Result<(), CliError> {
     let config_content = std::fs::read_to_string(file)
         .map_err(|e| CliError::Other(format!("Failed to read config file: {}", e)))?;
@@ -143,7 +143,7 @@ async fn run_apply(
     println!("{}", formatter.format_bulk_results(&results));
 
     let failed_count = results.iter().filter(|(_, s, _)| !s).count();
-    if strict && failed_count > 0 {
+    if failed_count > 0 {
         return Err(CliError::PartialFailure {
             succeeded: results.len() - failed_count,
             failed: failed_count,

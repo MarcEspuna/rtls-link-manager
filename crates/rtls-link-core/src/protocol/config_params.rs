@@ -331,12 +331,13 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
 
     // Flatten anchors array to devId1/x1/y1/z1, devId2/x2/y2/z2, etc.
     if let Some(ref anchors) = config.uwb.anchors {
-        if config
-            .uwb
-            .anchor_count
-            .is_some_and(|count| count > 0 && anchors.len() != count as usize)
-        {
-            return Err("Anchor geometry required when anchorCount is set".to_string());
+        if let Some(count) = config.uwb.anchor_count {
+            if count == 0 {
+                return Err("Anchor count must be positive when set".to_string());
+            }
+            if anchors.len() != count as usize {
+                return Err("Anchor geometry required when anchorCount is set".to_string());
+            }
         }
         append_anchor_params(&mut params, anchors)?;
     } else if let Some(v) = config.uwb.anchor_count {
@@ -1196,6 +1197,24 @@ mod tests {
     #[test]
     fn config_to_params_rejects_zero_count_without_geometry() {
         let config = minimal_device_config(Some(0), None);
+
+        assert_eq!(
+            config_to_params(&config).unwrap_err(),
+            "Anchor count must be positive when set"
+        );
+    }
+
+    #[test]
+    fn config_to_params_rejects_zero_count_with_geometry() {
+        let config = minimal_device_config(
+            Some(0),
+            Some(vec![AnchorConfig {
+                id: "0".to_string(),
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            }]),
+        );
 
         assert_eq!(
             config_to_params(&config).unwrap_err(),

@@ -268,7 +268,7 @@ async fn run_upload(
     _concurrency: usize,
     timeout: Duration,
     json: bool,
-    strict: bool,
+    _strict: bool,
 ) -> Result<(), CliError> {
     let storage = create_preset_storage()?;
     let preset: Preset = storage
@@ -322,7 +322,7 @@ async fn run_upload(
     println!("{}", formatter.format_bulk_results(&results));
 
     let failed_count = results.iter().filter(|(_, s, _)| !s).count();
-    if strict && failed_count > 0 {
+    if failed_count > 0 {
         return Err(CliError::PartialFailure {
             succeeded: results.len() - failed_count,
             failed: failed_count,
