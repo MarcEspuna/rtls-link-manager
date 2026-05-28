@@ -292,6 +292,15 @@ pub struct UwbConfig {
     /// TDoA TDMA slot duration in microseconds, 0=legacy (~2ms)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tdoa_slot_duration_us: Option<u16>,
+    /// Periodic TDoA anchor stats UDP telemetry enable (0=disabled, 1=enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_anchor_telemetry_enable: Option<u8>,
+    /// TDoA anchor stats UDP telemetry interval in milliseconds (250-60000)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_anchor_telemetry_interval_ms: Option<u16>,
+    /// UDP destination port for TDoA anchor stats telemetry
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_anchor_telemetry_port: Option<u16>,
     /// TDoA tag matcher policy: 0=Youngest, 1=Random
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tdoa_matcher_policy: Option<u8>,
@@ -662,6 +671,9 @@ mod tests {
                 smart_power_enable: None,
                 tdoa_slot_count: None,
                 tdoa_slot_duration_us: None,
+                tdoa_anchor_telemetry_enable: Some(1),
+                tdoa_anchor_telemetry_interval_ms: Some(1000),
+                tdoa_anchor_telemetry_port: Some(3335),
                 tdoa_matcher_policy: Some(1),
                 dynamic_anchor_pos_enabled: None,
                 anchor_layout: None,

@@ -129,6 +129,9 @@ export interface UwbConfig {
   // TDoA TDMA schedule (TDoA anchors only, expert mode)
   tdoaSlotCount?: number;       // Active TDMA slots per frame (2-8), 0=legacy (8)
   tdoaSlotDurationUs?: number;  // Slot duration in microseconds, 0=legacy (~2ms)
+  tdoaAnchorTelemetryEnable?: 0 | 1; // Periodic anchor stats UDP telemetry
+  tdoaAnchorTelemetryIntervalMs?: number; // Telemetry interval in milliseconds (250-60000)
+  tdoaAnchorTelemetryPort?: number; // UDP destination port for anchor stats telemetry
   tdoaMatcherPolicy?: 0 | 1;    // 0=Youngest, 1=Random
   // Dynamic anchor positioning (TDoA tags only)
   dynamicAnchorPosEnabled?: 0 | 1;  // 0=static (use configured positions), 1=dynamic

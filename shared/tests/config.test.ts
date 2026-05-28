@@ -84,4 +84,18 @@ describe('validateConfig', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('TDoA matcher policy must be 0 or 1');
   });
+
+  it('validates TDoA anchor telemetry settings', () => {
+    const result = validateConfig({
+      uwb: {
+        tdoaAnchorTelemetryEnable: 2,
+        tdoaAnchorTelemetryIntervalMs: 100,
+        tdoaAnchorTelemetryPort: 0,
+      } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('TDoA anchor telemetry enable must be 0 or 1');
+    expect(result.errors).toContain('TDoA anchor telemetry interval must be an integer in 250-60000 ms');
+    expect(result.errors).toContain('TDoA anchor telemetry port must be an integer in 1-65535');
+  });
 });

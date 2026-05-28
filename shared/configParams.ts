@@ -73,6 +73,9 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     // TDoA TDMA schedule (TDoA anchors only, expert mode)
     if (config.uwb.tdoaSlotCount !== undefined) params.push(['uwb', 'tdoaSlotCount', String(config.uwb.tdoaSlotCount)]);
     if (config.uwb.tdoaSlotDurationUs !== undefined) params.push(['uwb', 'tdoaSlotDurationUs', String(config.uwb.tdoaSlotDurationUs)]);
+    if (config.uwb.tdoaAnchorTelemetryEnable !== undefined) params.push(['uwb', 'tdoaAnchorTelemetryEnable', String(config.uwb.tdoaAnchorTelemetryEnable)]);
+    if (config.uwb.tdoaAnchorTelemetryIntervalMs !== undefined) params.push(['uwb', 'tdoaAnchorTelemetryIntervalMs', String(config.uwb.tdoaAnchorTelemetryIntervalMs)]);
+    if (config.uwb.tdoaAnchorTelemetryPort !== undefined) params.push(['uwb', 'tdoaAnchorTelemetryPort', String(config.uwb.tdoaAnchorTelemetryPort)]);
     if (config.uwb.tdoaMatcherPolicy !== undefined) params.push(['uwb', 'tdoaMatcherPolicy', String(config.uwb.tdoaMatcherPolicy)]);
     // Dynamic anchor positioning (TDoA tags only)
     if (config.uwb.dynamicAnchorPosEnabled !== undefined) params.push(['uwb', 'dynamicAnchorPosEnabled', String(config.uwb.dynamicAnchorPosEnabled)]);

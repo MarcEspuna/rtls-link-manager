@@ -357,6 +357,27 @@ pub fn config_to_params(config: &DeviceConfig) -> Vec<(String, String, String)> 
             v.to_string(),
         ));
     }
+    if let Some(v) = config.uwb.tdoa_anchor_telemetry_enable {
+        params.push((
+            "uwb".to_string(),
+            "tdoaAnchorTelemetryEnable".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.tdoa_anchor_telemetry_interval_ms {
+        params.push((
+            "uwb".to_string(),
+            "tdoaAnchorTelemetryIntervalMs".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.tdoa_anchor_telemetry_port {
+        params.push((
+            "uwb".to_string(),
+            "tdoaAnchorTelemetryPort".to_string(),
+            v.to_string(),
+        ));
+    }
     if let Some(v) = config.uwb.tdoa_matcher_policy {
         params.push((
             "uwb".to_string(),
@@ -533,6 +554,9 @@ mod tests {
                 smart_power_enable: None,
                 tdoa_slot_count: None,
                 tdoa_slot_duration_us: None,
+                tdoa_anchor_telemetry_enable: Some(1),
+                tdoa_anchor_telemetry_interval_ms: Some(1000),
+                tdoa_anchor_telemetry_port: Some(3335),
                 tdoa_matcher_policy: Some(1),
                 dynamic_anchor_pos_enabled: None,
                 anchor_layout: None,
@@ -609,6 +633,15 @@ mod tests {
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "tdoaMatcherPolicy" && v == "1"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "tdoaAnchorTelemetryEnable" && v == "1"));
+        assert!(params.iter().any(|(g, n, v)| {
+            g == "uwb" && n == "tdoaAnchorTelemetryIntervalMs" && v == "1000"
+        }));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "tdoaAnchorTelemetryPort" && v == "3335"));
     }
 
     #[test]

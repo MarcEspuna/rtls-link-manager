@@ -203,6 +203,39 @@ fn decode_tdoa_anchor_stats(frame: BinaryFrame<'_>) -> Result<Value, CoreError> 
     let stall_resets = r.u32().map_err(CoreError::Other)?;
     let tx_scheduled = r.u32().map_err(CoreError::Other)?;
     let tx_done = r.u32().map_err(CoreError::Other)?;
+    let timing = if version >= 2 {
+        json!({
+            "irqCount": r.u32().map_err(CoreError::Other)?,
+            "irqToServiceLastUs": r.u32().map_err(CoreError::Other)?,
+            "irqToServiceMaxUs": r.u32().map_err(CoreError::Other)?,
+            "dwHandleInterruptLastUs": r.u32().map_err(CoreError::Other)?,
+            "dwHandleInterruptMaxUs": r.u32().map_err(CoreError::Other)?,
+            "uwbHardPathLastUs": r.u32().map_err(CoreError::Other)?,
+            "uwbHardPathMaxUs": r.u32().map_err(CoreError::Other)?,
+            "slotSlackMinUs": r.u32().map_err(CoreError::Other)?,
+            "rxArmLateCount": r.u32().map_err(CoreError::Other)?,
+            "txArmLateCount": r.u32().map_err(CoreError::Other)?,
+            "missedDeadlineCount": r.u32().map_err(CoreError::Other)?,
+            "guardedTxCount": r.u32().map_err(CoreError::Other)?,
+            "lastDwStatusBeforeStall": r.u32().map_err(CoreError::Other)?,
+        })
+    } else {
+        json!({
+            "irqCount": 0,
+            "irqToServiceLastUs": 0,
+            "irqToServiceMaxUs": 0,
+            "dwHandleInterruptLastUs": 0,
+            "dwHandleInterruptMaxUs": 0,
+            "uwbHardPathLastUs": 0,
+            "uwbHardPathMaxUs": 0,
+            "slotSlackMinUs": 0,
+            "rxArmLateCount": 0,
+            "txArmLateCount": 0,
+            "missedDeadlineCount": 0,
+            "guardedTxCount": 0,
+            "lastDwStatusBeforeStall": 0,
+        })
+    };
     let slot_count = r.u8().map_err(CoreError::Other)? as usize;
 
     let mut packet_ids = Vec::with_capacity(slot_count);
@@ -262,6 +295,7 @@ fn decode_tdoa_anchor_stats(frame: BinaryFrame<'_>) -> Result<Value, CoreError> 
             "scheduled": tx_scheduled,
             "done": tx_done,
         },
+        "timing": timing,
         "packetIds": packet_ids,
         "distances": distances,
         "slots": slots,
