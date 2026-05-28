@@ -22,12 +22,20 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
   }
 
   if (config.uwb) {
+    const isTagTdoa = config.uwb.mode === 4;
+    const shouldValidateTagAnchors = isTagTdoa || config.uwb.mode === undefined;
+    const hasAnchorArray = Array.isArray(config.uwb.anchors);
+    const hasAnchorGeometry = hasAnchorArray && config.uwb.anchors!.length > 0;
     const anchorCount = config.uwb.anchorCount;
     let validAnchorCount: number | null = null;
-    if (anchorCount !== undefined) {
+    if (shouldValidateTagAnchors && anchorCount !== undefined) {
       const count = Number(anchorCount);
-      if (!Number.isInteger(count) || count <= 0) {
+      if (!Number.isInteger(count) || count < 0) {
         errors.push('Anchor count must be positive when set');
+      } else if (count === 0) {
+        if (isTagTdoa || config.uwb.mode === undefined || hasAnchorGeometry) {
+          errors.push('Anchor count must be positive when set');
+        }
       } else {
         validAnchorCount = count;
         if (count > MAX_CONFIGURABLE_ANCHORS) {
@@ -41,12 +49,12 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       errors.push('Anchor geometry required when anchorCount is set');
     }
 
-    if (config.uwb.mode === 4 && !config.uwb.anchors) {
+    if (isTagTdoa && !hasAnchorGeometry) {
       errors.push('Anchor geometry required for TAG_TDOA configs');
     }
 
-    if (config.uwb.anchors) {
-      const anchorError = validateAnchorList(config.uwb.anchors);
+    if (shouldValidateTagAnchors && hasAnchorGeometry) {
+      const anchorError = validateAnchorList(config.uwb.anchors!);
       if (anchorError) {
         errors.push(anchorError);
       }

@@ -319,34 +319,32 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
     }
 
     // UWB params
-    params.push((
-        "uwb".to_string(),
-        "mode".to_string(),
-        config.uwb.mode.to_string(),
-    ));
-    if let Some(v) = config.uwb.uwb_enable {
-        params.push(("uwb".to_string(), "uwbEnable".to_string(), v.to_string()));
-    }
     // NOTE: devShortAddr intentionally skipped - preserved per-device
 
     // Flatten anchors array to devId1/x1/y1/z1, devId2/x2/y2/z2, etc.
-    if let Some(ref anchors) = config.uwb.anchors {
-        if let Some(count) = config.uwb.anchor_count {
-            if count == 0 {
-                return Err("Anchor count must be positive when set".to_string());
+    if config.uwb.mode == 4 {
+        if let Some(ref anchors) = config.uwb.anchors {
+            if let Some(count) = config.uwb.anchor_count {
+                if count == 0 {
+                    return Err("Anchor count must be positive when set".to_string());
+                } else if anchors.len() != count as usize {
+                    return Err("Anchor geometry required when anchorCount is set".to_string());
+                }
             }
-            if anchors.len() != count as usize {
+            if anchors.is_empty() {
+                return Err("Anchor geometry required for TAG_TDOA configs".to_string());
+            } else {
+                append_anchor_params(&mut params, anchors)?;
+            }
+        } else if let Some(v) = config.uwb.anchor_count {
+            if v == 0 {
+                return Err("Anchor count must be positive when set".to_string());
+            } else {
                 return Err("Anchor geometry required when anchorCount is set".to_string());
             }
+        } else {
+            return Err("Anchor geometry required for TAG_TDOA configs".to_string());
         }
-        append_anchor_params(&mut params, anchors)?;
-    } else if let Some(v) = config.uwb.anchor_count {
-        if v == 0 {
-            return Err("Anchor count must be positive when set".to_string());
-        }
-        return Err("Anchor geometry required when anchorCount is set".to_string());
-    } else if config.uwb.mode == 4 {
-        return Err("Anchor geometry required for TAG_TDOA configs".to_string());
     }
 
     if let Some(v) = config.uwb.origin_lat {
@@ -496,6 +494,14 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
             "use2DEstimator".to_string(),
             v.to_string(),
         ));
+    }
+    params.push((
+        "uwb".to_string(),
+        "mode".to_string(),
+        config.uwb.mode.to_string(),
+    ));
+    if let Some(v) = config.uwb.uwb_enable {
+        params.push(("uwb".to_string(), "uwbEnable".to_string(), v.to_string()));
     }
 
     // App params
@@ -1082,7 +1088,12 @@ mod tests {
             .iter()
             .position(|(g, n, _)| g == "uwb" && n == "devId2")
             .unwrap();
+        let mode_pos = params
+            .iter()
+            .position(|(g, n, _)| g == "uwb" && n == "mode")
+            .unwrap();
         assert!(anchor_count_pos > dev_id_2_pos);
+        assert!(mode_pos > anchor_count_pos);
     }
 
     #[test]
@@ -1230,6 +1241,19 @@ mod tests {
     }
 
     #[test]
+    fn config_to_params_allows_anchor_mode_zero_count_empty_geometry() {
+        let mut config = minimal_device_config(Some(0), Some(vec![]));
+        config.uwb.mode = 3;
+
+        let params = config_to_params(&config).unwrap();
+
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "mode" && v == "3"));
+        assert!(!params.iter().any(|(_, n, _)| n == "anchorCount"));
+    }
+
+    #[test]
     fn config_to_params_rejects_zero_count_with_geometry() {
         let config = minimal_device_config(
             Some(0),
@@ -1253,7 +1277,7 @@ mod tests {
 
         assert_eq!(
             config_to_params(&config).unwrap_err(),
-            "Anchor geometry required when anchorCount is set"
+            "Anchor geometry required for TAG_TDOA configs"
         );
     }
 

@@ -129,7 +129,7 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
       if (!validation.valid) {
         throw new Error(validation.errors[0] || 'Invalid configuration');
       }
-      const anchorCommands = getAnchorWriteCommands(config.uwb.anchors || [])
+      const anchorCommands = getConfiguredAnchorCommands(config)
         .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
       const batch = [...anchorCommands, Commands.saveConfig()];
       const result = await sendCommands(batch);
@@ -152,7 +152,7 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
           if (!validation.valid) {
             throw new Error(validation.errors[0] || 'Invalid configuration');
           }
-          const anchorCommands = getAnchorWriteCommands(config.uwb.anchors || [])
+          const anchorCommands = getConfiguredAnchorCommands(config)
             .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
           const batch = [...anchorCommands, Commands.saveConfigAs(name)];
           const result = await sendCommands(batch);
@@ -221,6 +221,11 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
     }
   };
 
+  const getConfiguredAnchorCommands = (nextConfig: DeviceConfig) => {
+    const anchors = nextConfig.uwb.anchors || [];
+    return nextConfig.uwb.mode === 4 && anchors.length > 0 ? getAnchorWriteCommands(anchors) : [];
+  };
+
   const handleChange = (group: keyof DeviceConfig, name: string, value: any) => {
     if (!config) return;
     const newConfig = { ...config, [group]: { ...config[group], [name]: value } };
@@ -266,6 +271,7 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
             config={config}
             onChange={handleChange}
             onApply={handleApply}
+            onApplyBatch={handleApplyBatch}
             isExpertMode={isExpertMode}
           />
         );

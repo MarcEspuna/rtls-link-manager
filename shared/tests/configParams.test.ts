@@ -90,6 +90,8 @@ describe('configToParams', () => {
     expect(params).toContainEqual(['uwb', 'anchorCount', '2']);
     expect(params.findIndex(([, name]) => name === 'anchorCount'))
       .toBeGreaterThan(params.findIndex(([, name]) => name === 'devId2'));
+    expect(params.findIndex(([, name]) => name === 'mode'))
+      .toBeGreaterThan(params.findIndex(([, name]) => name === 'anchorCount'));
 
     expect(() => configToParams({
       wifi: {},
@@ -116,6 +118,17 @@ describe('configToParams', () => {
     const params = configToParams({
       wifi: {},
       uwb: { mode: 3 },
+      app: {},
+    });
+
+    expect(params).toContainEqual(['uwb', 'mode', '3']);
+    expect(params.some(([, name]) => name === 'anchorCount')).toBe(false);
+  });
+
+  it('allows anchor-mode backups with zero anchorCount and empty anchors', () => {
+    const params = configToParams({
+      wifi: {},
+      uwb: { mode: 3, anchorCount: 0, anchors: [] },
       app: {},
     });
 

@@ -1,21 +1,51 @@
 import { useState } from 'react';
 import { DeviceConfig } from '@shared/types';
+import { Commands } from '@shared/commands';
+import { getAnchorWriteCommands, validateAnchorList } from '@shared/anchors';
 import styles from '../ConfigModal.module.css';
 
 interface UWBSectionProps {
   config: DeviceConfig;
   onChange: (group: keyof DeviceConfig, name: string, value: any) => void;
   onApply: (group: string, name: string, value: any) => Promise<void>;
+  onApplyBatch: (commands: string[]) => Promise<void>;
   isExpertMode?: boolean;
 }
 
-export function UWBSection({ config, onChange, onApply, isExpertMode = false }: UWBSectionProps) {
+export function UWBSection({ config, onChange, onApply, onApplyBatch, isExpertMode = false }: UWBSectionProps) {
   const [shortAddrError, setShortAddrError] = useState<string | null>(null);
+  const [modeApplyError, setModeApplyError] = useState<string | null>(null);
 
   const validateShortAddr = (value: string): string | null => {
     if (!value) return 'Device ID is required';
     if (!/^\d{1,2}$/.test(value)) return 'Use 1-2 digits (0-99)';
     return null;
+  };
+
+  const applyMode = async (value: number) => {
+    setModeApplyError(null);
+    if (value === 4) {
+      const anchors = config.uwb.anchors || [];
+      const anchorError = validateAnchorList(anchors);
+      if (anchorError) {
+        setModeApplyError('Configure valid anchors before applying TDoA Tag mode');
+        return;
+      }
+      try {
+        const anchorCommands = getAnchorWriteCommands(anchors)
+          .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
+        await onApplyBatch([...anchorCommands, Commands.writeParam('uwb', 'mode', value)]);
+      } catch (e) {
+        setModeApplyError(e instanceof Error ? e.message : 'Failed to apply UWB mode');
+      }
+      return;
+    }
+
+    try {
+      await onApply('uwb', 'mode', value);
+    } catch (e) {
+      setModeApplyError(e instanceof Error ? e.message : 'Failed to apply UWB mode');
+    }
   };
 
   return (
@@ -46,12 +76,13 @@ export function UWBSection({ config, onChange, onApply, isExpertMode = false }: 
             onChange={(e) => {
               const val = Number(e.target.value);
               onChange('uwb', 'mode', val);
-              onApply('uwb', 'mode', val);
+              void applyMode(val);
             }}
           >
             <option value={3}>TDoA Anchor</option>
             <option value={4}>TDoA Tag</option>
           </select>
+          {modeApplyError && <div className={styles.fieldError}>{modeApplyError}</div>}
         </div>
         <div className={styles.field}>
           <label>Output Backend</label>

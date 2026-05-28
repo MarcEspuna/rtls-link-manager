@@ -31,43 +31,55 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
 
   // UWB params
   if (config.uwb) {
-    if (config.uwb.mode !== undefined) params.push(['uwb', 'mode', String(config.uwb.mode)]);
-    if (config.uwb.uwbEnable !== undefined) params.push(['uwb', 'uwbEnable', String(config.uwb.uwbEnable)]);
     // NOTE: devShortAddr intentionally skipped - preserved per-device
 
     // Flatten anchors array to devId1/x1/y1/z1, devId2/x2/y2/z2, etc.
-    if (config.uwb.anchors !== undefined) {
+    const shouldWriteTagAnchors = config.uwb.mode === 4 || config.uwb.mode === undefined;
+    if (shouldWriteTagAnchors && config.uwb.anchors !== undefined) {
       if (config.uwb.anchorCount !== undefined) {
         const count = Number(config.uwb.anchorCount);
-        if (!Number.isInteger(count) || count <= 0) {
+        if (!Number.isInteger(count) || count < 0) {
           throw new Error('Anchor count must be positive when set');
         }
-        if (config.uwb.anchors.length !== count) {
+        if (count === 0) {
+          if (config.uwb.mode === 4 || config.uwb.mode === undefined || config.uwb.anchors.length > 0) {
+            throw new Error('Anchor count must be positive when set');
+          }
+        } else if (config.uwb.anchors.length !== count) {
           throw new Error('Anchor geometry required when anchorCount is set');
         }
       }
       if (config.uwb.anchors.length === 0) {
-        throw new Error('Anchor geometry required when anchorCount is set');
+        if (config.uwb.mode === 4) {
+          throw new Error('Anchor geometry required for TAG_TDOA configs');
+        }
+      } else {
+        const validationError = validateAnchorList(config.uwb.anchors);
+        if (validationError) {
+          throw new Error(validationError);
+        }
+        const anchors = config.uwb.anchors.slice(0, MAX_CONFIGURABLE_ANCHORS);
+        anchors.forEach((anchor, i) => {
+          const idx = i + 1; // 1-indexed in firmware
+          params.push(['uwb', `devId${idx}`, normalizeUwbShortAddr(anchor.id)]);
+          params.push(['uwb', `x${idx}`, String(anchor.x)]);
+          params.push(['uwb', `y${idx}`, String(anchor.y)]);
+          params.push(['uwb', `z${idx}`, String(anchor.z)]);
+        });
+        params.push(['uwb', 'anchorCount', String(anchors.length)]);
       }
-      const validationError = validateAnchorList(config.uwb.anchors);
-      if (validationError) {
-        throw new Error(validationError);
-      }
-      const anchors = config.uwb.anchors.slice(0, MAX_CONFIGURABLE_ANCHORS);
-      anchors.forEach((anchor, i) => {
-        const idx = i + 1; // 1-indexed in firmware
-        params.push(['uwb', `devId${idx}`, normalizeUwbShortAddr(anchor.id)]);
-        params.push(['uwb', `x${idx}`, String(anchor.x)]);
-        params.push(['uwb', `y${idx}`, String(anchor.y)]);
-        params.push(['uwb', `z${idx}`, String(anchor.z)]);
-      });
-      params.push(['uwb', 'anchorCount', String(anchors.length)]);
-    } else if (config.uwb.anchorCount !== undefined) {
+    } else if (shouldWriteTagAnchors && config.uwb.anchorCount !== undefined) {
       const count = Number(config.uwb.anchorCount);
-      if (!Number.isInteger(count) || count <= 0) {
+      if (!Number.isInteger(count) || count < 0) {
         throw new Error('Anchor count must be positive when set');
       }
-      throw new Error('Anchor geometry required when anchorCount is set');
+      if (count === 0) {
+        if (config.uwb.mode === 4 || config.uwb.mode === undefined) {
+          throw new Error('Anchor count must be positive when set');
+        }
+      } else {
+        throw new Error('Anchor geometry required when anchorCount is set');
+      }
     } else if (config.uwb.mode === 4) {
       throw new Error('Anchor geometry required for TAG_TDOA configs');
     }
@@ -101,6 +113,8 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.uwb.anchorPosLocked !== undefined) params.push(['uwb', 'anchorPosLocked', String(config.uwb.anchorPosLocked)]);
     if (config.uwb.distanceAvgSamples !== undefined) params.push(['uwb', 'distanceAvgSamples', String(config.uwb.distanceAvgSamples)]);
     if (config.uwb.use2DEstimator !== undefined) params.push(['uwb', 'use2DEstimator', String(config.uwb.use2DEstimator)]);
+    if (config.uwb.mode !== undefined) params.push(['uwb', 'mode', String(config.uwb.mode)]);
+    if (config.uwb.uwbEnable !== undefined) params.push(['uwb', 'uwbEnable', String(config.uwb.uwbEnable)]);
   }
 
   // App params

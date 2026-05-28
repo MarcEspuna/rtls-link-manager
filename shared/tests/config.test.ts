@@ -49,6 +49,17 @@ describe('validateConfig', () => {
     expect(result.valid).toBe(true);
   });
 
+  it('allows anchor-mode backups with zero anchorCount and empty anchors', () => {
+    const result = validateConfig({
+      uwb: {
+        mode: 3,
+        anchorCount: 0,
+        anchors: [],
+      } as any
+    });
+    expect(result.valid).toBe(true);
+  });
+
   it('rejects anchorCount that does not match provided geometry', () => {
     const result = validateConfig({
       uwb: {
