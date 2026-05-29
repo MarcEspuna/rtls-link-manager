@@ -189,12 +189,6 @@ pub struct WifiConfig {
     /// Enable UART bridge (0 or 1)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_uart_bridge: Option<u8>,
-    /// Enable UDP discovery (0 or 1)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub enable_discovery: Option<u8>,
-    /// UDP discovery port
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub discovery_port: Option<u16>,
     /// UDP port for log streaming
     #[serde(skip_serializing_if = "Option::is_none")]
     pub log_udp_port: Option<u16>,
@@ -241,6 +235,15 @@ pub struct UwbConfig {
     /// Safety bias added to RTLSLink TDoA age estimates, in milliseconds
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rtls_beacon_age_bias_ms: Option<u8>,
+    /// Minimum TDoA one-sigma error reported to ArduPilot, in meters
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rtls_beacon_tdoa_sigma_floor_m: Option<f64>,
+    /// Drop physically impossible TDoA samples (0=disabled, 1=enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rtls_beacon_tdoa_physical_guard_enable: Option<u8>,
+    /// Extra allowed TDoA range-difference beyond anchor baseline, in meters
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rtls_beacon_tdoa_physical_guard_margin_m: Option<f64>,
     /// Coordinate rotation in degrees
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rotation_degrees: Option<f64>,
@@ -283,15 +286,30 @@ pub struct UwbConfig {
     /// TDoA TDMA slot duration in microseconds, 0=legacy (~2ms)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tdoa_slot_duration_us: Option<u16>,
+    /// Periodic TDoA anchor stats UDP telemetry enable (0=disabled, 1=enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_anchor_telemetry_enable: Option<u8>,
+    /// TDoA anchor stats UDP telemetry interval in milliseconds (250-60000)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_anchor_telemetry_interval_ms: Option<u16>,
+    /// UDP destination port for TDoA anchor stats telemetry
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_anchor_telemetry_port: Option<u16>,
+    /// TDoA tag matcher policy: 0=Youngest, 1=Random
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_matcher_policy: Option<u8>,
     /// Dynamic anchor positioning enable (0=static, 1=dynamic)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dynamic_anchor_pos_enabled: Option<u8>,
     /// Anchor layout for dynamic position calculation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor_layout: Option<u8>,
-    /// Anchor height for Z calculation (NED: Z = -height)
+    /// Lower-plane anchor height (NED: Z = -height)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor_height: Option<f64>,
+    /// Vertical distance between lower and upper dynamic anchor planes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_plane_separation: Option<f64>,
     /// Bitmask: bit N = anchor N position locked
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor_pos_locked: Option<u32>,
@@ -596,8 +614,6 @@ mod tests {
                 udp_port: Some(14550),
                 enable_web_server: Some(1),
                 enable_uart_bridge: Some(1),
-                enable_discovery: Some(1),
-                discovery_port: Some(3333),
                 log_udp_port: None,
                 log_serial_enabled: None,
                 log_udp_enabled: None,
@@ -633,6 +649,9 @@ mod tests {
                 mavlink_target_system_id: Some(1),
                 output_backend: Some(1),
                 rtls_beacon_age_bias_ms: Some(2),
+                rtls_beacon_tdoa_sigma_floor_m: Some(0.25),
+                rtls_beacon_tdoa_physical_guard_enable: Some(1),
+                rtls_beacon_tdoa_physical_guard_margin_m: Some(1.0),
                 rotation_degrees: Some(0.0),
                 z_calc_mode: Some(1),
                 rf_forward_enable: Some(1),
@@ -647,9 +666,14 @@ mod tests {
                 smart_power_enable: None,
                 tdoa_slot_count: None,
                 tdoa_slot_duration_us: None,
+                tdoa_anchor_telemetry_enable: Some(1),
+                tdoa_anchor_telemetry_interval_ms: Some(1000),
+                tdoa_anchor_telemetry_port: Some(3335),
+                tdoa_matcher_policy: Some(1),
                 dynamic_anchor_pos_enabled: None,
                 anchor_layout: None,
                 anchor_height: None,
+                anchor_plane_separation: None,
                 anchor_pos_locked: None,
                 distance_avg_samples: None,
                 use_2d_estimator: None,

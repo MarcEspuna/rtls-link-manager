@@ -23,6 +23,13 @@ describe('configToParams', () => {
         rmseThreshold: 0.8,
         outputBackend: 1,
         rtlsBeaconAgeBiasMs: 2,
+        rtlsBeaconTdoaSigmaFloorM: 0.25,
+        rtlsBeaconTdoaPhysicalGuardEnable: 1,
+        rtlsBeaconTdoaPhysicalGuardMarginM: 1,
+        tdoaAnchorTelemetryEnable: 1,
+        tdoaAnchorTelemetryIntervalMs: 1000,
+        tdoaAnchorTelemetryPort: 3335,
+        tdoaMatcherPolicy: 1,
       },
       app: {},
     };
@@ -39,6 +46,13 @@ describe('configToParams', () => {
     expect(params).toContainEqual(['uwb', 'rmseThreshold', '0.8']);
     expect(params).toContainEqual(['uwb', 'outputBackend', '1']);
     expect(params).toContainEqual(['uwb', 'rtlsBeaconAgeBiasMs', '2']);
+    expect(params).toContainEqual(['uwb', 'rtlsBeaconTdoaSigmaFloorM', '0.25']);
+    expect(params).toContainEqual(['uwb', 'rtlsBeaconTdoaPhysicalGuardEnable', '1']);
+    expect(params).toContainEqual(['uwb', 'rtlsBeaconTdoaPhysicalGuardMarginM', '1']);
+    expect(params).toContainEqual(['uwb', 'tdoaAnchorTelemetryEnable', '1']);
+    expect(params).toContainEqual(['uwb', 'tdoaAnchorTelemetryIntervalMs', '1000']);
+    expect(params).toContainEqual(['uwb', 'tdoaAnchorTelemetryPort', '3335']);
+    expect(params).not.toContainEqual(['uwb', 'tdoaMatcherPolicy', '1']);
   });
 
   it('rejects oversized flattened anchor writes before upload', () => {
@@ -112,6 +126,29 @@ describe('configToParams', () => {
       uwb: { mode: 4 },
       app: {},
     })).toThrow('Anchor geometry required for TAG_TDOA configs');
+  });
+
+  it('allows dynamic TAG_TDOA configs without writing static anchor geometry', () => {
+    const params = configToParams({
+      wifi: {},
+      uwb: {
+        mode: 4,
+        dynamicAnchorPosEnabled: 1,
+        use2DEstimator: 0,
+        anchorPlaneSeparation: 2,
+        anchorCount: 8,
+      },
+      app: {},
+    });
+
+    expect(params).toContainEqual(['uwb', 'dynamicAnchorPosEnabled', '1']);
+    expect(params).toContainEqual(['uwb', 'use2DEstimator', '0']);
+    expect(params).toContainEqual(['uwb', 'anchorPlaneSeparation', '2']);
+    const paramIndex = (name: string) => params.findIndex(([, paramName]) => paramName === name);
+    expect(paramIndex('anchorPlaneSeparation')).toBeLessThan(paramIndex('dynamicAnchorPosEnabled'));
+    expect(paramIndex('dynamicAnchorPosEnabled')).toBeLessThan(paramIndex('use2DEstimator'));
+    expect(params.some(([, name]) => name === 'anchorCount')).toBe(false);
+    expect(params.some(([, name]) => name.startsWith('devId'))).toBe(false);
   });
 
   it('allows anchor-mode configs without tag anchor geometry', () => {

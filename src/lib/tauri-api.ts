@@ -185,7 +185,7 @@ export interface DeviceCommandResponse {
 }
 
 /**
- * Send a single WebSocket command to a device and return the response.
+ * Send a single UDP MAVLink command to a device and return the response.
  */
 export async function sendDeviceCommand(
   ip: string,
@@ -196,7 +196,7 @@ export async function sendDeviceCommand(
 }
 
 /**
- * Send multiple WebSocket commands to a device sequentially.
+ * Send multiple UDP MAVLink commands to a device sequentially.
  */
 export async function sendDeviceCommands(
   ip: string,
@@ -280,8 +280,10 @@ export async function uploadPresetToDevices(
 }
 
 export interface AnchorCalibrationConfig {
+  anchorCount?: number;
   x: number;
   y: number;
+  planeSeparation?: number;
   layout: 'rectangular-a1x-a3y' | 'rectangular-a1x-a2y' | 'rectangular-a3x-a1y' | 'rectangular-a2x-a3y';
   ips?: string[];
   discoveryDuration: number;
@@ -317,8 +319,10 @@ export interface CalibrationIteration {
 
 export interface CalibrationRun {
   layout: string;
+  anchorCount: number;
   xM: number;
   yM: number;
+  planeSeparationM?: number;
   anchors: Array<{ anchorId: number; ip: string }>;
   iterations: CalibrationIteration[];
   finalResult?: CalibrationIteration;

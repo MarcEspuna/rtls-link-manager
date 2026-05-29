@@ -20,6 +20,7 @@ pub enum FrameType {
     Heartbeat = 16,
     LogMessage = 17,
     TdoaEstimatorStatus = 32,
+    TdoaAnchorStats = 33,
 }
 
 #[derive(Debug, Clone)]
@@ -124,6 +125,7 @@ pub fn decode_command_frame(data: &[u8], device_ip: &str) -> Result<Value, CoreE
         x if x == FrameType::ConfigSnapshot as u8 => decode_config_snapshot(frame.payload)?,
         x if x == FrameType::LedState as u8 => decode_led_state(frame)?,
         x if x == FrameType::TdoaEstimatorStatus as u8 => decode_tdoa_estimator_status(frame)?,
+        x if x == FrameType::TdoaAnchorStats as u8 => decode_tdoa_anchor_stats(frame)?,
         _ => {
             return Err(CoreError::Device(DeviceError::InvalidResponse {
                 ip: device_ip.to_string(),
@@ -173,6 +175,130 @@ fn decode_tdoa_distances(frame: BinaryFrame<'_>) -> Result<Value, CoreError> {
         "activeSlots": active_slots,
         "antennaDelay": antenna_delay,
         "distances": distances,
+    }))
+}
+
+fn decode_tdoa_anchor_stats(frame: BinaryFrame<'_>) -> Result<Value, CoreError> {
+    if frame.status != 0 {
+        return decode_ack(frame);
+    }
+
+    let mut r = Reader::new(frame.payload);
+    let version = r.u8().map_err(CoreError::Other)?;
+    let anchor_id = r.u8().map_err(CoreError::Other)?;
+    let active_slots = r.u8().map_err(CoreError::Other)?;
+    let state_id = r.u8().map_err(CoreError::Other)?;
+    let slot_state_id = r.u8().map_err(CoreError::Other)?;
+    let slot = r.u8().map_err(CoreError::Other)?;
+    let next_slot = r.u8().map_err(CoreError::Other)?;
+    let tx_enabled = r.bool().map_err(CoreError::Other)?;
+    let antenna_delay = r.u16().map_err(CoreError::Other)?;
+    let slot_duration_us = r.u32().map_err(CoreError::Other)?;
+    let frame_duration_us = r.u32().map_err(CoreError::Other)?;
+    let slot0_miss_streak = r.u8().map_err(CoreError::Other)?;
+    let slot0_misses = r.u32().map_err(CoreError::Other)?;
+    let sync_acquisitions = r.u32().map_err(CoreError::Other)?;
+    let sync_losses = r.u32().map_err(CoreError::Other)?;
+    let resyncs = r.u32().map_err(CoreError::Other)?;
+    let stall_resets = r.u32().map_err(CoreError::Other)?;
+    let tx_scheduled = r.u32().map_err(CoreError::Other)?;
+    let tx_done = r.u32().map_err(CoreError::Other)?;
+    let timing = if version >= 2 {
+        json!({
+            "irqCount": r.u32().map_err(CoreError::Other)?,
+            "irqToServiceLastUs": r.u32().map_err(CoreError::Other)?,
+            "irqToServiceMaxUs": r.u32().map_err(CoreError::Other)?,
+            "dwHandleInterruptLastUs": r.u32().map_err(CoreError::Other)?,
+            "dwHandleInterruptMaxUs": r.u32().map_err(CoreError::Other)?,
+            "uwbHardPathLastUs": r.u32().map_err(CoreError::Other)?,
+            "uwbHardPathMaxUs": r.u32().map_err(CoreError::Other)?,
+            "slotSlackMinUs": r.u32().map_err(CoreError::Other)?,
+            "rxArmLateCount": r.u32().map_err(CoreError::Other)?,
+            "txArmLateCount": r.u32().map_err(CoreError::Other)?,
+            "missedDeadlineCount": r.u32().map_err(CoreError::Other)?,
+            "guardedTxCount": r.u32().map_err(CoreError::Other)?,
+            "lastDwStatusBeforeStall": r.u32().map_err(CoreError::Other)?,
+        })
+    } else {
+        json!({
+            "irqCount": 0,
+            "irqToServiceLastUs": 0,
+            "irqToServiceMaxUs": 0,
+            "dwHandleInterruptLastUs": 0,
+            "dwHandleInterruptMaxUs": 0,
+            "uwbHardPathLastUs": 0,
+            "uwbHardPathMaxUs": 0,
+            "slotSlackMinUs": 0,
+            "rxArmLateCount": 0,
+            "txArmLateCount": 0,
+            "missedDeadlineCount": 0,
+            "guardedTxCount": 0,
+            "lastDwStatusBeforeStall": 0,
+        })
+    };
+    let slot_count = r.u8().map_err(CoreError::Other)? as usize;
+
+    let mut packet_ids = Vec::with_capacity(slot_count);
+    for _ in 0..slot_count {
+        packet_ids.push(r.u8().map_err(CoreError::Other)?);
+    }
+
+    let mut distances = Vec::with_capacity(slot_count);
+    for _ in 0..slot_count {
+        distances.push(r.u16().map_err(CoreError::Other)?);
+    }
+
+    let mut slots = Vec::with_capacity(slot_count);
+    for slot_index in 0..slot_count {
+        slots.push(json!({
+            "slot": slot_index,
+            "goodRx": r.u32().map_err(CoreError::Other)?,
+            "rxTimeout": r.u32().map_err(CoreError::Other)?,
+            "rxFailed": r.u32().map_err(CoreError::Other)?,
+            "unexpectedPacket": r.u32().map_err(CoreError::Other)?,
+            "validDistance": r.u32().map_err(CoreError::Other)?,
+            "invalidDistance": r.u32().map_err(CoreError::Other)?,
+            "packetIdMismatch": r.u32().map_err(CoreError::Other)?,
+        }));
+    }
+
+    Ok(json!({
+        "version": version,
+        "anchorId": anchor_id,
+        "activeSlots": active_slots,
+        "state": match state_id {
+            2 => "synchronized",
+            1 => "sync_time",
+            _ => "sync_tdma",
+        },
+        "stateId": state_id,
+        "slotState": match slot_state_id {
+            1 => "tx_done",
+            _ => "rx_done",
+        },
+        "slotStateId": slot_state_id,
+        "slot": slot,
+        "nextSlot": next_slot,
+        "txEnabled": tx_enabled,
+        "antennaDelay": antenna_delay,
+        "slotDurationUs": slot_duration_us,
+        "frameDurationUs": frame_duration_us,
+        "sync": {
+            "slot0MissStreak": slot0_miss_streak,
+            "slot0Misses": slot0_misses,
+            "acquisitions": sync_acquisitions,
+            "losses": sync_losses,
+            "resyncs": resyncs,
+            "stallResets": stall_resets,
+        },
+        "tx": {
+            "scheduled": tx_scheduled,
+            "done": tx_done,
+        },
+        "timing": timing,
+        "packetIds": packet_ids,
+        "distances": distances,
+        "slots": slots,
     }))
 }
 
@@ -411,6 +537,10 @@ mod tests {
         out.extend_from_slice(&value.to_le_bytes());
     }
 
+    fn push_u32(out: &mut Vec<u8>, value: u32) {
+        out.extend_from_slice(&value.to_le_bytes());
+    }
+
     fn push_string(out: &mut Vec<u8>, value: &str) {
         push_u16(out, value.len() as u16);
         out.extend_from_slice(value.as_bytes());
@@ -444,6 +574,52 @@ mod tests {
         assert_eq!(value["activeSlots"], 4);
         assert_eq!(value["antennaDelay"], 16580);
         assert_eq!(value["distances"][7], 107);
+    }
+
+    #[test]
+    fn decodes_tdoa_anchor_stats_frame() {
+        let mut payload = vec![1, 2, 4, 2, 0, 1, 2, 1];
+        push_u16(&mut payload, 16477);
+        push_u32(&mut payload, 2101);
+        push_u32(&mut payload, 8404);
+        payload.push(1);
+        push_u32(&mut payload, 3);
+        push_u32(&mut payload, 4);
+        push_u32(&mut payload, 1);
+        push_u32(&mut payload, 2);
+        push_u32(&mut payload, 1);
+        push_u32(&mut payload, 100);
+        push_u32(&mut payload, 99);
+        payload.push(4);
+        payload.extend_from_slice(&[10, 11, 12, 13]);
+        for i in 0..4 {
+            push_u16(&mut payload, 33000 + i);
+        }
+        for i in 0..4 {
+            push_u32(&mut payload, 20 + i);
+            push_u32(&mut payload, 1);
+            push_u32(&mut payload, 2);
+            push_u32(&mut payload, 3);
+            push_u32(&mut payload, 4);
+            push_u32(&mut payload, 5);
+            push_u32(&mut payload, 6);
+        }
+
+        let value = decode_command_frame(&frame(FrameType::TdoaAnchorStats, payload), "1.2.3.4")
+            .expect("frame decodes");
+
+        assert_eq!(value["version"], 1);
+        assert_eq!(value["anchorId"], 2);
+        assert_eq!(value["state"], "synchronized");
+        assert_eq!(value["txEnabled"], true);
+        assert_eq!(value["sync"]["slot0Misses"], 3);
+        assert_eq!(value["tx"]["done"], 99);
+        assert_eq!(value["packetIds"][2], 12);
+        assert_eq!(value["packetIds"].as_array().unwrap().len(), 4);
+        assert_eq!(value["distances"][3], 33003);
+        assert_eq!(value["slots"].as_array().unwrap().len(), 4);
+        assert_eq!(value["slots"][3]["goodRx"], 23);
+        assert_eq!(value["slots"][3]["packetIdMismatch"], 6);
     }
 
     #[test]

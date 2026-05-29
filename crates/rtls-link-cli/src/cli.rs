@@ -48,6 +48,9 @@ pub enum Commands {
     /// Log streaming from devices
     Logs(LogsArgs),
 
+    /// TDoA anchor UDP telemetry
+    AnchorTelemetry(AnchorTelemetryArgs),
+
     /// Send raw commands to devices
     Cmd(CmdArgs),
 
@@ -121,6 +124,10 @@ impl From<RectLayout> for rtls_link_core::calibration::RectLayout {
 
 #[derive(Args, Debug)]
 pub struct CalibrateAnchorsArgs {
+    /// Anchor count to calibrate: 4 for 2D/default layout, 8 for two-plane 3D layout
+    #[arg(long, default_value = "4")]
+    pub anchor_count: u8,
+
     /// Target X-axis distance in meters (between A0 and +X anchor)
     #[arg(long)]
     pub x: f64,
@@ -128,6 +135,10 @@ pub struct CalibrateAnchorsArgs {
     /// Target Y-axis distance in meters (between A0 and +Y anchor)
     #[arg(long)]
     pub y: f64,
+
+    /// Vertical separation in meters between lower and upper planes (required for --anchor-count 8)
+    #[arg(long)]
+    pub plane_separation: Option<f64>,
 
     /// Layout mapping (which anchor IDs define +X and +Y axes)
     #[arg(long, value_enum, default_value = "rectangular-a1x-a3y")]
@@ -464,6 +475,71 @@ pub struct LogsArgs {
 
     /// UDP port to listen on
     #[arg(long, default_value = "3334")]
+    pub port: u16,
+
+    /// Output as newline-delimited JSON (NDJSON)
+    #[arg(long)]
+    pub ndjson: bool,
+}
+
+// ==================== Anchor Telemetry ====================
+
+#[derive(Args, Debug)]
+pub struct AnchorTelemetryArgs {
+    #[command(subcommand)]
+    pub command: AnchorTelemetryCommands,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum AnchorTelemetryCommands {
+    /// Configure TDoA anchor UDP telemetry parameters
+    Configure(AnchorTelemetryConfigureArgs),
+
+    /// Listen for TDoA anchor UDP telemetry frames
+    Listen(AnchorTelemetryListenArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct AnchorTelemetryConfigureArgs {
+    /// Target: device IP, "all", or comma-separated IPs
+    pub target: String,
+
+    /// Enable periodic telemetry
+    #[arg(long, conflicts_with = "disable")]
+    pub enable: bool,
+
+    /// Disable periodic telemetry
+    #[arg(long, conflicts_with = "enable")]
+    pub disable: bool,
+
+    /// Telemetry interval in milliseconds
+    #[arg(long)]
+    pub interval_ms: Option<u16>,
+
+    /// UDP destination port
+    #[arg(long)]
+    pub port: Option<u16>,
+
+    /// Filter by role when target is "all"
+    #[arg(long, value_enum)]
+    pub filter_role: Option<RoleFilter>,
+
+    /// Discovery duration when using "all" (seconds)
+    #[arg(long, default_value = "3")]
+    pub discovery_duration: u64,
+
+    /// Save to flash after writing
+    #[arg(long)]
+    pub save: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct AnchorTelemetryListenArgs {
+    /// Device IP address (optional, default: all devices)
+    pub ip: Option<String>,
+
+    /// UDP port to listen on
+    #[arg(long, default_value = "3335")]
     pub port: u16,
 
     /// Output as newline-delimited JSON (NDJSON)

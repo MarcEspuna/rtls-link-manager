@@ -1,0 +1,180 @@
+<?xml version="1.0"?>
+<mavlink>
+  <include>minimal.xml</include>
+  <version>3</version>
+  <dialect>241</dialect>
+
+  <enums>
+    <enum name="RTLS_DEVICE_ROLE">
+      <description>RTLS-Link device role.</description>
+      <entry value="0" name="RTLS_DEVICE_ROLE_UNKNOWN"/>
+      <entry value="3" name="RTLS_DEVICE_ROLE_ANCHOR_TDOA"/>
+      <entry value="4" name="RTLS_DEVICE_ROLE_TAG_TDOA"/>
+    </enum>
+
+    <enum name="RTLS_DEVICE_STATUS_FLAGS" bitmask="true">
+      <description>RTLS-Link status flags.</description>
+      <entry value="1" name="RTLS_DEVICE_STATUS_FLAG_SENDING_POSITION"/>
+      <entry value="2" name="RTLS_DEVICE_STATUS_FLAG_ORIGIN_SENT"/>
+      <entry value="4" name="RTLS_DEVICE_STATUS_FLAG_RANGEFINDER_ENABLED"/>
+      <entry value="8" name="RTLS_DEVICE_STATUS_FLAG_RANGEFINDER_HEALTHY"/>
+      <entry value="16" name="RTLS_DEVICE_STATUS_FLAG_UWB_ENABLED"/>
+      <entry value="32" name="RTLS_DEVICE_STATUS_FLAG_RF_FORWARD_ENABLED"/>
+      <entry value="64" name="RTLS_DEVICE_STATUS_FLAG_LOG_SERIAL_ENABLED"/>
+      <entry value="128" name="RTLS_DEVICE_STATUS_FLAG_LOG_UDP_ENABLED"/>
+      <entry value="256" name="RTLS_DEVICE_STATUS_FLAG_DYNAMIC_ANCHORS_ENABLED"/>
+    </enum>
+
+    <enum name="RTLS_COMMAND">
+      <description>RTLS-Link management commands sent on the MAVLink management endpoint.</description>
+      <entry value="0" name="RTLS_COMMAND_NONE"/>
+      <entry value="1" name="RTLS_COMMAND_REBOOT"/>
+      <entry value="2" name="RTLS_COMMAND_FIRMWARE_INFO"/>
+      <entry value="3" name="RTLS_COMMAND_SAVE_CONFIG"/>
+      <entry value="4" name="RTLS_COMMAND_LOAD_CONFIG"/>
+      <entry value="5" name="RTLS_COMMAND_BACKUP_CONFIG"/>
+      <entry value="6" name="RTLS_COMMAND_LIST_CONFIGS"/>
+      <entry value="7" name="RTLS_COMMAND_SAVE_CONFIG_AS"/>
+      <entry value="8" name="RTLS_COMMAND_LOAD_CONFIG_NAMED"/>
+      <entry value="9" name="RTLS_COMMAND_READ_CONFIG_NAMED"/>
+      <entry value="10" name="RTLS_COMMAND_DELETE_CONFIG"/>
+      <entry value="11" name="RTLS_COMMAND_TOGGLE_LED2"/>
+      <entry value="12" name="RTLS_COMMAND_GET_LED2_STATE"/>
+      <entry value="13" name="RTLS_COMMAND_TDOA_DISTANCES"/>
+      <entry value="14" name="RTLS_COMMAND_TDOA_ANCHOR_STATS"/>
+      <entry value="15" name="RTLS_COMMAND_TDOA_ANCHOR_MODEL_RESET"/>
+      <entry value="16" name="RTLS_COMMAND_TDOA_ANCHOR_MODEL_COLLECT_START"/>
+      <entry value="17" name="RTLS_COMMAND_TDOA_ANCHOR_MODEL_COLLECT_STATUS"/>
+      <entry value="18" name="RTLS_COMMAND_TDOA_ANCHOR_MODEL_LOCK"/>
+      <entry value="19" name="RTLS_COMMAND_TDOA_ANCHOR_MODEL_STATUS"/>
+      <entry value="20" name="RTLS_COMMAND_TDOA_ANCHOR_MODEL_EXPORT"/>
+      <entry value="21" name="RTLS_COMMAND_TDOA_ESTIMATOR_STATS_RESET"/>
+    </enum>
+
+    <enum name="RTLS_RESULT">
+      <description>RTLS-Link management command result.</description>
+      <entry value="0" name="RTLS_RESULT_ACCEPTED"/>
+      <entry value="1" name="RTLS_RESULT_FAILED"/>
+      <entry value="2" name="RTLS_RESULT_UNSUPPORTED"/>
+      <entry value="3" name="RTLS_RESULT_INVALID_MODE"/>
+      <entry value="4" name="RTLS_RESULT_NOT_FOUND"/>
+      <entry value="5" name="RTLS_RESULT_INVALID_ARGUMENT"/>
+    </enum>
+
+    <enum name="RTLS_PAYLOAD_TYPE">
+      <description>RTLS-Link payload encoding.</description>
+      <entry value="0" name="RTLS_PAYLOAD_TYPE_NONE"/>
+      <entry value="1" name="RTLS_PAYLOAD_TYPE_BINARY_FRAME"/>
+      <entry value="2" name="RTLS_PAYLOAD_TYPE_TEXT"/>
+    </enum>
+
+    <enum name="MAV_PARAM_EXT_TYPE">
+      <description>Specifies the datatype of a MAVLink extended parameter.</description>
+      <entry value="1" name="MAV_PARAM_EXT_TYPE_UINT8"/>
+      <entry value="2" name="MAV_PARAM_EXT_TYPE_INT8"/>
+      <entry value="3" name="MAV_PARAM_EXT_TYPE_UINT16"/>
+      <entry value="4" name="MAV_PARAM_EXT_TYPE_INT16"/>
+      <entry value="5" name="MAV_PARAM_EXT_TYPE_UINT32"/>
+      <entry value="6" name="MAV_PARAM_EXT_TYPE_INT32"/>
+      <entry value="7" name="MAV_PARAM_EXT_TYPE_UINT64"/>
+      <entry value="8" name="MAV_PARAM_EXT_TYPE_INT64"/>
+      <entry value="9" name="MAV_PARAM_EXT_TYPE_REAL32"/>
+      <entry value="10" name="MAV_PARAM_EXT_TYPE_REAL64"/>
+      <entry value="11" name="MAV_PARAM_EXT_TYPE_CUSTOM"/>
+    </enum>
+
+    <enum name="PARAM_ACK">
+      <description>Result from PARAM_EXT_SET message.</description>
+      <entry value="0" name="PARAM_ACK_ACCEPTED"/>
+      <entry value="1" name="PARAM_ACK_VALUE_UNSUPPORTED"/>
+      <entry value="2" name="PARAM_ACK_FAILED"/>
+      <entry value="3" name="PARAM_ACK_IN_PROGRESS"/>
+    </enum>
+  </enums>
+
+  <messages>
+    <message id="320" name="PARAM_EXT_REQUEST_READ">
+      <description>Request to read a parameter by id or index.</description>
+      <field type="uint8_t" name="target_system">System ID.</field>
+      <field type="uint8_t" name="target_component">Component ID.</field>
+      <field type="char[16]" name="param_id">Parameter id.</field>
+      <field type="int16_t" name="param_index" invalid="-1">Parameter index, or -1 to use param_id.</field>
+    </message>
+
+    <message id="321" name="PARAM_EXT_REQUEST_LIST">
+      <description>Request all parameters from this component.</description>
+      <field type="uint8_t" name="target_system">System ID.</field>
+      <field type="uint8_t" name="target_component">Component ID.</field>
+    </message>
+
+    <message id="322" name="PARAM_EXT_VALUE">
+      <description>Emit one extended parameter value.</description>
+      <field type="char[16]" name="param_id">Parameter id.</field>
+      <field type="char[128]" name="param_value">Parameter value.</field>
+      <field type="uint8_t" name="param_type" enum="MAV_PARAM_EXT_TYPE">Parameter type.</field>
+      <field type="uint16_t" name="param_count">Total number of parameters.</field>
+      <field type="uint16_t" name="param_index">Index of this parameter.</field>
+    </message>
+
+    <message id="323" name="PARAM_EXT_SET">
+      <description>Set one extended parameter value.</description>
+      <field type="uint8_t" name="target_system">System ID.</field>
+      <field type="uint8_t" name="target_component">Component ID.</field>
+      <field type="char[16]" name="param_id">Parameter id.</field>
+      <field type="char[128]" name="param_value">Parameter value.</field>
+      <field type="uint8_t" name="param_type" enum="MAV_PARAM_EXT_TYPE">Parameter type.</field>
+    </message>
+
+    <message id="324" name="PARAM_EXT_ACK">
+      <description>Response from PARAM_EXT_SET.</description>
+      <field type="char[16]" name="param_id">Parameter id.</field>
+      <field type="char[128]" name="param_value">Parameter value.</field>
+      <field type="uint8_t" name="param_type" enum="MAV_PARAM_EXT_TYPE">Parameter type.</field>
+      <field type="uint8_t" name="param_result" enum="PARAM_ACK">Result code.</field>
+    </message>
+
+    <message id="52000" name="RTLS_DEVICE_STATUS">
+      <description>Periodic RTLS-Link device status for discovery and monitoring.</description>
+      <field type="uint32_t" name="time_boot_ms" units="ms">Timestamp since boot.</field>
+      <field type="uint32_t" name="flags" enum="RTLS_DEVICE_STATUS_FLAGS">Status flags.</field>
+      <field type="uint16_t" name="avg_rate_chz" units="cHz">Average position update rate.</field>
+      <field type="uint16_t" name="min_rate_chz" units="cHz">Minimum position update rate.</field>
+      <field type="uint16_t" name="max_rate_chz" units="cHz">Maximum position update rate.</field>
+      <field type="uint16_t" name="log_udp_port">UDP log port.</field>
+      <field type="uint8_t" name="role" enum="RTLS_DEVICE_ROLE">RTLS role.</field>
+      <field type="uint8_t" name="anchors_seen">Visible anchor count.</field>
+      <field type="uint8_t" name="mavlink_target_system">Configured ArduPilot target system id.</field>
+      <field type="uint8_t" name="log_level">Compiled log level.</field>
+      <field type="uint8_t" name="dynamic_anchor_count">Number of valid dynamic anchor entries.</field>
+      <field type="uint8_t[8]" name="dynamic_anchor_id">Dynamic anchor IDs.</field>
+      <field type="int32_t[8]" name="dynamic_anchor_x_mm" units="mm">Dynamic anchor X positions.</field>
+      <field type="int32_t[8]" name="dynamic_anchor_y_mm" units="mm">Dynamic anchor Y positions.</field>
+      <field type="int32_t[8]" name="dynamic_anchor_z_mm" units="mm">Dynamic anchor Z positions.</field>
+      <field type="uint8_t[4]" name="ip">Device IPv4 address.</field>
+      <field type="uint8_t[6]" name="mac">WiFi MAC address.</field>
+      <field type="char[16]" name="device_type">Device type string.</field>
+      <field type="char[8]" name="short_addr">UWB short address string.</field>
+      <field type="char[16]" name="firmware_version">Firmware version string.</field>
+    </message>
+
+    <message id="52001" name="RTLS_COMMAND">
+      <description>RTLS-Link management command. Simple commands can be represented by command id; named commands use name.</description>
+      <field type="uint32_t" name="request_id">Client request id used to match responses.</field>
+      <field type="uint16_t" name="command" enum="RTLS_COMMAND">RTLS command id.</field>
+      <field type="uint8_t" name="name_len">Valid bytes in name.</field>
+      <field type="char[32]" name="name">Optional command argument.</field>
+    </message>
+
+    <message id="52002" name="RTLS_COMMAND_RESPONSE">
+      <description>RTLS-Link management command response.</description>
+      <field type="uint32_t" name="request_id">Client request id.</field>
+      <field type="uint16_t" name="command" enum="RTLS_COMMAND">RTLS command id.</field>
+      <field type="uint8_t" name="result" enum="RTLS_RESULT">Command result.</field>
+      <field type="uint8_t" name="payload_type" enum="RTLS_PAYLOAD_TYPE">Payload encoding.</field>
+      <field type="uint8_t" name="chunk_index">Zero-based payload chunk index.</field>
+      <field type="uint8_t" name="chunk_count">Total payload chunks for this response.</field>
+      <field type="uint8_t" name="payload_len">Valid bytes in payload.</field>
+      <field type="uint8_t[220]" name="payload">Response payload.</field>
+    </message>
+  </messages>
+</mavlink>

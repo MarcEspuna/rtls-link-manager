@@ -6,6 +6,31 @@ export interface ConfigValidationResult {
   errors: string[];
 }
 
+function anchorsAreNonCoplanar3D(anchors: Array<{ x: number; y: number; z: number }>): boolean {
+  if (anchors.length < 4) return false;
+
+  const p0 = anchors[0];
+  const vec = (p: typeof p0) => ({ x: p.x - p0.x, y: p.y - p0.y, z: p.z - p0.z });
+  const norm2 = (v: ReturnType<typeof vec>) => v.x * v.x + v.y * v.y + v.z * v.z;
+  const cross = (a: ReturnType<typeof vec>, b: ReturnType<typeof vec>) => ({
+    x: a.y * b.z - a.z * b.y,
+    y: a.z * b.x - a.x * b.z,
+    z: a.x * b.y - a.y * b.x,
+  });
+  const dot = (a: ReturnType<typeof vec>, b: ReturnType<typeof vec>) => a.x * b.x + a.y * b.y + a.z * b.z;
+
+  const v1 = anchors.slice(1).map(vec).find((v) => norm2(v) > 1e-6);
+  if (!v1) return false;
+
+  const normal = anchors.slice(1).map(vec).map((v) => cross(v1, v)).find((n) => norm2(n) > 1e-8);
+  if (!normal) return false;
+
+  const normalNorm = Math.sqrt(norm2(normal));
+  const scale = Math.max(1, ...anchors.slice(1).map((p) => Math.sqrt(norm2(vec(p)))));
+  const tolerance = Math.max(0.01, scale * 0.001);
+  return anchors.slice(1).map(vec).some((v) => Math.abs(dot(normal, v)) / normalNorm > tolerance);
+}
+
 export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationResult {
   const errors: string[] = [];
 
@@ -23,12 +48,15 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
 
   if (config.uwb) {
     const isTagTdoa = config.uwb.mode === 4;
+    const dynamicAnchorsEnabled = config.uwb.dynamicAnchorPosEnabled === 1;
+    const use3DEstimator = config.uwb.use2DEstimator === 0;
     const shouldValidateTagAnchors = isTagTdoa || config.uwb.mode === undefined;
+    const shouldValidateStaticTagAnchors = shouldValidateTagAnchors && !dynamicAnchorsEnabled;
     const hasAnchorArray = Array.isArray(config.uwb.anchors);
     const hasAnchorGeometry = hasAnchorArray && config.uwb.anchors!.length > 0;
     const anchorCount = config.uwb.anchorCount;
     let validAnchorCount: number | null = null;
-    if (shouldValidateTagAnchors && anchorCount !== undefined) {
+    if (shouldValidateStaticTagAnchors && anchorCount !== undefined) {
       const count = Number(anchorCount);
       if (!Number.isInteger(count) || count < 0) {
         errors.push('Anchor count must be positive when set');
@@ -49,14 +77,25 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       errors.push('Anchor geometry required when anchorCount is set');
     }
 
-    if (isTagTdoa && !hasAnchorGeometry) {
+    if (isTagTdoa && !dynamicAnchorsEnabled && !hasAnchorGeometry) {
       errors.push('Anchor geometry required for TAG_TDOA configs');
     }
 
-    if (shouldValidateTagAnchors && hasAnchorGeometry) {
+    if (shouldValidateStaticTagAnchors && hasAnchorGeometry) {
       const anchorError = validateAnchorList(config.uwb.anchors!);
       if (anchorError) {
         errors.push(anchorError);
+      }
+      if (isTagTdoa && use3DEstimator && !dynamicAnchorsEnabled
+        && !anchorsAreNonCoplanar3D(config.uwb.anchors!)) {
+        errors.push('3D TAG_TDOA static geometry requires non-coplanar anchors');
+      }
+    }
+
+    if (isTagTdoa && dynamicAnchorsEnabled && use3DEstimator) {
+      const separation = Number(config.uwb.anchorPlaneSeparation);
+      if (!Number.isFinite(separation) || separation <= 0) {
+        errors.push('3D dynamic anchors require a positive anchor plane separation');
       }
     }
 
@@ -75,6 +114,26 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
         errors.push('TDoA slot duration must be an integer');
       } else if (v < 0) {
         errors.push('TDoA slot duration must be >= 0');
+      }
+    }
+
+    if (config.uwb.tdoaAnchorTelemetryEnable !== undefined &&
+      config.uwb.tdoaAnchorTelemetryEnable !== 0 &&
+      config.uwb.tdoaAnchorTelemetryEnable !== 1) {
+      errors.push('TDoA anchor telemetry enable must be 0 or 1');
+    }
+
+    if (config.uwb.tdoaAnchorTelemetryIntervalMs !== undefined) {
+      const v = Number(config.uwb.tdoaAnchorTelemetryIntervalMs);
+      if (Number.isNaN(v) || !Number.isInteger(v) || v < 250 || v > 60000) {
+        errors.push('TDoA anchor telemetry interval must be an integer in 250-60000 ms');
+      }
+    }
+
+    if (config.uwb.tdoaAnchorTelemetryPort !== undefined) {
+      const v = Number(config.uwb.tdoaAnchorTelemetryPort);
+      if (Number.isNaN(v) || !Number.isInteger(v) || v < 1 || v > 65535) {
+        errors.push('TDoA anchor telemetry port must be an integer in 1-65535');
       }
     }
 
@@ -123,6 +182,32 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       if (Number.isNaN(v) || !Number.isInteger(v) || v < 0 || v > 20) {
         errors.push('RTLSLink beacon age bias must be an integer in 0-20 ms');
       }
+    }
+
+    if (config.uwb.rtlsBeaconTdoaSigmaFloorM !== undefined) {
+      const v = Number(config.uwb.rtlsBeaconTdoaSigmaFloorM);
+      if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
+        errors.push('RTLSLink beacon TDoA sigma floor must be >= 0 m');
+      }
+    }
+
+    if (config.uwb.rtlsBeaconTdoaPhysicalGuardEnable !== undefined &&
+      config.uwb.rtlsBeaconTdoaPhysicalGuardEnable !== 0 &&
+      config.uwb.rtlsBeaconTdoaPhysicalGuardEnable !== 1) {
+      errors.push('RTLSLink beacon TDoA physical guard enable must be 0 or 1');
+    }
+
+    if (config.uwb.rtlsBeaconTdoaPhysicalGuardMarginM !== undefined) {
+      const v = Number(config.uwb.rtlsBeaconTdoaPhysicalGuardMarginM);
+      if (Number.isNaN(v) || !Number.isFinite(v) || v < 0) {
+        errors.push('RTLSLink beacon TDoA physical guard margin must be >= 0 m');
+      }
+    }
+
+    if (config.uwb.tdoaMatcherPolicy !== undefined &&
+      config.uwb.tdoaMatcherPolicy !== 0 &&
+      config.uwb.tdoaMatcherPolicy !== 1) {
+      errors.push('TDoA matcher policy must be 0 or 1');
     }
 
     if (config.uwb.rmseThreshold !== undefined) {

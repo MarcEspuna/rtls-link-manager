@@ -10,7 +10,7 @@ use crate::error::CliError;
 use crate::output::get_formatter;
 use crate::types::{Device, DeviceRole, GpsOrigin, LocationData, Preset, PresetInfo, PresetType};
 
-use rtls_link_core::device::websocket::{send_command, DeviceConnection};
+use rtls_link_core::device::mavlink::{send_command, DeviceConnection};
 use rtls_link_core::error::StorageError;
 use rtls_link_core::protocol::commands::Commands;
 use rtls_link_core::protocol::config_params::{

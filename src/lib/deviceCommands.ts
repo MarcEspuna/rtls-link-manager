@@ -3,7 +3,7 @@
  *
  * This module provides reusable functions for sending commands to devices
  * via the Tauri backend, supporting both single and bulk operations.
- * All device communication is routed through Rust (WebSocket/HTTP handled there).
+ * All device communication is routed through Rust (UDP MAVLink/HTTP handled there).
  */
 
 import { Device } from '@shared/types';
@@ -125,7 +125,7 @@ export async function sendDeviceCommand<T = string>(
 /**
  * Send multiple commands to a device sequentially.
  *
- * The Rust backend sends commands sequentially over one WebSocket connection.
+ * The Rust backend sends commands sequentially over one UDP MAVLink connection.
  * Response validation and progress callbacks are handled on the frontend.
  */
 export async function sendDeviceCommands(

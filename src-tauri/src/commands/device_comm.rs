@@ -1,6 +1,6 @@
 //! Device communication commands.
 //!
-//! Provides Tauri commands for sending WebSocket commands to devices
+//! Provides Tauri commands for sending UDP MAVLink commands to devices
 //! and uploading firmware via OTA. This routes all device communication
 //! through the Rust backend instead of direct browser connections.
 
@@ -16,11 +16,11 @@ use crate::error::AppError;
 use crate::state::AppState;
 use crate::types::{DeviceConfig, Preset, PresetType};
 use rtls_link_core::calibration::{calibrate_anchors, AnchorCalibrationConfig, CalibrationRun};
+use rtls_link_core::device::mavlink::{
+    send_command_parsed, send_commands_parsed, DeviceCommandResponse, DeviceConnection,
+};
 use rtls_link_core::device::ota::{
     upload_firmware_bulk_with_cancel, upload_firmware_with_progress_and_cancel, OtaProgressHandler,
-};
-use rtls_link_core::device::websocket::{
-    send_command_parsed, send_commands_parsed, DeviceCommandResponse, DeviceConnection,
 };
 use rtls_link_core::protocol::commands::Commands;
 use rtls_link_core::protocol::config_params::{config_to_params, location_to_params};

@@ -38,7 +38,7 @@ const navItems: NavItem[] = [
   { id: 'anchors', label: 'Anchor List' },
   { id: 'antennaCal', label: 'Antenna Calibration', condition: (config) => config?.uwb.mode === 3 },
   { id: 'dynamic', label: 'Dynamic Anchors', condition: (config) =>
-    config?.uwb.mode === 4 },
+    config?.uwb.mode === 3 || config?.uwb.mode === 4 || config?.uwb.dynamicAnchorPosEnabled === 1 },
   { id: 'wifi', label: 'WiFi', expertOnly: true },
   { id: 'logging', label: 'Logging', expertOnly: true },
   { id: 'advanced', label: 'Advanced', expertOnly: true },
@@ -93,7 +93,10 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
 
   const transformConfigResult = (result: any): DeviceConfig => {
     const uwb = result.uwb || {};
-    const anchors = flatToAnchors(uwb, uwb.anchorCount || 0);
+    const dynamicAnchorsEnabled = uwb.dynamicAnchorPosEnabled === 1;
+    const anchors = dynamicAnchorsEnabled
+      ? (Array.isArray(uwb.anchors) ? uwb.anchors : [])
+      : flatToAnchors(uwb, uwb.anchorCount || 0);
     return {
       ...result,
       uwb: {
@@ -223,7 +226,11 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
 
   const getConfiguredAnchorCommands = (nextConfig: DeviceConfig) => {
     const anchors = nextConfig.uwb.anchors || [];
-    return nextConfig.uwb.mode === 4 && anchors.length > 0 ? getAnchorWriteCommands(anchors) : [];
+    return nextConfig.uwb.mode === 4
+      && nextConfig.uwb.dynamicAnchorPosEnabled !== 1
+      && anchors.length > 0
+      ? getAnchorWriteCommands(anchors)
+      : [];
   };
 
   const handleChange = (group: keyof DeviceConfig, name: string, value: any) => {

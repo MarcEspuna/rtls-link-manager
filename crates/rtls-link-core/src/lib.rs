@@ -3,6 +3,7 @@ pub mod device;
 pub mod discovery;
 pub mod error;
 pub mod health;
+pub mod mavlink;
 pub mod protocol;
 pub mod storage;
 pub mod types;

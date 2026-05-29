@@ -6,20 +6,20 @@ use crate::cli::CmdArgs;
 use crate::error::CliError;
 use crate::output::get_formatter;
 
-use rtls_link_core::device::websocket::send_command;
-use rtls_link_core::protocol::commands::is_json_command;
+use rtls_link_core::device::mavlink::send_command;
+use rtls_link_core::protocol::commands::is_structured_response_command;
 
 /// Run the cmd command
 pub async fn run_cmd(args: CmdArgs, timeout: u64, json: bool) -> Result<(), CliError> {
     let formatter = get_formatter(json);
     let timeout_duration = Duration::from_millis(timeout);
 
-    let expect_json = args.expect_json || is_json_command(&args.command);
+    let expect_structured = args.expect_json || is_structured_response_command(&args.command);
 
     let response = send_command(&args.ip, &args.command, timeout_duration).await?;
 
     if json {
-        if expect_json {
+        if expect_structured {
             if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&response) {
                 println!(
                     "{}",
@@ -69,7 +69,7 @@ pub async fn run_cmd(args: CmdArgs, timeout: u64, json: bool) -> Result<(), CliE
             );
         }
     } else {
-        if expect_json {
+        if expect_structured {
             if let Some(start) = response.find('{') {
                 if let Ok(json_value) =
                     serde_json::from_str::<serde_json::Value>(&response[start..])

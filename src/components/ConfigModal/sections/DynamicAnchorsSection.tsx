@@ -63,56 +63,72 @@ export function DynamicAnchorsSection({
         </div>
       </div>
 
+      <div className={styles.section}>
+        <h3>Configuration</h3>
+        <div className={styles.field}>
+          <label>Anchor Layout</label>
+          <LayoutSelector
+            value={config.uwb.anchorLayout ?? AnchorLayout.RECTANGULAR_A1X_A3Y}
+            onChange={(layout) => {
+              onChange('uwb', 'anchorLayout', layout);
+              onApply('uwb', 'anchorLayout', layout);
+            }}
+          />
+        </div>
+        <div className={styles.fieldRow}>
+          <div className={styles.field}>
+            <label>Lower Plane Height (m)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={config.uwb.anchorHeight ?? 0}
+              onChange={(e) => onChange('uwb', 'anchorHeight', safeParseFloat(e.target.value, 0))}
+              onBlur={(e) => {
+                const val = safeParseFloat(e.target.value, 0);
+                onChange('uwb', 'anchorHeight', val);
+                onApply('uwb', 'anchorHeight', val);
+              }}
+              placeholder="Height above ground (NED: Z = -height)"
+            />
+          </div>
+          <div className={styles.field}>
+            <label>Plane Separation (m)</label>
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              value={config.uwb.anchorPlaneSeparation ?? 0}
+              onChange={(e) => onChange('uwb', 'anchorPlaneSeparation', safeParseFloat(e.target.value, 0))}
+              onBlur={(e) => {
+                const val = safeParseFloat(e.target.value, 0);
+                onChange('uwb', 'anchorPlaneSeparation', val);
+                onApply('uwb', 'anchorPlaneSeparation', val);
+              }}
+              placeholder="Vertical offset for 3D anchors"
+            />
+          </div>
+          <div className={styles.field}>
+            <label>Distance Averaging Samples</label>
+            <input
+              type="number"
+              step="1"
+              min="1"
+              max="500"
+              value={config.uwb.distanceAvgSamples ?? 50}
+              onChange={(e) => onChange('uwb', 'distanceAvgSamples', safeParseInt(e.target.value, 50))}
+              onBlur={(e) => {
+                const val = safeParseInt(e.target.value, 50);
+                onChange('uwb', 'distanceAvgSamples', val);
+                onApply('uwb', 'distanceAvgSamples', val);
+              }}
+              placeholder="Samples to average (default: 50)"
+            />
+          </div>
+        </div>
+      </div>
+
       {isEnabled && (
         <>
-          <div className={styles.section}>
-            <h3>Configuration</h3>
-            <div className={styles.field}>
-              <label>Anchor Layout</label>
-              <LayoutSelector
-                value={config.uwb.anchorLayout ?? AnchorLayout.RECTANGULAR_A1X_A3Y}
-                onChange={(layout) => {
-                  onChange('uwb', 'anchorLayout', layout);
-                  onApply('uwb', 'anchorLayout', layout);
-                }}
-              />
-            </div>
-            <div className={styles.fieldRow}>
-              <div className={styles.field}>
-                <label>Anchor Height (m)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={config.uwb.anchorHeight ?? 0}
-                  onChange={(e) => onChange('uwb', 'anchorHeight', safeParseFloat(e.target.value, 0))}
-                  onBlur={(e) => {
-                    const val = safeParseFloat(e.target.value, 0);
-                    onChange('uwb', 'anchorHeight', val);
-                    onApply('uwb', 'anchorHeight', val);
-                  }}
-                  placeholder="Height above ground (NED: Z = -height)"
-                />
-              </div>
-              <div className={styles.field}>
-                <label>Distance Averaging Samples</label>
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  max="500"
-                  value={config.uwb.distanceAvgSamples ?? 50}
-                  onChange={(e) => onChange('uwb', 'distanceAvgSamples', safeParseInt(e.target.value, 50))}
-                  onBlur={(e) => {
-                    const val = safeParseInt(e.target.value, 50);
-                    onChange('uwb', 'distanceAvgSamples', val);
-                    onApply('uwb', 'distanceAvgSamples', val);
-                  }}
-                  placeholder="Samples to average (default: 50)"
-                />
-              </div>
-            </div>
-          </div>
-
           <div className={styles.section}>
             <h3>Calculated Positions</h3>
             <p>

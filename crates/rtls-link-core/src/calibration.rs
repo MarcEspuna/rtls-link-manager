@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use tokio::time::sleep;
 
-use crate::device::websocket::{send_command_with_retry, BatchSender};
+use crate::device::mavlink::{send_command_with_retry, BatchSender};
 use crate::discovery::service::{DiscoveryService, DISCOVERY_PORT};
 use crate::error::{CoreError, Result};
 use crate::protocol::commands::Commands;
@@ -41,8 +41,10 @@ pub struct AnchorEndpoint {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnchorCalibrationConfig {
+    pub anchor_count: Option<u8>,
     pub x: f64,
     pub y: f64,
+    pub plane_separation: Option<f64>,
     pub layout: RectLayout,
     pub ips: Option<Vec<String>>,
     pub discovery_duration: u64,
@@ -68,7 +70,7 @@ pub enum CalibrationEvent {
     Iteration {
         iteration: u8,
         max_iterations: u8,
-        delays: [u16; 4],
+        delays: Vec<u16>,
         error: ErrorReport,
     },
     Complete {
@@ -81,8 +83,10 @@ pub enum CalibrationEvent {
 #[serde(rename_all = "camelCase")]
 pub struct CalibrationRun {
     pub layout: RectLayout,
+    pub anchor_count: u8,
     pub x_m: f64,
     pub y_m: f64,
+    pub plane_separation_m: Option<f64>,
     pub anchors: Vec<AnchorEndpoint>,
     pub iterations: Vec<CalibrationIteration>,
     pub final_result: Option<CalibrationIteration>,
@@ -94,7 +98,7 @@ pub struct CalibrationRun {
 #[serde(rename_all = "camelCase")]
 pub struct CalibrationIteration {
     pub iteration: u8,
-    pub delays: [u16; 4],
+    pub delays: Vec<u16>,
     pub error: ErrorReport,
 }
 
@@ -104,7 +108,7 @@ struct TdoaDistancesResponse {
     anchor_id: u8,
     antenna_delay: u16,
     #[serde(rename = "activeSlots")]
-    _active_slots: u8,
+    active_slots: u8,
     distances: Vec<u16>,
 }
 
@@ -172,12 +176,36 @@ where
     F: FnMut(CalibrationEvent) + Send,
 {
     let timeout_ms = args.timeout_ms;
-    // Only supports 4-anchor rectangular layouts for now.
-    let required_anchor_ids: [u8; 4] = [0, 1, 2, 3];
+    let anchor_count = match args.anchor_count.unwrap_or(4) {
+        4 => 4u8,
+        8 => 8u8,
+        other => {
+            return Err(CoreError::Other(format!(
+                "Unsupported calibration anchor count {}. Use 4 or 8.",
+                other
+            )));
+        }
+    };
+    let plane_separation = if anchor_count == 8 {
+        let Some(value) = args.plane_separation else {
+            return Err(CoreError::Other(
+                "8-anchor calibration requires planeSeparation".to_string(),
+            ));
+        };
+        if !value.is_finite() || value <= 0.0 {
+            return Err(CoreError::Other(
+                "8-anchor calibration requires a positive planeSeparation".to_string(),
+            ));
+        }
+        Some(value)
+    } else {
+        None
+    };
+    let required_anchor_ids: Vec<u8> = (0..anchor_count).collect();
 
     let anchors = resolve_anchors(&args, timeout_ms).await?;
 
-    // Ensure we have 0..3 once each.
+    // Ensure we have the required contiguous anchor IDs once each.
     let mut anchor_map: HashMap<u8, AnchorEndpoint> = HashMap::new();
     for a in anchors {
         let anchor_id = a.anchor_id;
@@ -191,11 +219,32 @@ where
         }
     }
 
-    for id in required_anchor_ids {
-        if !anchor_map.contains_key(&id) {
+    for id in &required_anchor_ids {
+        if !anchor_map.contains_key(id) {
             return Err(CoreError::Other(format!(
-                "Missing anchorId {}. Need anchors 0..3 in anchor_tdoa mode.",
-                id
+                "Missing anchorId {}. Need anchors 0..{} in anchor_tdoa mode.",
+                id,
+                anchor_count - 1
+            )));
+        }
+    }
+
+    for ep in anchor_map.values() {
+        let resp = send_command_with_retry(
+            &ep.ip,
+            Commands::tdoa_distances(),
+            Duration::from_millis(timeout_ms),
+            1,
+        )
+        .await?;
+        let parsed: TdoaDistancesResponse = parse_json_response(&resp, &ep.ip)?;
+        if parsed.active_slots != 0 && parsed.active_slots < anchor_count {
+            return Err(CoreError::Other(format!(
+                "Anchor {} reports activeSlots={} but {}-anchor calibration requires all IDs 0..{} active",
+                parsed.anchor_id,
+                parsed.active_slots,
+                anchor_count,
+                anchor_count - 1
             )));
         }
     }
@@ -206,13 +255,26 @@ where
         .collect();
     endpoints.sort_by_key(|e| e.anchor_id);
 
-    // Build target distances (meters) for all pairs 0..3.
-    let target_m = build_rectangular_targets(args.layout.clone(), args.x, args.y);
-    let target_ticks = target_m.map(|row| row.map(|d| d / DW1000_TIME_TO_METERS));
+    // Build target distances (meters) for all pairs.
+    let target_m = build_rectangular_targets(
+        args.layout,
+        args.x,
+        args.y,
+        plane_separation,
+        anchor_count as usize,
+    );
+    let target_ticks = target_m
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|d| d / DW1000_TIME_TO_METERS)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
 
     let max_iters = args.max_iters.max(1);
     let mut prev_rms: Option<f64> = None;
-    let mut current_delays: [f64; 4] = [0.0; 4];
+    let mut current_delays = vec![0.0f64; anchor_count as usize];
 
     // Prime prior delays from devices to avoid regularizing toward 0 on partial samples.
     for ep in &endpoints {
@@ -224,7 +286,7 @@ where
         )
         .await?;
         let parsed: TdoaDistancesResponse = parse_json_response(&resp, &ep.ip)?;
-        if parsed.anchor_id < 4 {
+        if parsed.anchor_id < anchor_count {
             current_delays[parsed.anchor_id as usize] = parsed.antenna_delay as f64;
         }
     }
@@ -259,8 +321,8 @@ where
         // Soft warning about low sample counts. We can still solve if the
         // measurement graph is connected, but results may be noisy.
         let mut low_pairs: Vec<(u8, u8, u32)> = Vec::new();
-        for i in 0..4u8 {
-            for j in (i + 1)..4u8 {
+        for i in 0..anchor_count {
+            for j in (i + 1)..anchor_count {
                 let c = sample_result.pair_samples[i as usize][j as usize].count();
                 if c > 0 && c < args.min_samples {
                     low_pairs.push((i, j, c));
@@ -282,20 +344,21 @@ where
         }
 
         let measurements = build_measurements(&sample_result.pair_samples, &target_ticks);
-        ensure_measurement_graph_ok(&measurements, 4)?;
+        ensure_measurement_graph_ok(&measurements, anchor_count as usize)?;
 
         let solved =
             solve_antenna_delays_irls(&measurements, &current_delays, args.prior_sigma_ticks)
                 .map_err(CoreError::Other)?;
 
-        let solved_u16: [u16; 4] = solved
+        let solved_u16: Vec<u16> = solved
             .iter()
             .map(|v| v.round().clamp(0.0, 65535.0) as u16)
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
+            .collect();
 
-        let current_u16: [u16; 4] = current_delays.map(|v| v.round().clamp(0.0, 65535.0) as u16);
+        let current_u16: Vec<u16> = current_delays
+            .iter()
+            .map(|v| v.round().clamp(0.0, 65535.0) as u16)
+            .collect();
         let report_before =
             compute_error_report(&sample_result.pair_samples, &target_m, &current_u16);
         let report_after =
@@ -303,7 +366,7 @@ where
 
         let iteration = CalibrationIteration {
             iteration: iter + 1,
-            delays: solved_u16,
+            delays: solved_u16.clone(),
             error: report_after.clone(),
         };
         progress(CalibrationEvent::Log {
@@ -315,7 +378,7 @@ where
         progress(CalibrationEvent::Iteration {
             iteration: iter + 1,
             max_iterations: max_iters,
-            delays: solved_u16,
+            delays: solved_u16.clone(),
             error: report_after.clone(),
         });
         iterations.push(iteration.clone());
@@ -420,8 +483,10 @@ where
 
     let result = CalibrationRun {
         layout: args.layout,
+        anchor_count,
         x_m: args.x,
         y_m: args.y,
+        plane_separation_m: plane_separation,
         anchors: endpoints,
         iterations,
         final_result,
@@ -480,7 +545,7 @@ async fn resolve_anchors(
 }
 
 struct SampleResult {
-    pair_samples: [[Samples; 4]; 4], // only valid for i<j
+    pair_samples: Vec<Vec<Samples>>, // only valid for i<j
     anchor_delays: HashMap<u8, u16>, // latest per-anchor delay observed
 }
 
@@ -494,13 +559,13 @@ async fn sample_inter_anchor_distances(
     let start = Instant::now();
     let sender = BatchSender::new(timeout_ms, endpoints.len().max(1));
     let ips: Vec<String> = endpoints.iter().map(|e| e.ip.clone()).collect();
+    let anchor_count = endpoints.len();
 
-    let mut pair_samples: [[Samples; 4]; 4] =
-        std::array::from_fn(|_| std::array::from_fn(|_| Samples::default()));
+    let mut pair_samples = vec![vec![Samples::default(); anchor_count]; anchor_count];
     let mut anchor_delays: HashMap<u8, u16> = HashMap::new();
 
-    let required_pairs: Vec<(u8, u8)> = (0u8..4)
-        .flat_map(|i| (i + 1..4).map(move |j| (i, j)))
+    let required_pairs: Vec<(u8, u8)> = (0u8..anchor_count as u8)
+        .flat_map(|i| (i + 1..anchor_count as u8).map(move |j| (i, j)))
         .collect();
 
     while start.elapsed() < duration {
@@ -516,7 +581,7 @@ async fn sample_inter_anchor_distances(
             };
 
             let anchor_id = parsed.anchor_id;
-            if anchor_id >= 4 {
+            if anchor_id as usize >= anchor_count {
                 continue;
             }
 
@@ -525,7 +590,7 @@ async fn sample_inter_anchor_distances(
             // Firmware always reports 8 entries; be defensive.
             for (remote_id, dist) in parsed.distances.iter().enumerate() {
                 let remote_id = remote_id as u8;
-                if remote_id >= 4 || remote_id == anchor_id {
+                if remote_id as usize >= anchor_count || remote_id == anchor_id {
                     continue;
                 }
                 if *dist == 0 {
@@ -557,8 +622,14 @@ async fn sample_inter_anchor_distances(
     })
 }
 
-fn build_rectangular_targets(layout: RectLayout, x: f64, y: f64) -> [[f64; 4]; 4] {
-    let mut pos = [(0.0f64, 0.0f64); 4];
+fn build_rectangular_targets(
+    layout: RectLayout,
+    x: f64,
+    y: f64,
+    plane_separation: Option<f64>,
+    anchor_count: usize,
+) -> Vec<Vec<f64>> {
+    let mut pos = vec![(0.0f64, 0.0f64, 0.0f64); anchor_count];
 
     let (x_anchor, y_anchor, corner) = match layout {
         RectLayout::RectangularA1xA3y => (1usize, 3usize, 2usize),
@@ -567,17 +638,26 @@ fn build_rectangular_targets(layout: RectLayout, x: f64, y: f64) -> [[f64; 4]; 4
         RectLayout::RectangularA2xA3y => (2usize, 3usize, 1usize),
     };
 
-    pos[0] = (0.0, 0.0);
-    pos[x_anchor] = (x, 0.0);
-    pos[y_anchor] = (0.0, y);
-    pos[corner] = (x, y);
+    pos[0] = (0.0, 0.0, 0.0);
+    pos[x_anchor] = (x, 0.0, 0.0);
+    pos[y_anchor] = (0.0, y, 0.0);
+    pos[corner] = (x, y, 0.0);
 
-    let mut d = [[0.0f64; 4]; 4];
-    for i in 0..4 {
-        for j in i + 1..4 {
+    if anchor_count == 8 {
+        let z = plane_separation.unwrap_or(0.0);
+        for lower in 0..4 {
+            let upper = lower + 4;
+            pos[upper] = (pos[lower].0, pos[lower].1, z);
+        }
+    }
+
+    let mut d = vec![vec![0.0f64; anchor_count]; anchor_count];
+    for i in 0..anchor_count {
+        for j in i + 1..anchor_count {
             let dx = pos[i].0 - pos[j].0;
             let dy = pos[i].1 - pos[j].1;
-            let dist = (dx * dx + dy * dy).sqrt();
+            let dz = pos[i].2 - pos[j].2;
+            let dist = (dx * dx + dy * dy + dz * dz).sqrt();
             d[i][j] = dist;
             d[j][i] = dist;
         }
@@ -586,12 +666,12 @@ fn build_rectangular_targets(layout: RectLayout, x: f64, y: f64) -> [[f64; 4]; 4
 }
 
 fn build_measurements(
-    pair_samples: &[[Samples; 4]; 4],
-    target_ticks: &[[f64; 4]; 4],
+    pair_samples: &[Vec<Samples>],
+    target_ticks: &[Vec<f64>],
 ) -> Vec<Measurement> {
     let mut measurements = Vec::new();
-    for i in 0..4usize {
-        for j in i + 1..4usize {
+    for i in 0..pair_samples.len() {
+        for j in i + 1..pair_samples.len() {
             let Some((raw_mean, inliers)) = pair_samples[i][j].robust_mean() else {
                 continue;
             };
@@ -667,14 +747,17 @@ fn ensure_measurement_graph_ok(measurements: &[Measurement], n: usize) -> Result
 
 fn solve_antenna_delays_irls(
     measurements: &[Measurement],
-    prior: &[f64; 4],
+    prior: &[f64],
     prior_sigma_ticks: f64,
 ) -> std::result::Result<Vec<f64>, String> {
     if measurements.is_empty() {
         return Err("No inter-anchor measurements available".to_string());
     }
 
-    let n = 4usize;
+    let n = prior.len();
+    if n == 0 {
+        return Err("No anchors available".to_string());
+    }
     let base_weights: Vec<f64> = measurements.iter().map(|m| m.weight).collect();
     let mut weights = base_weights.clone();
 
@@ -829,17 +912,17 @@ pub struct ErrorReport {
 }
 
 fn compute_error_report(
-    pair_samples: &[[Samples; 4]; 4],
-    target_m: &[[f64; 4]; 4],
-    delays: &[u16; 4],
+    pair_samples: &[Vec<Samples>],
+    target_m: &[Vec<f64>],
+    delays: &[u16],
 ) -> ErrorReport {
     let mut errs = Vec::new();
     let mut sum_sq = 0.0;
     let mut count = 0u32;
     let mut max_abs: f64 = 0.0;
 
-    for i in 0..4u8 {
-        for j in (i + 1)..4u8 {
+    for i in 0..pair_samples.len() {
+        for j in i + 1..pair_samples.len() {
             let Some((raw_mean, _inliers)) = pair_samples[i as usize][j as usize].robust_mean()
             else {
                 continue;
@@ -849,8 +932,8 @@ fn compute_error_report(
             let corrected_m = corrected_ticks * DW1000_TIME_TO_METERS;
             let e = corrected_m - target_m[i as usize][j as usize];
             errs.push(PairError {
-                a: i,
-                b: j,
+                a: i as u8,
+                b: j as u8,
                 error_m: e,
             });
             sum_sq += e * e;
@@ -872,16 +955,12 @@ fn compute_error_report(
     }
 }
 
-async fn apply_delays(
-    endpoints: &[AnchorEndpoint],
-    delays: &[u16; 4],
-    timeout_ms: u64,
-) -> Result<()> {
+async fn apply_delays(endpoints: &[AnchorEndpoint], delays: &[u16], timeout_ms: u64) -> Result<()> {
     let timeout = Duration::from_millis(timeout_ms);
 
     // Write per-anchor ADelay
     for ep in endpoints {
-        if ep.anchor_id >= 4 {
+        if ep.anchor_id as usize >= delays.len() {
             continue;
         }
         let value = delays[ep.anchor_id as usize].to_string();
@@ -965,13 +1044,29 @@ mod tests {
         ];
 
         for (layout, expected) in cases {
-            let actual = build_rectangular_targets(layout, 3.0, 4.0);
+            let actual = build_rectangular_targets(layout, 3.0, 4.0, None, 4);
             for i in 0..4 {
                 for j in 0..4 {
                     assert_close(actual[i][j], expected[i][j]);
                 }
             }
         }
+    }
+
+    #[test]
+    fn build_rectangular_targets_supports_two_plane_eight_anchor_layout() {
+        let actual =
+            build_rectangular_targets(RectLayout::RectangularA1xA3y, 3.0, 4.0, Some(2.0), 8);
+
+        assert_eq!(actual.len(), 8);
+        assert_close(actual[0][4], 2.0);
+        assert_close(actual[1][5], 2.0);
+        assert_close(actual[2][6], 2.0);
+        assert_close(actual[3][7], 2.0);
+        assert_close(actual[4][5], 3.0);
+        assert_close(actual[4][7], 4.0);
+        assert_close(actual[4][6], 5.0);
+        assert_close(actual[0][6], (3.0f64 * 3.0 + 4.0 * 4.0 + 2.0 * 2.0).sqrt());
     }
 
     #[test]

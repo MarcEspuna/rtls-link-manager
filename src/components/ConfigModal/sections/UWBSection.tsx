@@ -25,6 +25,33 @@ export function UWBSection({ config, onChange, onApply, onApplyBatch, isExpertMo
   const applyMode = async (value: number): Promise<boolean> => {
     setModeApplyError(null);
     if (value === 4) {
+      if (config.uwb.dynamicAnchorPosEnabled === 1) {
+        if ((config.uwb.use2DEstimator ?? 1) === 0) {
+          const planeSeparation = Number(config.uwb.anchorPlaneSeparation);
+          if (!Number.isFinite(planeSeparation) || planeSeparation <= 0) {
+            setModeApplyError('Set a positive plane separation before applying dynamic 3D TDoA Tag mode');
+            return false;
+          }
+        }
+
+        try {
+          const dynamicCommands = [
+            Commands.writeParam('uwb', 'anchorLayout', config.uwb.anchorLayout ?? 0),
+            Commands.writeParam('uwb', 'anchorHeight', config.uwb.anchorHeight ?? 0),
+            Commands.writeParam('uwb', 'anchorPlaneSeparation', config.uwb.anchorPlaneSeparation ?? 0),
+            Commands.writeParam('uwb', 'distanceAvgSamples', config.uwb.distanceAvgSamples ?? 50),
+            Commands.writeParam('uwb', 'anchorPosLocked', config.uwb.anchorPosLocked ?? 0),
+            Commands.writeParam('uwb', 'dynamicAnchorPosEnabled', 1),
+            Commands.writeParam('uwb', 'use2DEstimator', config.uwb.use2DEstimator ?? 1),
+          ];
+          await onApplyBatch([...dynamicCommands, Commands.writeParam('uwb', 'mode', value)]);
+          return true;
+        } catch (e) {
+          setModeApplyError(e instanceof Error ? e.message : 'Failed to apply UWB mode');
+          return false;
+        }
+      }
+
       const anchors = config.uwb.anchors || [];
       const anchorError = validateAnchorList(anchors);
       if (anchorError) {
@@ -229,30 +256,85 @@ export function UWBSection({ config, onChange, onApply, onApplyBatch, isExpertMo
               </span>
             </div>
             {isExpertMode && (config.uwb.outputBackend ?? 0) === 1 && (
-              <div className={styles.field}>
-                <label>Beacon Age Bias (ms)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={20}
-                  step={1}
-                  value={config.uwb.rtlsBeaconAgeBiasMs ?? 2}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    const val = raw === '' ? 2 : Number(raw);
-                    onChange('uwb', 'rtlsBeaconAgeBiasMs', val);
-                  }}
-                  onBlur={(e) => {
-                    const raw = e.target.value;
-                    const val = raw === '' ? 2 : Number(raw);
-                    if (!Number.isFinite(val) || !Number.isInteger(val) || val < 0 || val > 20) return;
-                    onChange('uwb', 'rtlsBeaconAgeBiasMs', val);
-                    onApply('uwb', 'rtlsBeaconAgeBiasMs', val);
-                  }}
-                />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-                  Adds a small safety margin to the TDoA measurement age sent to ArduPilot.
-                </span>
+              <div className={styles.fieldRow}>
+                <div className={styles.field}>
+                  <label>Beacon Age Bias (ms)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={20}
+                    step={1}
+                    value={config.uwb.rtlsBeaconAgeBiasMs ?? 2}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const val = raw === '' ? 2 : Number(raw);
+                      onChange('uwb', 'rtlsBeaconAgeBiasMs', val);
+                    }}
+                    onBlur={(e) => {
+                      const raw = e.target.value;
+                      const val = raw === '' ? 2 : Number(raw);
+                      if (!Number.isFinite(val) || !Number.isInteger(val) || val < 0 || val > 20) return;
+                      onChange('uwb', 'rtlsBeaconAgeBiasMs', val);
+                      onApply('uwb', 'rtlsBeaconAgeBiasMs', val);
+                    }}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label>TDoA Sigma Floor (m)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={config.uwb.rtlsBeaconTdoaSigmaFloorM ?? 0.25}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const val = raw === '' ? 0.25 : Number(raw);
+                      onChange('uwb', 'rtlsBeaconTdoaSigmaFloorM', val);
+                    }}
+                    onBlur={(e) => {
+                      const raw = e.target.value;
+                      const val = raw === '' ? 0.25 : Number(raw);
+                      if (!Number.isFinite(val) || val < 0) return;
+                      onChange('uwb', 'rtlsBeaconTdoaSigmaFloorM', val);
+                      onApply('uwb', 'rtlsBeaconTdoaSigmaFloorM', val);
+                    }}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label>Physical Guard</label>
+                  <select
+                    value={config.uwb.rtlsBeaconTdoaPhysicalGuardEnable ?? 1}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      onChange('uwb', 'rtlsBeaconTdoaPhysicalGuardEnable', val);
+                      onApply('uwb', 'rtlsBeaconTdoaPhysicalGuardEnable', val);
+                    }}
+                  >
+                    <option value={1}>Enabled</option>
+                    <option value={0}>Disabled</option>
+                  </select>
+                </div>
+                <div className={styles.field}>
+                  <label>Guard Margin (m)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.05}
+                    value={config.uwb.rtlsBeaconTdoaPhysicalGuardMarginM ?? 1.0}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const val = raw === '' ? 1.0 : Number(raw);
+                      onChange('uwb', 'rtlsBeaconTdoaPhysicalGuardMarginM', val);
+                    }}
+                    onBlur={(e) => {
+                      const raw = e.target.value;
+                      const val = raw === '' ? 1.0 : Number(raw);
+                      if (!Number.isFinite(val) || val < 0) return;
+                      onChange('uwb', 'rtlsBeaconTdoaPhysicalGuardMarginM', val);
+                      onApply('uwb', 'rtlsBeaconTdoaPhysicalGuardMarginM', val);
+                    }}
+                  />
+                </div>
               </div>
             )}
             <div className={styles.field}>
@@ -278,6 +360,29 @@ export function UWBSection({ config, onChange, onApply, onApplyBatch, isExpertMo
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
                 Rejects position estimates whose solver RMSE exceeds this value.
               </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TDoA Tag Policy - Expert Mode + TDoA Tag only */}
+      {isExpertMode && config.uwb.mode === 4 && (
+        <div className={styles.section}>
+          <h3>TDoA Tag Policy</h3>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label>Matcher Policy</label>
+              <select
+                value={config.uwb.tdoaMatcherPolicy ?? 0}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  onChange('uwb', 'tdoaMatcherPolicy', val);
+                  onApply('uwb', 'tdoaMatcherPolicy', val);
+                }}
+              >
+                <option value={0}>Youngest</option>
+                <option value={1}>Random</option>
+              </select>
             </div>
           </div>
         </div>
@@ -330,6 +435,73 @@ export function UWBSection({ config, onChange, onApply, onApplyBatch, isExpertMo
                   const val = raw === '' ? 0 : Number(raw);
                   if (!Number.isFinite(val) || !Number.isInteger(val) || val < 0) return;
                   onApply('uwb', 'tdoaSlotDurationUs', val);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TDoA Anchor Telemetry - Expert Mode + TDoA Anchor only */}
+      {isExpertMode && config.uwb.mode === 3 && (
+        <div className={styles.section}>
+          <h3>TDoA Anchor Telemetry</h3>
+          <div className={styles.fieldRow}>
+            <div className={styles.field}>
+              <label>Telemetry</label>
+              <select
+                value={config.uwb.tdoaAnchorTelemetryEnable ?? 0}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  onChange('uwb', 'tdoaAnchorTelemetryEnable', val);
+                  onApply('uwb', 'tdoaAnchorTelemetryEnable', val);
+                }}
+              >
+                <option value={0}>Disabled</option>
+                <option value={1}>Enabled</option>
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label>Interval (ms)</label>
+              <input
+                type="number"
+                min={250}
+                max={60000}
+                step={250}
+                value={config.uwb.tdoaAnchorTelemetryIntervalMs ?? 1000}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 1000 : Number(raw);
+                  onChange('uwb', 'tdoaAnchorTelemetryIntervalMs', val);
+                }}
+                onBlur={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 1000 : Number(raw);
+                  if (!Number.isFinite(val) || !Number.isInteger(val) || val < 250 || val > 60000) return;
+                  onChange('uwb', 'tdoaAnchorTelemetryIntervalMs', val);
+                  onApply('uwb', 'tdoaAnchorTelemetryIntervalMs', val);
+                }}
+              />
+            </div>
+            <div className={styles.field}>
+              <label>Port</label>
+              <input
+                type="number"
+                min={1}
+                max={65535}
+                step={1}
+                value={config.uwb.tdoaAnchorTelemetryPort ?? 3335}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 3335 : Number(raw);
+                  onChange('uwb', 'tdoaAnchorTelemetryPort', val);
+                }}
+                onBlur={(e) => {
+                  const raw = e.target.value;
+                  const val = raw === '' ? 3335 : Number(raw);
+                  if (!Number.isFinite(val) || !Number.isInteger(val) || val < 1 || val > 65535) return;
+                  onChange('uwb', 'tdoaAnchorTelemetryPort', val);
+                  onApply('uwb', 'tdoaAnchorTelemetryPort', val);
                 }}
               />
             </div>

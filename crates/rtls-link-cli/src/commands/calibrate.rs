@@ -20,8 +20,10 @@ async fn run_calibrate_anchors(
     json: bool,
 ) -> Result<(), CliError> {
     let config = AnchorCalibrationConfig {
+        anchor_count: Some(args.anchor_count),
         x: args.x,
         y: args.y,
+        plane_separation: args.plane_separation,
         layout: args.layout.into(),
         ips: args.ips.map(|raw| {
             raw.split(',')
@@ -50,8 +52,13 @@ async fn run_calibrate_anchors(
             CalibrationEvent::Log { message } => println!("{}", message),
             CalibrationEvent::Iteration { delays, error, .. } => {
                 println!(
-                    "  Delays: A0={} A1={} A2={} A3={}",
-                    delays[0], delays[1], delays[2], delays[3]
+                    "  Delays: {}",
+                    delays
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, value)| format!("A{}={}", idx, value))
+                        .collect::<Vec<_>>()
+                        .join(" ")
                 );
                 println!(
                     "  Pair errors (m): {}",

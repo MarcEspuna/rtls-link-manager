@@ -3,7 +3,7 @@
 use crate::error::AppError;
 use crate::preset_storage::PresetStorageService;
 use crate::types::{GpsOrigin, LocationData, Preset, PresetInfo, PresetType};
-use rtls_link_core::device::websocket::send_command_parsed;
+use rtls_link_core::device::mavlink::send_command_parsed;
 use rtls_link_core::protocol::commands::Commands;
 use rtls_link_core::protocol::config_params::device_config_from_backup_value;
 use std::sync::Arc;

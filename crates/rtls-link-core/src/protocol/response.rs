@@ -123,6 +123,7 @@ pub fn is_error_response(response: &str) -> Option<String> {
                     }
                 }
             }
+            return None;
         }
     }
 
@@ -222,6 +223,8 @@ mod tests {
         assert!(is_error_response("Fail to write parameter").is_some());
         assert!(is_error_response("Not found").is_some());
         assert!(is_error_response(r#"{"success": false, "message": "Invalid param"}"#).is_some());
+        assert!(is_error_response(r#"{"success": true, "error": null}"#).is_none());
+        assert!(is_error_response(r#"{"invalidDistance": 1, "rxFailed": 2}"#).is_none());
         assert!(is_error_response("OK - success").is_none());
         assert!(is_error_response(r#"{"success": true}"#).is_none());
         assert!(
