@@ -182,6 +182,7 @@ export interface LocationData {
   };
   rotation: number;
   anchors: AnchorConfig[];
+  use2DEstimator?: 0 | 1;
 }
 
 export interface Preset {

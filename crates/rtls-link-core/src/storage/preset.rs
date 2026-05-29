@@ -268,6 +268,7 @@ mod tests {
                     y: 0.0,
                     z: 1.5,
                 }],
+                use_2d_estimator: Some(1),
             }),
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),

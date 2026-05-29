@@ -103,8 +103,14 @@ export function DynamicAnchorsSection({
           ...getDynamicAnchorConfigCommands(nextConfig),
           Commands.writeParam('uwb', 'use2DEstimator', use2DEstimator),
         ]);
-      } else if (config.uwb.mode !== 4
-        || validateStaticTagAnchorList(config.uwb.anchors || [], use2DEstimator) === null) {
+      } else if (config.uwb.mode === 4) {
+        const anchorError = validateStaticTagAnchorList(config.uwb.anchors || [], use2DEstimator);
+        if (anchorError) {
+          setDynamicApplyError(`Configure valid static anchors before switching estimator mode: ${anchorError}`);
+          return;
+        }
+        await onApply('uwb', 'use2DEstimator', use2DEstimator);
+      } else {
         await onApply('uwb', 'use2DEstimator', use2DEstimator);
       }
       onChange('uwb', 'use2DEstimator', use2DEstimator);
@@ -188,6 +194,19 @@ export function DynamicAnchorsSection({
               onChange={(e) => onChange('uwb', 'anchorPlaneSeparation', safeParseFloat(e.target.value, 0))}
               onBlur={(e) => {
                 const val = safeParseFloat(e.target.value, 0);
+                const nextConfig: DeviceConfig = {
+                  ...config,
+                  uwb: {
+                    ...config.uwb,
+                    anchorPlaneSeparation: val,
+                  },
+                };
+                const dynamicError = isEnabled ? validateDynamicAnchorEnable(nextConfig) : null;
+                if (dynamicError) {
+                  setDynamicApplyError(dynamicError);
+                  return;
+                }
+                setDynamicApplyError(null);
                 onChange('uwb', 'anchorPlaneSeparation', val);
                 onApply('uwb', 'anchorPlaneSeparation', val);
               }}

@@ -286,7 +286,21 @@ fn validate_static_tag_anchor_requirements(
         return Ok(());
     }
 
-    let use_3d_estimator = config.uwb.use_2d_estimator == Some(0);
+    validate_tag_anchor_requirements_for_estimator(
+        anchors,
+        config.uwb.use_2d_estimator.unwrap_or(1),
+    )
+}
+
+fn validate_tag_anchor_requirements_for_estimator(
+    anchors: &[AnchorConfig],
+    use_2d_estimator: u8,
+) -> Result<(), String> {
+    if use_2d_estimator > 1 {
+        return Err("use2DEstimator must be 0 or 1".to_string());
+    }
+
+    let use_3d_estimator = use_2d_estimator == 0;
     if anchors.len() < 4 {
         return Err(format!(
             "{} TAG_TDOA static geometry requires at least 4 anchors",
@@ -302,6 +316,11 @@ fn validate_static_tag_anchor_requirements(
 }
 
 fn validate_dynamic_tag_anchor_requirements(config: &DeviceConfig) -> Result<(), String> {
+    if let Some(v) = config.uwb.use_2d_estimator {
+        if v > 1 {
+            return Err("use2DEstimator must be 0 or 1".to_string());
+        }
+    }
     if config.uwb.mode == 4
         && config.uwb.dynamic_anchor_pos_enabled == Some(1)
         && config.uwb.use_2d_estimator == Some(0)
@@ -418,6 +437,15 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
     // Flatten anchors array to devId1/x1/y1/z1, devId2/x2/y2/z2, etc.
     let dynamic_anchors_enabled = config.uwb.dynamic_anchor_pos_enabled == Some(1);
     validate_dynamic_tag_anchor_requirements(config)?;
+    let use_2d_estimator_written_early =
+        config.uwb.mode == 4 && config.uwb.use_2d_estimator == Some(1);
+    if use_2d_estimator_written_early {
+        params.push((
+            "uwb".to_string(),
+            "use2DEstimator".to_string(),
+            "1".to_string(),
+        ));
+    }
     if config.uwb.mode == 4 && !dynamic_anchors_enabled {
         if let Some(ref anchors) = config.uwb.anchors {
             if let Some(count) = config.uwb.anchor_count {
@@ -637,11 +665,13 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
         ));
     }
     if let Some(v) = config.uwb.use_2d_estimator {
-        params.push((
-            "uwb".to_string(),
-            "use2DEstimator".to_string(),
-            v.to_string(),
-        ));
+        if !use_2d_estimator_written_early {
+            params.push((
+                "uwb".to_string(),
+                "use2DEstimator".to_string(),
+                v.to_string(),
+            ));
+        }
     }
     params.push((
         "uwb".to_string(),
@@ -671,6 +701,7 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
 /// - Anchors
 pub fn location_to_params(location: &LocationData) -> Result<Vec<ParamTuple>, String> {
     let mut params = Vec::new();
+    let use_2d_estimator = location.use_2d_estimator.unwrap_or(1);
 
     // Origin
     params.push((
@@ -700,7 +731,22 @@ pub fn location_to_params(location: &LocationData) -> Result<Vec<ParamTuple>, St
     if location.anchors.is_empty() {
         return Err("Location preset must include anchor geometry".to_string());
     }
+    validate_tag_anchor_requirements_for_estimator(&location.anchors, use_2d_estimator)?;
+    if use_2d_estimator != 0 {
+        params.push((
+            "uwb".to_string(),
+            "use2DEstimator".to_string(),
+            use_2d_estimator.to_string(),
+        ));
+    }
     append_anchor_params(&mut params, &location.anchors)?;
+    if use_2d_estimator == 0 {
+        params.push((
+            "uwb".to_string(),
+            "use2DEstimator".to_string(),
+            use_2d_estimator.to_string(),
+        ));
+    }
 
     Ok(params)
 }
@@ -1355,20 +1401,36 @@ mod tests {
                     y: 0.0,
                     z: 0.0,
                 },
+                AnchorConfig {
+                    id: "2".to_string(),
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "3".to_string(),
+                    x: 0.0,
+                    y: 1.0,
+                    z: 0.0,
+                },
             ],
+            use_2d_estimator: Some(1),
         };
 
         let params = location_to_params(&location).unwrap();
 
         assert!(params
             .iter()
-            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "2"));
+            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "4"));
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "devId1" && v == "0"));
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "devId2" && v == "1"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "use2DEstimator" && v == "1"));
         let anchor_count_pos = params
             .iter()
             .position(|(g, n, _)| g == "uwb" && n == "anchorCount")
@@ -1378,6 +1440,132 @@ mod tests {
             .position(|(g, n, _)| g == "uwb" && n == "devId2")
             .unwrap();
         assert!(anchor_count_pos > dev_id_2_pos);
+    }
+
+    #[test]
+    fn location_to_params_rejects_too_few_tag_anchors() {
+        let location = LocationData {
+            origin: GpsOrigin {
+                lat: 1.0,
+                lon: 2.0,
+                alt: 3.0,
+            },
+            rotation: 0.0,
+            anchors: vec![
+                AnchorConfig {
+                    id: "0".to_string(),
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "1".to_string(),
+                    x: 1.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            ],
+            use_2d_estimator: Some(1),
+        };
+
+        assert_eq!(
+            location_to_params(&location).unwrap_err(),
+            "2D TAG_TDOA static geometry requires at least 4 anchors"
+        );
+    }
+
+    #[test]
+    fn location_to_params_rejects_coplanar_3d_tag_geometry() {
+        let location = LocationData {
+            origin: GpsOrigin {
+                lat: 1.0,
+                lon: 2.0,
+                alt: 3.0,
+            },
+            rotation: 0.0,
+            anchors: vec![
+                AnchorConfig {
+                    id: "0".to_string(),
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "1".to_string(),
+                    x: 3.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "2".to_string(),
+                    x: 3.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "3".to_string(),
+                    x: 0.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+            ],
+            use_2d_estimator: Some(0),
+        };
+
+        assert_eq!(
+            location_to_params(&location).unwrap_err(),
+            "3D TAG_TDOA static geometry requires non-coplanar anchors"
+        );
+    }
+
+    #[test]
+    fn location_to_params_allows_non_coplanar_3d_tag_geometry() {
+        let location = LocationData {
+            origin: GpsOrigin {
+                lat: 1.0,
+                lon: 2.0,
+                alt: 3.0,
+            },
+            rotation: 0.0,
+            anchors: vec![
+                AnchorConfig {
+                    id: "0".to_string(),
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "1".to_string(),
+                    x: 3.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "2".to_string(),
+                    x: 0.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "3".to_string(),
+                    x: 1.0,
+                    y: 1.0,
+                    z: 2.0,
+                },
+            ],
+            use_2d_estimator: Some(0),
+        };
+
+        let params = location_to_params(&location).unwrap();
+        let anchor_count_pos = params
+            .iter()
+            .position(|(g, n, _)| g == "uwb" && n == "anchorCount")
+            .unwrap();
+        let estimator_pos = params
+            .iter()
+            .position(|(g, n, v)| g == "uwb" && n == "use2DEstimator" && v == "0")
+            .unwrap();
+        assert!(estimator_pos > anchor_count_pos);
     }
 
     #[test]
@@ -1491,6 +1679,20 @@ mod tests {
         let param_index = |name: &str| params.iter().position(|(_, n, _)| n == name).unwrap();
         assert!(param_index("anchorPlaneSeparation") < param_index("dynamicAnchorPosEnabled"));
         assert!(param_index("dynamicAnchorPosEnabled") < param_index("use2DEstimator"));
+        assert!(!params.iter().any(|(_, n, _)| n == "anchorCount"));
+        assert!(!params.iter().any(|(_, n, _)| n.starts_with("devId")));
+    }
+
+    #[test]
+    fn config_to_params_writes_2d_estimator_before_dynamic_enable() {
+        let mut config = minimal_device_config(Some(4), None);
+        config.uwb.dynamic_anchor_pos_enabled = Some(1);
+        config.uwb.use_2d_estimator = Some(1);
+
+        let params = config_to_params(&config).unwrap();
+        let param_index = |name: &str| params.iter().position(|(_, n, _)| n == name).unwrap();
+
+        assert!(param_index("use2DEstimator") < param_index("dynamicAnchorPosEnabled"));
         assert!(!params.iter().any(|(_, n, _)| n == "anchorCount"));
         assert!(!params.iter().any(|(_, n, _)| n.starts_with("devId")));
     }
@@ -1613,6 +1815,60 @@ mod tests {
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "4"));
+        let anchor_count_pos = params
+            .iter()
+            .position(|(g, n, _)| g == "uwb" && n == "anchorCount")
+            .unwrap();
+        let estimator_pos = params
+            .iter()
+            .position(|(g, n, v)| g == "uwb" && n == "use2DEstimator" && v == "0")
+            .unwrap();
+        assert!(estimator_pos > anchor_count_pos);
+    }
+
+    #[test]
+    fn config_to_params_writes_2d_estimator_before_static_anchor_count() {
+        let mut config = minimal_device_config(
+            Some(4),
+            Some(vec![
+                AnchorConfig {
+                    id: "0".to_string(),
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "1".to_string(),
+                    x: 3.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "2".to_string(),
+                    x: 3.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "3".to_string(),
+                    x: 0.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+            ]),
+        );
+        config.uwb.use_2d_estimator = Some(1);
+
+        let params = config_to_params(&config).unwrap();
+        let anchor_count_pos = params
+            .iter()
+            .position(|(g, n, _)| g == "uwb" && n == "anchorCount")
+            .unwrap();
+        let estimator_pos = params
+            .iter()
+            .position(|(g, n, v)| g == "uwb" && n == "use2DEstimator" && v == "1")
+            .unwrap();
+        assert!(estimator_pos < anchor_count_pos);
     }
 
     #[test]
@@ -1801,12 +2057,25 @@ mod tests {
                     z: 0.0,
                 },
                 AnchorConfig {
-                    id: "2".to_string(),
+                    id: "1".to_string(),
                     x: 3.0,
                     y: 0.0,
                     z: 0.0,
                 },
+                AnchorConfig {
+                    id: "2".to_string(),
+                    x: 3.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "4".to_string(),
+                    x: 3.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
             ],
+            use_2d_estimator: Some(1),
         };
 
         assert_eq!(
@@ -1825,6 +2094,7 @@ mod tests {
             },
             rotation: 0.0,
             anchors: vec![],
+            use_2d_estimator: Some(1),
         };
 
         assert_eq!(
