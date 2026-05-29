@@ -228,6 +228,100 @@ fn valid_anchor_entries(anchors: &[AnchorConfig]) -> Result<Vec<(String, &Anchor
     Ok(valid)
 }
 
+fn anchors_are_non_coplanar_3d(anchors: &[AnchorConfig]) -> bool {
+    if anchors.len() < 4 {
+        return false;
+    }
+
+    let p0 = &anchors[0];
+    let vec_from_p0 = |p: &AnchorConfig| (p.x - p0.x, p.y - p0.y, p.z - p0.z);
+    let norm2 = |v: (f64, f64, f64)| v.0 * v.0 + v.1 * v.1 + v.2 * v.2;
+    let cross = |a: (f64, f64, f64), b: (f64, f64, f64)| {
+        (
+            a.1 * b.2 - a.2 * b.1,
+            a.2 * b.0 - a.0 * b.2,
+            a.0 * b.1 - a.1 * b.0,
+        )
+    };
+    let dot = |a: (f64, f64, f64), b: (f64, f64, f64)| a.0 * b.0 + a.1 * b.1 + a.2 * b.2;
+
+    let Some(v1) = anchors
+        .iter()
+        .skip(1)
+        .map(vec_from_p0)
+        .find(|v| norm2(*v) > 1e-6)
+    else {
+        return false;
+    };
+
+    let Some(normal) = anchors
+        .iter()
+        .skip(1)
+        .map(vec_from_p0)
+        .map(|v| cross(v1, v))
+        .find(|n| norm2(*n) > 1e-8)
+    else {
+        return false;
+    };
+
+    let normal_norm = norm2(normal).sqrt();
+    let scale = anchors
+        .iter()
+        .skip(1)
+        .map(|p| norm2(vec_from_p0(p)).sqrt())
+        .fold(1.0f64, f64::max);
+    let tolerance = 0.01f64.max(scale * 0.001);
+
+    anchors.iter().skip(1).map(vec_from_p0).any(|v| {
+        let distance_from_plane = dot(normal, v).abs() / normal_norm;
+        distance_from_plane > tolerance
+    })
+}
+
+fn validate_static_tag_anchor_requirements(
+    config: &DeviceConfig,
+    anchors: &[AnchorConfig],
+) -> Result<(), String> {
+    if config.uwb.mode != 4 || config.uwb.dynamic_anchor_pos_enabled == Some(1) {
+        return Ok(());
+    }
+
+    let use_3d_estimator = config.uwb.use_2d_estimator == Some(0);
+    let minimum_anchors = if use_3d_estimator { 5 } else { 4 };
+    if anchors.len() < minimum_anchors {
+        return Err(format!(
+            "{} TAG_TDOA static geometry requires at least {} anchors",
+            if use_3d_estimator { "3D" } else { "2D" },
+            minimum_anchors
+        ));
+    }
+
+    if use_3d_estimator && !anchors_are_non_coplanar_3d(anchors) {
+        return Err("3D TAG_TDOA static geometry requires non-coplanar anchors".to_string());
+    }
+
+    Ok(())
+}
+
+fn validate_dynamic_tag_anchor_requirements(config: &DeviceConfig) -> Result<(), String> {
+    if config.uwb.mode == 4
+        && config.uwb.dynamic_anchor_pos_enabled == Some(1)
+        && config.uwb.use_2d_estimator == Some(0)
+    {
+        let Some(separation) = config.uwb.anchor_plane_separation else {
+            return Err(
+                "3D dynamic anchors require a positive anchor plane separation".to_string(),
+            );
+        };
+        if !separation.is_finite() || separation <= 0.0 {
+            return Err(
+                "3D dynamic anchors require a positive anchor plane separation".to_string(),
+            );
+        }
+    }
+    Ok(())
+}
+
 fn append_anchor_params(
     params: &mut Vec<ParamTuple>,
     anchors: &[AnchorConfig],
@@ -325,6 +419,7 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
 
     // Flatten anchors array to devId1/x1/y1/z1, devId2/x2/y2/z2, etc.
     let dynamic_anchors_enabled = config.uwb.dynamic_anchor_pos_enabled == Some(1);
+    validate_dynamic_tag_anchor_requirements(config)?;
     if config.uwb.mode == 4 && !dynamic_anchors_enabled {
         if let Some(ref anchors) = config.uwb.anchors {
             if let Some(count) = config.uwb.anchor_count {
@@ -337,6 +432,7 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
             if anchors.is_empty() {
                 return Err("Anchor geometry required for TAG_TDOA configs".to_string());
             } else {
+                validate_static_tag_anchor_requirements(config, anchors)?;
                 append_anchor_params(&mut params, anchors)?;
             }
         } else if let Some(v) = config.uwb.anchor_count {
@@ -718,6 +814,18 @@ mod tests {
                         y: 0.0,
                         z: 1.5,
                     },
+                    AnchorConfig {
+                        id: "2".to_string(),
+                        x: 3.0,
+                        y: 4.0,
+                        z: 1.5,
+                    },
+                    AnchorConfig {
+                        id: "3".to_string(),
+                        x: 0.0,
+                        y: 4.0,
+                        z: 1.5,
+                    },
                 ]),
                 origin_lat: Some(41.4036),
                 origin_lon: Some(2.1744),
@@ -768,7 +876,7 @@ mod tests {
         // Check that anchors are flattened
         assert!(params
             .iter()
-            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "2"));
+            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "4"));
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "devId1" && v == "0"));
@@ -843,7 +951,7 @@ mod tests {
             "uwb": {
                 "mode": 4,
                 "devShortAddr": "7",
-                "anchorCount": 2,
+                "anchorCount": 4,
                 "devId1": "3030",
                 "x1": "1.5",
                 "y1": 2.0,
@@ -851,7 +959,15 @@ mod tests {
                 "devId2": 1,
                 "x2": 3,
                 "y2": "4.25",
-                "z2": 0
+                "z2": 0,
+                "devId3": 2,
+                "x3": 4,
+                "y3": 5,
+                "z3": 0,
+                "devId4": 3,
+                "x4": 6,
+                "y4": 7,
+                "z4": 0
             },
             "app": {}
         });
@@ -859,7 +975,7 @@ mod tests {
         let config = device_config_from_backup_value(raw).unwrap();
         let anchors = config.uwb.anchors.as_ref().unwrap();
 
-        assert_eq!(anchors.len(), 2);
+        assert_eq!(anchors.len(), 4);
         assert_eq!(anchors[0].id, "0");
         assert_eq!(anchors[0].x, 1.5);
         assert_eq!(anchors[0].y, 2.0);
@@ -1138,6 +1254,18 @@ mod tests {
                         y: 0.0,
                         z: 0.0,
                     },
+                    AnchorConfig {
+                        id: "2".to_string(),
+                        x: 1.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
+                    AnchorConfig {
+                        id: "3".to_string(),
+                        x: 0.0,
+                        y: 1.0,
+                        z: 0.0,
+                    },
                 ]),
                 origin_lat: None,
                 origin_lon: None,
@@ -1184,7 +1312,7 @@ mod tests {
 
         assert!(params
             .iter()
-            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "2"));
+            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "4"));
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "devId1" && v == "0"));
@@ -1367,6 +1495,138 @@ mod tests {
         assert!(param_index("dynamicAnchorPosEnabled") < param_index("use2DEstimator"));
         assert!(!params.iter().any(|(_, n, _)| n == "anchorCount"));
         assert!(!params.iter().any(|(_, n, _)| n.starts_with("devId")));
+    }
+
+    #[test]
+    fn config_to_params_rejects_dynamic_3d_without_positive_plane_separation() {
+        let mut config = minimal_device_config(Some(8), None);
+        config.uwb.dynamic_anchor_pos_enabled = Some(1);
+        config.uwb.use_2d_estimator = Some(0);
+
+        assert_eq!(
+            config_to_params(&config).unwrap_err(),
+            "3D dynamic anchors require a positive anchor plane separation"
+        );
+
+        config.uwb.anchor_plane_separation = Some(0.0);
+        assert_eq!(
+            config_to_params(&config).unwrap_err(),
+            "3D dynamic anchors require a positive anchor plane separation"
+        );
+    }
+
+    #[test]
+    fn config_to_params_rejects_static_tag_with_too_few_anchors_for_estimator() {
+        let mut config = minimal_device_config(
+            Some(3),
+            Some(vec![
+                AnchorConfig {
+                    id: "0".to_string(),
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "1".to_string(),
+                    x: 3.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "2".to_string(),
+                    x: 0.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+            ]),
+        );
+        config.uwb.use_2d_estimator = Some(1);
+
+        assert_eq!(
+            config_to_params(&config).unwrap_err(),
+            "2D TAG_TDOA static geometry requires at least 4 anchors"
+        );
+
+        config = minimal_device_config(
+            Some(4),
+            Some(vec![
+                AnchorConfig {
+                    id: "0".to_string(),
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "1".to_string(),
+                    x: 3.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "2".to_string(),
+                    x: 0.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "3".to_string(),
+                    x: 1.0,
+                    y: 1.0,
+                    z: 2.0,
+                },
+            ]),
+        );
+        config.uwb.use_2d_estimator = Some(0);
+
+        assert_eq!(
+            config_to_params(&config).unwrap_err(),
+            "3D TAG_TDOA static geometry requires at least 5 anchors"
+        );
+    }
+
+    #[test]
+    fn config_to_params_rejects_static_3d_coplanar_anchors_before_writing() {
+        let mut config = minimal_device_config(
+            Some(5),
+            Some(vec![
+                AnchorConfig {
+                    id: "0".to_string(),
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "1".to_string(),
+                    x: 3.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "2".to_string(),
+                    x: 3.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "3".to_string(),
+                    x: 0.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "4".to_string(),
+                    x: 1.5,
+                    y: 2.0,
+                    z: 0.0,
+                },
+            ]),
+        );
+        config.uwb.use_2d_estimator = Some(0);
+
+        assert_eq!(
+            config_to_params(&config).unwrap_err(),
+            "3D TAG_TDOA static geometry requires non-coplanar anchors"
+        );
     }
 
     #[test]

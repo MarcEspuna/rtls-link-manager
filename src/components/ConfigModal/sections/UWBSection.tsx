@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { DeviceConfig } from '@shared/types';
 import { Commands } from '@shared/commands';
 import { getAnchorWriteCommands, validateAnchorList } from '@shared/anchors';
+import { getDynamicAnchorEnableCommands, validateDynamicAnchorEnable } from './dynamicAnchorCommands';
 import styles from '../ConfigModal.module.css';
 
 interface UWBSectionProps {
@@ -26,24 +27,14 @@ export function UWBSection({ config, onChange, onApply, onApplyBatch, isExpertMo
     setModeApplyError(null);
     if (value === 4) {
       if (config.uwb.dynamicAnchorPosEnabled === 1) {
-        if ((config.uwb.use2DEstimator ?? 1) === 0) {
-          const planeSeparation = Number(config.uwb.anchorPlaneSeparation);
-          if (!Number.isFinite(planeSeparation) || planeSeparation <= 0) {
-            setModeApplyError('Set a positive plane separation before applying dynamic 3D TDoA Tag mode');
-            return false;
-          }
+        const dynamicError = validateDynamicAnchorEnable(config);
+        if (dynamicError) {
+          setModeApplyError(dynamicError);
+          return false;
         }
 
         try {
-          const dynamicCommands = [
-            Commands.writeParam('uwb', 'anchorLayout', config.uwb.anchorLayout ?? 0),
-            Commands.writeParam('uwb', 'anchorHeight', config.uwb.anchorHeight ?? 0),
-            Commands.writeParam('uwb', 'anchorPlaneSeparation', config.uwb.anchorPlaneSeparation ?? 0),
-            Commands.writeParam('uwb', 'distanceAvgSamples', config.uwb.distanceAvgSamples ?? 50),
-            Commands.writeParam('uwb', 'anchorPosLocked', config.uwb.anchorPosLocked ?? 0),
-            Commands.writeParam('uwb', 'dynamicAnchorPosEnabled', 1),
-            Commands.writeParam('uwb', 'use2DEstimator', config.uwb.use2DEstimator ?? 1),
-          ];
+          const dynamicCommands = getDynamicAnchorEnableCommands(config);
           await onApplyBatch([...dynamicCommands, Commands.writeParam('uwb', 'mode', value)]);
           return true;
         } catch (e) {

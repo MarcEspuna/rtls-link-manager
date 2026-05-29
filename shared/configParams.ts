@@ -1,5 +1,5 @@
 import { DeviceConfig } from './types.js';
-import { MAX_CONFIGURABLE_ANCHORS, normalizeUwbShortAddr, validateAnchorList } from './anchors.js';
+import { anchorsAreNonCoplanar3D, MAX_CONFIGURABLE_ANCHORS, normalizeUwbShortAddr, validateAnchorList } from './anchors.js';
 
 /**
  * Converts a DeviceConfig to an array of [group, paramName, value] tuples.
@@ -33,6 +33,12 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
 
     // Flatten anchors array to devId1/x1/y1/z1, devId2/x2/y2/z2, etc.
     const dynamicAnchorsEnabled = config.uwb.dynamicAnchorPosEnabled === 1;
+    if (config.uwb.mode === 4 && dynamicAnchorsEnabled && config.uwb.use2DEstimator === 0) {
+      const separation = Number(config.uwb.anchorPlaneSeparation);
+      if (!Number.isFinite(separation) || separation <= 0) {
+        throw new Error('3D dynamic anchors require a positive anchor plane separation');
+      }
+    }
     const shouldWriteTagAnchors = (config.uwb.mode === 4 || config.uwb.mode === undefined)
       && !dynamicAnchorsEnabled;
     if (shouldWriteTagAnchors && config.uwb.anchors !== undefined) {
@@ -59,6 +65,16 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
           throw new Error(validationError);
         }
         const anchors = config.uwb.anchors.slice(0, MAX_CONFIGURABLE_ANCHORS);
+        if (config.uwb.mode === 4) {
+          const use3DEstimator = config.uwb.use2DEstimator === 0;
+          const minimumAnchors = use3DEstimator ? 5 : 4;
+          if (anchors.length < minimumAnchors) {
+            throw new Error(`${use3DEstimator ? '3D' : '2D'} TAG_TDOA static geometry requires at least ${minimumAnchors} anchors`);
+          }
+          if (use3DEstimator && !anchorsAreNonCoplanar3D(anchors)) {
+            throw new Error('3D TAG_TDOA static geometry requires non-coplanar anchors');
+          }
+        }
         anchors.forEach((anchor, i) => {
           const idx = i + 1; // 1-indexed in firmware
           params.push(['uwb', `devId${idx}`, normalizeUwbShortAddr(anchor.id)]);

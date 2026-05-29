@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { DeviceConfig, Device, AnchorLayout } from '@shared/types';
+import { Commands } from '@shared/commands';
 import { LayoutSelector } from '../../SystemConfig';
+import { getDynamicAnchorEnableCommands, validateDynamicAnchorEnable } from './dynamicAnchorCommands';
 import styles from '../ConfigModal.module.css';
 
 interface DynamicAnchorsSectionProps {
@@ -7,6 +10,7 @@ interface DynamicAnchorsSectionProps {
   device: Device;
   onChange: (group: keyof DeviceConfig, name: string, value: any) => void;
   onApply: (group: string, name: string, value: any) => Promise<void>;
+  onApplyBatch: (commands: string[]) => Promise<void>;
 }
 
 export function DynamicAnchorsSection({
@@ -14,7 +18,9 @@ export function DynamicAnchorsSection({
   device,
   onChange,
   onApply,
+  onApplyBatch,
 }: DynamicAnchorsSectionProps) {
+  const [dynamicApplyError, setDynamicApplyError] = useState<string | null>(null);
   const safeParseFloat = (value: string, fallback: number): number => {
     const parsed = parseFloat(value);
     return isNaN(parsed) ? fallback : parsed;
@@ -38,6 +44,31 @@ export function DynamicAnchorsSection({
     await onApply('uwb', 'anchorPosLocked', newMask);
   };
 
+  const handleDynamicEnabledChange = async (enabled: number) => {
+    setDynamicApplyError(null);
+    if (enabled === 1) {
+      const dynamicError = validateDynamicAnchorEnable(config);
+      if (dynamicError) {
+        setDynamicApplyError(dynamicError);
+        return;
+      }
+      try {
+        await onApplyBatch(getDynamicAnchorEnableCommands(config));
+        onChange('uwb', 'dynamicAnchorPosEnabled', 1);
+      } catch (e) {
+        setDynamicApplyError(e instanceof Error ? e.message : 'Failed to enable dynamic anchors');
+      }
+      return;
+    }
+
+    try {
+      await onApplyBatch([Commands.writeParam('uwb', 'dynamicAnchorPosEnabled', 0)]);
+      onChange('uwb', 'dynamicAnchorPosEnabled', 0);
+    } catch (e) {
+      setDynamicApplyError(e instanceof Error ? e.message : 'Failed to disable dynamic anchors');
+    }
+  };
+
   return (
     <div>
       <div className={styles.section}>
@@ -53,13 +84,13 @@ export function DynamicAnchorsSection({
             value={config.uwb.dynamicAnchorPosEnabled ?? 0}
             onChange={(e) => {
               const val = Number(e.target.value);
-              onChange('uwb', 'dynamicAnchorPosEnabled', val);
-              onApply('uwb', 'dynamicAnchorPosEnabled', val);
+              void handleDynamicEnabledChange(val);
             }}
           >
             <option value={0}>Disabled (Use Static Positions)</option>
             <option value={1}>Enabled (Calculate from Distances)</option>
           </select>
+          {dynamicApplyError && <div className={styles.fieldError}>{dynamicApplyError}</div>}
         </div>
       </div>
 

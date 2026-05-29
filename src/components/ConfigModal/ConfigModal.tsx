@@ -307,6 +307,7 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
             device={device}
             onChange={handleChange}
             onApply={handleApply}
+            onApplyBatch={handleApplyBatch}
           />
         );
       case 'wifi':

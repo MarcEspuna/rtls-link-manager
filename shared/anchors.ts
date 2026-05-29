@@ -126,3 +126,28 @@ export function validateAnchorList(anchors: AnchorConfig[]): string | null {
 
   return null;
 }
+
+export function anchorsAreNonCoplanar3D(anchors: Array<{ x: number; y: number; z: number }>): boolean {
+  if (anchors.length < 4) return false;
+
+  const p0 = anchors[0];
+  const vec = (p: typeof p0) => ({ x: p.x - p0.x, y: p.y - p0.y, z: p.z - p0.z });
+  const norm2 = (v: ReturnType<typeof vec>) => v.x * v.x + v.y * v.y + v.z * v.z;
+  const cross = (a: ReturnType<typeof vec>, b: ReturnType<typeof vec>) => ({
+    x: a.y * b.z - a.z * b.y,
+    y: a.z * b.x - a.x * b.z,
+    z: a.x * b.y - a.y * b.x,
+  });
+  const dot = (a: ReturnType<typeof vec>, b: ReturnType<typeof vec>) => a.x * b.x + a.y * b.y + a.z * b.z;
+
+  const v1 = anchors.slice(1).map(vec).find((v) => norm2(v) > 1e-6);
+  if (!v1) return false;
+
+  const normal = anchors.slice(1).map(vec).map((v) => cross(v1, v)).find((n) => norm2(n) > 1e-8);
+  if (!normal) return false;
+
+  const normalNorm = Math.sqrt(norm2(normal));
+  const scale = Math.max(1, ...anchors.slice(1).map((p) => Math.sqrt(norm2(vec(p)))));
+  const tolerance = Math.max(0.01, scale * 0.001);
+  return anchors.slice(1).map(vec).some((v) => Math.abs(dot(normal, v)) / normalNorm > tolerance);
+}
