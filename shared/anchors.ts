@@ -127,6 +127,23 @@ export function validateAnchorList(anchors: AnchorConfig[]): string | null {
   return null;
 }
 
+export function validateStaticTagAnchorList(anchors: AnchorConfig[], use2DEstimator: 0 | 1 = 1): string | null {
+  const anchorError = validateAnchorList(anchors);
+  if (anchorError) {
+    return anchorError;
+  }
+
+  const use3DEstimator = use2DEstimator === 0;
+  if (anchors.length < 4) {
+    return `${use3DEstimator ? '3D' : '2D'} TAG_TDOA static geometry requires at least 4 anchors`;
+  }
+  if (use3DEstimator && !anchorsAreNonCoplanar3D(anchors)) {
+    return '3D TAG_TDOA static geometry requires non-coplanar anchors';
+  }
+
+  return null;
+}
+
 export function anchorsAreNonCoplanar3D(anchors: Array<{ x: number; y: number; z: number }>): boolean {
   if (anchors.length < 4) return false;
 

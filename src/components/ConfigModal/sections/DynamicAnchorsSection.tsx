@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { DeviceConfig, Device, AnchorLayout } from '@shared/types';
 import { Commands } from '@shared/commands';
+import { getAnchorWriteCommands, validateStaticTagAnchorList } from '@shared/anchors';
 import { LayoutSelector } from '../../SystemConfig';
-import { getDynamicAnchorEnableCommands, validateDynamicAnchorEnable } from './dynamicAnchorCommands';
+import { getDynamicAnchorConfigCommands, getDynamicAnchorEnableCommands, validateDynamicAnchorEnable } from './dynamicAnchorCommands';
 import styles from '../ConfigModal.module.css';
 
 interface DynamicAnchorsSectionProps {
@@ -62,10 +63,53 @@ export function DynamicAnchorsSection({
     }
 
     try {
-      await onApplyBatch([Commands.writeParam('uwb', 'dynamicAnchorPosEnabled', 0)]);
+      const commands: string[] = [];
+      if (config.uwb.mode === 4) {
+        const anchors = config.uwb.anchors || [];
+        const anchorError = validateStaticTagAnchorList(anchors, config.uwb.use2DEstimator ?? 1);
+        if (anchorError) {
+          setDynamicApplyError(`Configure valid static anchors before disabling dynamic positioning: ${anchorError}`);
+          return;
+        }
+        commands.push(...getAnchorWriteCommands(anchors)
+          .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value)));
+      }
+      commands.push(Commands.writeParam('uwb', 'dynamicAnchorPosEnabled', 0));
+      await onApplyBatch(commands);
       onChange('uwb', 'dynamicAnchorPosEnabled', 0);
     } catch (e) {
       setDynamicApplyError(e instanceof Error ? e.message : 'Failed to disable dynamic anchors');
+    }
+  };
+
+  const handleEstimatorModeChange = async (use2DEstimator: 0 | 1) => {
+    setDynamicApplyError(null);
+    const nextConfig: DeviceConfig = {
+      ...config,
+      uwb: {
+        ...config.uwb,
+        use2DEstimator,
+      },
+    };
+    const dynamicError = validateDynamicAnchorEnable(nextConfig);
+    if (isEnabled && dynamicError) {
+      setDynamicApplyError(dynamicError);
+      return;
+    }
+
+    try {
+      if (isEnabled) {
+        await onApplyBatch([
+          ...getDynamicAnchorConfigCommands(nextConfig),
+          Commands.writeParam('uwb', 'use2DEstimator', use2DEstimator),
+        ]);
+      } else if (config.uwb.mode !== 4
+        || validateStaticTagAnchorList(config.uwb.anchors || [], use2DEstimator) === null) {
+        await onApply('uwb', 'use2DEstimator', use2DEstimator);
+      }
+      onChange('uwb', 'use2DEstimator', use2DEstimator);
+    } catch (e) {
+      setDynamicApplyError(e instanceof Error ? e.message : 'Failed to apply estimator mode');
     }
   };
 
@@ -78,6 +122,18 @@ export function DynamicAnchorsSection({
           instead of using manually configured static coordinates.
         </p>
 
+        <div className={styles.field}>
+          <label>Estimator Mode</label>
+          <select
+            value={config.uwb.use2DEstimator ?? 1}
+            onChange={(e) => {
+              void handleEstimatorModeChange(Number(e.target.value) as 0 | 1);
+            }}
+          >
+            <option value={1}>2D / 4 anchors</option>
+            <option value={0}>3D / 8 anchors</option>
+          </select>
+        </div>
         <div className={styles.field}>
           <label>Dynamic Positioning</label>
           <select

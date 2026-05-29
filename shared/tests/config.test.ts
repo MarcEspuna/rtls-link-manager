@@ -101,7 +101,23 @@ describe('validateConfig', () => {
     expect(result.errors).toContain('2D TAG_TDOA static geometry requires at least 4 anchors');
   });
 
-  it('rejects static 3D TAG_TDOA geometry with fewer than 5 anchors', () => {
+  it('rejects static 3D TAG_TDOA geometry with fewer than 4 anchors', () => {
+    const result = validateConfig({
+      uwb: {
+        mode: 4,
+        use2DEstimator: 0,
+        anchors: [
+          { id: '0', x: 0, y: 0, z: 0 },
+          { id: '1', x: 3, y: 0, z: 0 },
+          { id: '2', x: 0, y: 4, z: 0 },
+        ],
+      } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('3D TAG_TDOA static geometry requires at least 4 anchors');
+  });
+
+  it('accepts four non-coplanar static anchors for 3D TAG_TDOA configs', () => {
     const result = validateConfig({
       uwb: {
         mode: 4,
@@ -114,8 +130,7 @@ describe('validateConfig', () => {
         ],
       } as any
     });
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContain('3D TAG_TDOA static geometry requires at least 5 anchors');
+    expect(result.valid).toBe(true);
   });
 
   it('accepts two-plane static geometry for 3D TAG_TDOA configs', () => {

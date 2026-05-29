@@ -1,5 +1,5 @@
 import { DeviceConfig } from './types.js';
-import { anchorsAreNonCoplanar3D, MAX_CONFIGURABLE_ANCHORS, normalizeUwbShortAddr, validateAnchorList } from './anchors.js';
+import { MAX_CONFIGURABLE_ANCHORS, normalizeUwbShortAddr, validateAnchorList, validateStaticTagAnchorList } from './anchors.js';
 
 /**
  * Converts a DeviceConfig to an array of [group, paramName, value] tuples.
@@ -66,13 +66,9 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
         }
         const anchors = config.uwb.anchors.slice(0, MAX_CONFIGURABLE_ANCHORS);
         if (config.uwb.mode === 4) {
-          const use3DEstimator = config.uwb.use2DEstimator === 0;
-          const minimumAnchors = use3DEstimator ? 5 : 4;
-          if (anchors.length < minimumAnchors) {
-            throw new Error(`${use3DEstimator ? '3D' : '2D'} TAG_TDOA static geometry requires at least ${minimumAnchors} anchors`);
-          }
-          if (use3DEstimator && !anchorsAreNonCoplanar3D(anchors)) {
-            throw new Error('3D TAG_TDOA static geometry requires non-coplanar anchors');
+          const tagAnchorError = validateStaticTagAnchorList(anchors, config.uwb.use2DEstimator ?? 1);
+          if (tagAnchorError) {
+            throw new Error(tagAnchorError);
           }
         }
         anchors.forEach((anchor, i) => {

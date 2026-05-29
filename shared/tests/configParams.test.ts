@@ -202,11 +202,29 @@ describe('configToParams', () => {
           { id: '0', x: 0, y: 0, z: 0 },
           { id: '1', x: 3, y: 0, z: 0 },
           { id: '2', x: 0, y: 4, z: 0 },
+        ],
+      },
+      app: {},
+    })).toThrow('3D TAG_TDOA static geometry requires at least 4 anchors');
+  });
+
+  it('allows four non-coplanar static 3D TAG_TDOA anchors', () => {
+    const params = configToParams({
+      wifi: {},
+      uwb: {
+        mode: 4,
+        use2DEstimator: 0,
+        anchors: [
+          { id: '0', x: 0, y: 0, z: 0 },
+          { id: '1', x: 3, y: 0, z: 0 },
+          { id: '2', x: 0, y: 4, z: 0 },
           { id: '3', x: 1, y: 1, z: 2 },
         ],
       },
       app: {},
-    })).toThrow('3D TAG_TDOA static geometry requires at least 5 anchors');
+    });
+
+    expect(params).toContainEqual(['uwb', 'anchorCount', '4']);
   });
 
   it('rejects coplanar static 3D TAG_TDOA params before writing geometry', () => {

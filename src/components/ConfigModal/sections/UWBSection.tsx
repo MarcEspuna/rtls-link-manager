@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DeviceConfig } from '@shared/types';
 import { Commands } from '@shared/commands';
-import { getAnchorWriteCommands, validateAnchorList } from '@shared/anchors';
+import { getAnchorWriteCommands, validateStaticTagAnchorList } from '@shared/anchors';
 import { getDynamicAnchorEnableCommands, validateDynamicAnchorEnable } from './dynamicAnchorCommands';
 import styles from '../ConfigModal.module.css';
 
@@ -44,9 +44,9 @@ export function UWBSection({ config, onChange, onApply, onApplyBatch, isExpertMo
       }
 
       const anchors = config.uwb.anchors || [];
-      const anchorError = validateAnchorList(anchors);
+      const anchorError = validateStaticTagAnchorList(anchors, config.uwb.use2DEstimator ?? 1);
       if (anchorError) {
-        setModeApplyError('Configure valid anchors before applying TDoA Tag mode');
+        setModeApplyError(anchorError);
         return false;
       }
       try {

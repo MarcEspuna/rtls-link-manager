@@ -1,5 +1,5 @@
 import { DeviceConfig } from './types.js';
-import { anchorsAreNonCoplanar3D, MAX_CONFIGURABLE_ANCHORS, validateAnchorList } from './anchors.js';
+import { MAX_CONFIGURABLE_ANCHORS, validateAnchorList, validateStaticTagAnchorList } from './anchors.js';
 
 export interface ConfigValidationResult {
   valid: boolean;
@@ -57,17 +57,11 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
     }
 
     if (shouldValidateStaticTagAnchors && hasAnchorGeometry) {
-      const anchorError = validateAnchorList(config.uwb.anchors!);
+      const anchorError = isTagTdoa
+        ? validateStaticTagAnchorList(config.uwb.anchors!, use3DEstimator ? 0 : 1)
+        : validateAnchorList(config.uwb.anchors!);
       if (anchorError) {
         errors.push(anchorError);
-      }
-      if (isTagTdoa && !dynamicAnchorsEnabled) {
-        const minimumAnchors = use3DEstimator ? 5 : 4;
-        if (config.uwb.anchors!.length < minimumAnchors) {
-          errors.push(`${use3DEstimator ? '3D' : '2D'} TAG_TDOA static geometry requires at least ${minimumAnchors} anchors`);
-        } else if (use3DEstimator && !anchorsAreNonCoplanar3D(config.uwb.anchors!)) {
-          errors.push('3D TAG_TDOA static geometry requires non-coplanar anchors');
-        }
       }
     }
 

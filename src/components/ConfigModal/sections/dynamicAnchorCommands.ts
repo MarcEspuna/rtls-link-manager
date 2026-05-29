@@ -13,12 +13,18 @@ export function validateDynamicAnchorEnable(config: DeviceConfig): string | null
 
 export function getDynamicAnchorEnableCommands(config: DeviceConfig): string[] {
   return [
+    ...getDynamicAnchorConfigCommands(config),
+    Commands.writeParam('uwb', 'dynamicAnchorPosEnabled', 1),
+    Commands.writeParam('uwb', 'use2DEstimator', config.uwb.use2DEstimator ?? 1),
+  ];
+}
+
+export function getDynamicAnchorConfigCommands(config: DeviceConfig): string[] {
+  return [
     Commands.writeParam('uwb', 'anchorLayout', config.uwb.anchorLayout ?? 0),
     Commands.writeParam('uwb', 'anchorHeight', config.uwb.anchorHeight ?? 0),
     Commands.writeParam('uwb', 'anchorPlaneSeparation', config.uwb.anchorPlaneSeparation ?? 0),
     Commands.writeParam('uwb', 'distanceAvgSamples', config.uwb.distanceAvgSamples ?? 50),
     Commands.writeParam('uwb', 'anchorPosLocked', config.uwb.anchorPosLocked ?? 0),
-    Commands.writeParam('uwb', 'dynamicAnchorPosEnabled', 1),
-    Commands.writeParam('uwb', 'use2DEstimator', config.uwb.use2DEstimator ?? 1),
   ];
 }

@@ -287,12 +287,10 @@ fn validate_static_tag_anchor_requirements(
     }
 
     let use_3d_estimator = config.uwb.use_2d_estimator == Some(0);
-    let minimum_anchors = if use_3d_estimator { 5 } else { 4 };
-    if anchors.len() < minimum_anchors {
+    if anchors.len() < 4 {
         return Err(format!(
-            "{} TAG_TDOA static geometry requires at least {} anchors",
+            "{} TAG_TDOA static geometry requires at least 4 anchors",
             if use_3d_estimator { "3D" } else { "2D" },
-            minimum_anchors
         ));
     }
 
@@ -1548,6 +1546,39 @@ mod tests {
         );
 
         config = minimal_device_config(
+            Some(3),
+            Some(vec![
+                AnchorConfig {
+                    id: "0".to_string(),
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "1".to_string(),
+                    x: 3.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "2".to_string(),
+                    x: 0.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+            ]),
+        );
+        config.uwb.use_2d_estimator = Some(0);
+
+        assert_eq!(
+            config_to_params(&config).unwrap_err(),
+            "3D TAG_TDOA static geometry requires at least 4 anchors"
+        );
+    }
+
+    #[test]
+    fn config_to_params_allows_four_non_coplanar_static_3d_anchors() {
+        let mut config = minimal_device_config(
             Some(4),
             Some(vec![
                 AnchorConfig {
@@ -1578,10 +1609,10 @@ mod tests {
         );
         config.uwb.use_2d_estimator = Some(0);
 
-        assert_eq!(
-            config_to_params(&config).unwrap_err(),
-            "3D TAG_TDOA static geometry requires at least 5 anchors"
-        );
+        let params = config_to_params(&config).unwrap();
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "4"));
     }
 
     #[test]
