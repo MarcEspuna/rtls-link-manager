@@ -36,7 +36,7 @@ fn device_from_status(status: RTLS_DEVICE_STATUS_DATA, source_ip: &str) -> Devic
         .flags
         .contains(RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_DYNAMIC_ANCHORS_ENABLED)
     {
-        let count = usize::from(status.dynamic_anchor_count.min(4));
+        let count = usize::from(status.dynamic_anchor_count.min(8));
         let anchors = (0..count)
             .map(|index| DynamicAnchorPosition {
                 id: status.dynamic_anchor_id[index],
@@ -297,11 +297,11 @@ mod tests {
         let packet = status_packet(RTLS_DEVICE_STATUS_DATA {
             role: RtlsDeviceRole::RTLS_DEVICE_ROLE_TAG_TDOA,
             flags: RtlsDeviceStatusFlags::RTLS_DEVICE_STATUS_FLAG_DYNAMIC_ANCHORS_ENABLED,
-            dynamic_anchor_count: 4,
-            dynamic_anchor_id: [0, 1, 2, 3],
-            dynamic_anchor_x_mm: [0, 5000, 5000, 0],
-            dynamic_anchor_y_mm: [0, 0, 3000, 3000],
-            dynamic_anchor_z_mm: [-2000, -2000, -2000, -2000],
+            dynamic_anchor_count: 8,
+            dynamic_anchor_id: [0, 1, 2, 3, 4, 5, 6, 7],
+            dynamic_anchor_x_mm: [0, 5000, 5000, 0, 0, 5000, 5000, 0],
+            dynamic_anchor_y_mm: [0, 0, 3000, 3000, 0, 0, 3000, 3000],
+            dynamic_anchor_z_mm: [-2000, -2000, -2000, -2000, -5000, -5000, -5000, -5000],
             short_addr: CharArray::<8>::from("1"),
             ..Default::default()
         });
@@ -312,7 +312,7 @@ mod tests {
         assert!(device.dynamic_anchors.is_some());
 
         let anchors = device.dynamic_anchors.unwrap();
-        assert_eq!(anchors.len(), 4);
+        assert_eq!(anchors.len(), 8);
         assert_eq!(anchors[0].id, 0);
         assert_eq!(anchors[0].x, 0.0);
         assert_eq!(anchors[0].y, 0.0);
@@ -321,6 +321,8 @@ mod tests {
         assert_eq!(anchors[1].x, 5.0);
         assert_eq!(anchors[3].id, 3);
         assert_eq!(anchors[3].y, 3.0);
+        assert_eq!(anchors[4].id, 4);
+        assert_eq!(anchors[4].z, -5.0);
     }
 
     #[test]

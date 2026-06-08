@@ -1,21 +1,72 @@
 import { useState } from 'react';
 import { DeviceConfig } from '@shared/types';
+import { Commands } from '@shared/commands';
+import { getAnchorWriteCommands, validateStaticTagAnchorList } from '@shared/anchors';
+import { getDynamicAnchorEnableCommands, validateDynamicAnchorEnable } from './dynamicAnchorCommands';
 import styles from '../ConfigModal.module.css';
 
 interface UWBSectionProps {
   config: DeviceConfig;
   onChange: (group: keyof DeviceConfig, name: string, value: any) => void;
   onApply: (group: string, name: string, value: any) => Promise<void>;
+  onApplyBatch: (commands: string[]) => Promise<void>;
   isExpertMode?: boolean;
 }
 
-export function UWBSection({ config, onChange, onApply, isExpertMode = false }: UWBSectionProps) {
+export function UWBSection({ config, onChange, onApply, onApplyBatch, isExpertMode = false }: UWBSectionProps) {
   const [shortAddrError, setShortAddrError] = useState<string | null>(null);
+  const [modeApplyError, setModeApplyError] = useState<string | null>(null);
 
   const validateShortAddr = (value: string): string | null => {
     if (!value) return 'Device ID is required';
     if (!/^\d{1,2}$/.test(value)) return 'Use 1-2 digits (0-99)';
     return null;
+  };
+
+  const applyMode = async (value: number): Promise<boolean> => {
+    setModeApplyError(null);
+    if (value === 4) {
+      if (config.uwb.dynamicAnchorPosEnabled === 1) {
+        const dynamicError = validateDynamicAnchorEnable(config);
+        if (dynamicError) {
+          setModeApplyError(dynamicError);
+          return false;
+        }
+
+        try {
+          const dynamicCommands = getDynamicAnchorEnableCommands(config);
+          await onApplyBatch([...dynamicCommands, Commands.writeParam('uwb', 'mode', value)]);
+          return true;
+        } catch (e) {
+          setModeApplyError(e instanceof Error ? e.message : 'Failed to apply UWB mode');
+          return false;
+        }
+      }
+
+      const anchors = config.uwb.anchors || [];
+      const anchorError = validateStaticTagAnchorList(anchors, config.uwb.use2DEstimator ?? 1);
+      if (anchorError) {
+        setModeApplyError(anchorError);
+        return false;
+      }
+      try {
+        const anchorCommands = getAnchorWriteCommands(anchors)
+          .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
+        await onApplyBatch([...anchorCommands, Commands.writeParam('uwb', 'mode', value)]);
+        return true;
+      } catch (e) {
+        setModeApplyError(e instanceof Error ? e.message : 'Failed to apply UWB mode');
+        return false;
+      }
+    }
+
+    try {
+      await onApply('uwb', 'mode', value);
+      return true;
+    } catch (e) {
+      setModeApplyError(e instanceof Error ? e.message : 'Failed to apply UWB mode');
+      return false;
+    }
   };
 
   return (
@@ -45,13 +96,17 @@ export function UWBSection({ config, onChange, onApply, isExpertMode = false }: 
             value={config.uwb.mode}
             onChange={(e) => {
               const val = Number(e.target.value);
-              onChange('uwb', 'mode', val);
-              onApply('uwb', 'mode', val);
+              void applyMode(val).then((applied) => {
+                if (applied) {
+                  onChange('uwb', 'mode', val);
+                }
+              });
             }}
           >
             <option value={3}>TDoA Anchor</option>
             <option value={4}>TDoA Tag</option>
           </select>
+          {modeApplyError && <div className={styles.fieldError}>{modeApplyError}</div>}
         </div>
         <div className={styles.field}>
           <label>Output Backend</label>

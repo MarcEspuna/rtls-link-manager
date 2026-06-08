@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { DeviceConfig, AnchorConfig } from '@shared/types';
 import { Commands } from '@shared/commands';
-import { getAnchorWriteCommands } from '@shared/anchors';
+import { getAnchorWriteCommands, validateStaticTagAnchorList } from '@shared/anchors';
 import { AnchorListEditor } from '../../ConfigPanel/AnchorListEditor';
 import styles from '../ConfigModal.module.css';
 
@@ -55,9 +55,15 @@ export function AnchorListSection({
       while (pendingAnchorsRef.current) {
         const anchorsToApply = pendingAnchorsRef.current;
         pendingAnchorsRef.current = null;
-        const commands = getAnchorWriteCommands(anchorsToApply);
-        const batch = commands.map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
         try {
+          if (config.uwb.mode === 4 && config.uwb.dynamicAnchorPosEnabled !== 1) {
+            const anchorError = validateStaticTagAnchorList(anchorsToApply, config.uwb.use2DEstimator ?? 1);
+            if (anchorError) {
+              throw new Error(anchorError);
+            }
+          }
+          const commands = getAnchorWriteCommands(anchorsToApply);
+          const batch = commands.map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
           await onApplyBatch(batch);
         } catch (e) {
           onError(e instanceof Error ? e.message : 'Failed to write anchors');

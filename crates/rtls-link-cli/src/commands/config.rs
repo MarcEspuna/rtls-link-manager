@@ -107,7 +107,7 @@ async fn run_apply(
     let config: DeviceConfig =
         serde_json::from_str(&config_content).map_err(ConfigError::ParseError)?;
 
-    let params = config_to_params(&config);
+    let params = config_to_params(&config).map_err(CliError::Other)?;
 
     let ips = if target.to_lowercase() == "all" {
         let options = DiscoveryOptions {
@@ -143,7 +143,7 @@ async fn run_apply(
     println!("{}", formatter.format_bulk_results(&results));
 
     let failed_count = results.iter().filter(|(_, s, _)| !s).count();
-    if strict && failed_count > 0 {
+    if failed_count == results.len() || (strict && failed_count > 0) {
         return Err(CliError::PartialFailure {
             succeeded: results.len() - failed_count,
             failed: failed_count,

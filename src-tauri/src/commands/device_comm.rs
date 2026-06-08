@@ -304,7 +304,8 @@ pub async fn apply_config_to_devices(
 ) -> Result<Vec<DeviceOperationResult>, AppError> {
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(3000));
     let operation_id = operation_id.unwrap_or_else(|| "apply-config".to_string());
-    let mut base_commands = write_commands_from_params(config_to_params(&config));
+    let mut base_commands =
+        write_commands_from_params(config_to_params(&config).map_err(AppError::Json)?);
     base_commands.push(Commands::save_config_as(&config_name));
     let command_batches = ips.iter().map(|_| base_commands.clone()).collect();
 
@@ -362,7 +363,8 @@ pub async fn upload_preset_to_devices(
             let config = preset.config.as_ref().ok_or_else(|| {
                 AppError::Json("Full preset must include config data".to_string())
             })?;
-            let mut commands = write_commands_from_params(config_to_params(config));
+            let mut commands =
+                write_commands_from_params(config_to_params(config).map_err(AppError::Json)?);
             commands.push(Commands::save_config_as(&preset.name));
             commands
         }
@@ -370,7 +372,8 @@ pub async fn upload_preset_to_devices(
             let locations = preset.locations.as_ref().ok_or_else(|| {
                 AppError::Json("Location preset must include location data".to_string())
             })?;
-            let mut commands = write_commands_from_params(location_to_params(locations));
+            let mut commands =
+                write_commands_from_params(location_to_params(locations).map_err(AppError::Json)?);
             commands.push(Commands::save_config().to_string());
             commands
         }

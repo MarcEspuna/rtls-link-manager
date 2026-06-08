@@ -1,4 +1,5 @@
 import { DeviceConfig } from './types.js';
+import { MAX_CONFIGURABLE_ANCHORS, validateAnchorList, validateStaticTagAnchorList } from './anchors.js';
 
 export interface ConfigValidationResult {
   valid: boolean;
@@ -21,8 +22,54 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
   }
 
   if (config.uwb) {
-    if (config.uwb.anchorCount && config.uwb.anchorCount > 6) {
-      errors.push('Maximum 6 anchors supported');
+    const isTagTdoa = config.uwb.mode === 4;
+    const dynamicAnchorsEnabled = config.uwb.dynamicAnchorPosEnabled === 1;
+    const use3DEstimator = config.uwb.use2DEstimator === 0;
+    const shouldValidateTagAnchors = isTagTdoa || config.uwb.mode === undefined;
+    const shouldValidateStaticTagAnchors = shouldValidateTagAnchors && !dynamicAnchorsEnabled;
+    const hasAnchorArray = Array.isArray(config.uwb.anchors);
+    const hasAnchorGeometry = hasAnchorArray && config.uwb.anchors!.length > 0;
+    const anchorCount = config.uwb.anchorCount;
+    let validAnchorCount: number | null = null;
+    if (shouldValidateStaticTagAnchors && anchorCount !== undefined) {
+      const count = Number(anchorCount);
+      if (!Number.isInteger(count) || count < 0) {
+        errors.push('Anchor count must be positive when set');
+      } else if (count === 0) {
+        if (isTagTdoa || config.uwb.mode === undefined || hasAnchorGeometry) {
+          errors.push('Anchor count must be positive when set');
+        }
+      } else {
+        validAnchorCount = count;
+        if (count > MAX_CONFIGURABLE_ANCHORS) {
+          errors.push(`Maximum ${MAX_CONFIGURABLE_ANCHORS} anchors supported`);
+        }
+      }
+    }
+
+    if (validAnchorCount !== null
+      && (!config.uwb.anchors || config.uwb.anchors.length !== validAnchorCount)) {
+      errors.push('Anchor geometry required when anchorCount is set');
+    }
+
+    if (isTagTdoa && !dynamicAnchorsEnabled && !hasAnchorGeometry) {
+      errors.push('Anchor geometry required for TAG_TDOA configs');
+    }
+
+    if (shouldValidateStaticTagAnchors && hasAnchorGeometry) {
+      const anchorError = isTagTdoa
+        ? validateStaticTagAnchorList(config.uwb.anchors!, use3DEstimator ? 0 : 1)
+        : validateAnchorList(config.uwb.anchors!);
+      if (anchorError) {
+        errors.push(anchorError);
+      }
+    }
+
+    if (isTagTdoa && dynamicAnchorsEnabled && use3DEstimator) {
+      const separation = Number(config.uwb.anchorPlaneSeparation);
+      if (!Number.isFinite(separation) || separation <= 0) {
+        errors.push('3D dynamic anchors require a positive anchor plane separation');
+      }
     }
 
     if (config.uwb.tdoaSlotCount !== undefined) {

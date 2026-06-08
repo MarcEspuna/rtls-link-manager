@@ -134,7 +134,8 @@ export interface UwbConfig {
   // Dynamic anchor positioning (TDoA tags only)
   dynamicAnchorPosEnabled?: 0 | 1;  // 0=static (use configured positions), 1=dynamic
   anchorLayout?: AnchorLayout;      // Layout for dynamic position calculation
-  anchorHeight?: number;            // Height for Z calculation (NED: Z = -height)
+  anchorHeight?: number;            // Lower-plane height (NED: Z = -height)
+  anchorPlaneSeparation?: number;   // Vertical distance between lower and upper dynamic anchor planes
   anchorPosLocked?: number;         // Bitmask: bit N = anchor N position locked
   distanceAvgSamples?: number;      // Number of samples to average (default: 50)
   // Position estimator configuration
@@ -181,6 +182,7 @@ export interface LocationData {
   };
   rotation: number;
   anchors: AnchorConfig[];
+  use2DEstimator?: 0 | 1;
 }
 
 export interface Preset {

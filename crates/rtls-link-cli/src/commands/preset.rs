@@ -205,6 +205,7 @@ async fn run_save(
                 },
                 rotation: config.uwb.rotation_degrees.unwrap_or(0.0),
                 anchors: config.uwb.anchors.unwrap_or_default(),
+                use_2d_estimator: config.uwb.use_2d_estimator,
             };
 
             Preset {
@@ -281,6 +282,8 @@ async fn run_upload(
             ))
         })?;
 
+    let params = preset_to_params(&preset)?;
+
     let ips = if target.to_lowercase() == "all" {
         let options = DiscoveryOptions {
             port: DISCOVERY_PORT,
@@ -310,7 +313,7 @@ async fn run_upload(
     let mut results = Vec::new();
 
     for ip in &ips {
-        let result = upload_preset_to_device(ip, &preset, timeout).await;
+        let result = upload_preset_to_device(ip, &preset, &params, timeout).await;
         let success = result.is_ok();
         let message = match &result {
             Ok(_) => "Preset uploaded".to_string(),
@@ -322,7 +325,7 @@ async fn run_upload(
     println!("{}", formatter.format_bulk_results(&results));
 
     let failed_count = results.iter().filter(|(_, s, _)| !s).count();
-    if strict && failed_count > 0 {
+    if failed_count == results.len() || (strict && failed_count > 0) {
         return Err(CliError::PartialFailure {
             succeeded: results.len() - failed_count,
             failed: failed_count,
@@ -335,28 +338,12 @@ async fn run_upload(
 async fn upload_preset_to_device(
     ip: &str,
     preset: &Preset,
+    params: &[(String, String, String)],
     timeout: Duration,
 ) -> Result<(), CliError> {
-    let params = match preset.preset_type {
-        PresetType::Full => {
-            if let Some(ref config) = preset.config {
-                config_to_params(config)
-            } else {
-                return Err(CliError::Other("Preset has no config data".to_string()));
-            }
-        }
-        PresetType::Locations => {
-            if let Some(ref locations) = preset.locations {
-                location_to_params(locations)
-            } else {
-                return Err(CliError::Other("Preset has no location data".to_string()));
-            }
-        }
-    };
-
     let mut conn = DeviceConnection::connect(ip, timeout).await?;
 
-    for (group, name, value) in &params {
+    for (group, name, value) in params {
         let cmd = Commands::write_param(group, name, value);
         conn.send_raw(&cmd).await?;
     }
@@ -369,6 +356,25 @@ async fn upload_preset_to_device(
     }
 
     Ok(())
+}
+
+fn preset_to_params(preset: &Preset) -> Result<Vec<(String, String, String)>, CliError> {
+    match preset.preset_type {
+        PresetType::Full => {
+            if let Some(ref config) = preset.config {
+                config_to_params(config).map_err(CliError::Other)
+            } else {
+                return Err(CliError::Other("Preset has no config data".to_string()));
+            }
+        }
+        PresetType::Locations => {
+            if let Some(ref locations) = preset.locations {
+                location_to_params(locations).map_err(CliError::Other)
+            } else {
+                return Err(CliError::Other("Preset has no location data".to_string()));
+            }
+        }
+    }
 }
 
 fn filter_devices_by_role(devices: Vec<Device>, filter: Option<RoleFilter>) -> Vec<Device> {

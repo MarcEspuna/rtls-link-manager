@@ -304,9 +304,12 @@ pub struct UwbConfig {
     /// Anchor layout for dynamic position calculation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor_layout: Option<u8>,
-    /// Anchor height for Z calculation (NED: Z = -height)
+    /// Lower-plane anchor height (NED: Z = -height)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor_height: Option<f64>,
+    /// Vertical distance between lower and upper dynamic anchor planes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_plane_separation: Option<f64>,
     /// Bitmask: bit N = anchor N position locked
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor_pos_locked: Option<u32>,
@@ -314,7 +317,11 @@ pub struct UwbConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub distance_avg_samples: Option<u16>,
     /// Position estimator mode: 0=3D, 1=2D (XY with fixed Z, default)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "use2DEstimator",
+        alias = "use2dEstimator",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub use_2d_estimator: Option<u8>,
 }
 
@@ -405,6 +412,7 @@ pub struct GpsOrigin {
 
 /// Location data for a preset.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LocationData {
     /// GPS origin coordinates
     pub origin: GpsOrigin,
@@ -412,6 +420,14 @@ pub struct LocationData {
     pub rotation: f64,
     /// Anchor configurations
     pub anchors: Vec<AnchorConfig>,
+    /// Position estimator mode for TAG_TDOA uploads: 0=3D, 1=2D.
+    #[serde(
+        default,
+        rename = "use2DEstimator",
+        alias = "use2dEstimator",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub use_2d_estimator: Option<u8>,
 }
 
 /// Unified preset that can be either full config or locations only.
@@ -670,6 +686,7 @@ mod tests {
                 dynamic_anchor_pos_enabled: None,
                 anchor_layout: None,
                 anchor_height: None,
+                anchor_plane_separation: None,
                 anchor_pos_locked: None,
                 distance_avg_samples: None,
                 use_2d_estimator: None,
@@ -686,6 +703,40 @@ mod tests {
         assert_eq!(config.wifi.mode, deserialized.wifi.mode);
         assert_eq!(config.uwb.mode, deserialized.uwb.mode);
         assert_eq!(config.uwb.anchors.as_ref().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_use_2d_estimator_wire_name_for_device_config() {
+        let uwb: UwbConfig =
+            serde_json::from_str(r#"{"mode":4,"devShortAddr":"1","use2DEstimator":0}"#).unwrap();
+        assert_eq!(uwb.use_2d_estimator, Some(0));
+
+        let alias_uwb: UwbConfig =
+            serde_json::from_str(r#"{"mode":4,"devShortAddr":"1","use2dEstimator":1}"#).unwrap();
+        assert_eq!(alias_uwb.use_2d_estimator, Some(1));
+
+        let json = serde_json::to_string(&uwb).unwrap();
+        assert!(json.contains("\"use2DEstimator\":0"));
+        assert!(!json.contains("use2dEstimator"));
+    }
+
+    #[test]
+    fn test_use_2d_estimator_wire_name_for_location_presets() {
+        let location: LocationData = serde_json::from_str(
+            r#"{"origin":{"lat":0.0,"lon":0.0,"alt":0.0},"rotation":0.0,"anchors":[],"use2DEstimator":0}"#,
+        )
+        .unwrap();
+        assert_eq!(location.use_2d_estimator, Some(0));
+
+        let alias_location: LocationData = serde_json::from_str(
+            r#"{"origin":{"lat":0.0,"lon":0.0,"alt":0.0},"rotation":0.0,"anchors":[],"use2dEstimator":1}"#,
+        )
+        .unwrap();
+        assert_eq!(alias_location.use_2d_estimator, Some(1));
+
+        let json = serde_json::to_string(&location).unwrap();
+        assert!(json.contains("\"use2DEstimator\":0"));
+        assert!(!json.contains("use2dEstimator"));
     }
 
     #[test]

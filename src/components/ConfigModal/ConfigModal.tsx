@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Device, DeviceConfig } from '@shared/types';
 import { Commands } from '@shared/commands';
 import { flatToAnchors, getAnchorWriteCommands, normalizeUwbShortAddr } from '@shared/anchors';
+import { validateConfig } from '@shared/config';
 import { useDeviceCommand } from '../../hooks/useDeviceCommand';
 import { GeneralSection } from './sections/GeneralSection';
 import { UWBSection } from './sections/UWBSection';
@@ -37,7 +38,7 @@ const navItems: NavItem[] = [
   { id: 'anchors', label: 'Anchor List' },
   { id: 'antennaCal', label: 'Antenna Calibration', condition: (config) => config?.uwb.mode === 3 },
   { id: 'dynamic', label: 'Dynamic Anchors', condition: (config) =>
-    config?.uwb.mode === 4 },
+    config?.uwb.mode === 3 || config?.uwb.mode === 4 || config?.uwb.dynamicAnchorPosEnabled === 1 },
   { id: 'wifi', label: 'WiFi', expertOnly: true },
   { id: 'logging', label: 'Logging', expertOnly: true },
   { id: 'advanced', label: 'Advanced', expertOnly: true },
@@ -58,6 +59,23 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
   const findCommandError = (responses: string[] | null): string | null => {
     if (!responses) return 'No response from device';
     for (const response of responses) {
+      const jsonStart = response.search(/[\{\[]/);
+      if (jsonStart >= 0) {
+        try {
+          const parsed = JSON.parse(response.slice(jsonStart));
+          if (parsed?.success === true) {
+            continue;
+          }
+          if (parsed?.success === false) {
+            return parsed.message || parsed.error || 'Command failed';
+          }
+          if (parsed?.error !== undefined && parsed.error !== null && parsed.error !== '') {
+            return typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
+          }
+        } catch {
+          // Fall through to text matching for non-JSON command responses.
+        }
+      }
       if (/error|fail|invalid|not found/i.test(response)) {
         return response;
       }
@@ -75,7 +93,10 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
 
   const transformConfigResult = (result: any): DeviceConfig => {
     const uwb = result.uwb || {};
-    const anchors = flatToAnchors(uwb, uwb.anchorCount || 0);
+    const dynamicAnchorsEnabled = uwb.dynamicAnchorPosEnabled === 1;
+    const anchors = dynamicAnchorsEnabled
+      ? (Array.isArray(uwb.anchors) ? uwb.anchors : [])
+      : flatToAnchors(uwb, uwb.anchorCount || 0);
     return {
       ...result,
       uwb: {
@@ -107,7 +128,11 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
   const handleSave = async () => {
     if (!config) return;
     try {
-      const anchorCommands = getAnchorWriteCommands(config.uwb.anchors || [])
+      const validation = validateConfig(config);
+      if (!validation.valid) {
+        throw new Error(validation.errors[0] || 'Invalid configuration');
+      }
+      const anchorCommands = getConfiguredAnchorCommands(config)
         .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
       const batch = [...anchorCommands, Commands.saveConfig()];
       const result = await sendCommands(batch);
@@ -126,7 +151,11 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
     if (name) {
       try {
         if (config) {
-          const anchorCommands = getAnchorWriteCommands(config.uwb.anchors || [])
+          const validation = validateConfig(config);
+          if (!validation.valid) {
+            throw new Error(validation.errors[0] || 'Invalid configuration');
+          }
+          const anchorCommands = getConfiguredAnchorCommands(config)
             .map((cmd) => Commands.writeParam('uwb', cmd.name, cmd.value));
           const batch = [...anchorCommands, Commands.saveConfigAs(name)];
           const result = await sendCommands(batch);
@@ -155,8 +184,19 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
   };
 
   const handleActivate = async () => {
-    if (!previewingConfig) return;
+    if (!previewingConfig || !config) return;
     try {
+      const saved = await sendCommand<any>(Commands.readConfigNamed(previewingConfig));
+      if (!saved || saved.error) {
+        throw new Error(saved?.error || 'Failed to load configuration preview');
+      }
+      const savedConfig = transformConfigResult(saved);
+      setConfig(savedConfig);
+
+      const validation = validateConfig(savedConfig);
+      if (!validation.valid) {
+        throw new Error(validation.errors[0] || 'Invalid configuration');
+      }
       const result = await sendCommand<{ success: boolean; error?: string }>(
         Commands.loadConfigNamed(previewingConfig)
       );
@@ -184,6 +224,15 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
     }
   };
 
+  const getConfiguredAnchorCommands = (nextConfig: DeviceConfig) => {
+    const anchors = nextConfig.uwb.anchors || [];
+    return nextConfig.uwb.mode === 4
+      && nextConfig.uwb.dynamicAnchorPosEnabled !== 1
+      && anchors.length > 0
+      ? getAnchorWriteCommands(anchors)
+      : [];
+  };
+
   const handleChange = (group: keyof DeviceConfig, name: string, value: any) => {
     if (!config) return;
     const newConfig = { ...config, [group]: { ...config[group], [name]: value } };
@@ -195,6 +244,8 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
     if (item.condition && !item.condition(config, device)) return false;
     return true;
   });
+  const configErrors = config ? validateConfig(config).errors : [];
+  const hasConfigErrors = configErrors.length > 0;
 
   const renderSection = () => {
     if (!config) {
@@ -227,6 +278,7 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
             config={config}
             onChange={handleChange}
             onApply={handleApply}
+            onApplyBatch={handleApplyBatch}
             isExpertMode={isExpertMode}
           />
         );
@@ -255,6 +307,7 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
             device={device}
             onChange={handleChange}
             onApply={handleApply}
+            onApplyBatch={handleApplyBatch}
           />
         );
       case 'wifi':
@@ -300,10 +353,10 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
             <span className={styles.deviceInfo}>{device.id} ({device.ip})</span>
           </div>
           <div className={styles.headerRight}>
-            <button className={styles.btnPrimary} onClick={handleSave} disabled={loading || anchorBusy}>
+            <button className={styles.btnPrimary} onClick={handleSave} disabled={loading || anchorBusy || hasConfigErrors}>
               Save
             </button>
-            <button className={styles.btnSecondary} onClick={handleSaveAs} disabled={loading || anchorBusy}>
+            <button className={styles.btnSecondary} onClick={handleSaveAs} disabled={loading || anchorBusy || hasConfigErrors}>
               Save As...
             </button>
             <button className={styles.btnSecondary} onClick={loadConfig} disabled={loading || anchorBusy}>
@@ -320,7 +373,7 @@ export function ConfigModal({ device, allDevices, onClose, isExpertMode = false 
               <button
                 className={styles.btnActivate}
                 onClick={handleActivate}
-                disabled={loading}
+                disabled={loading || hasConfigErrors}
               >
                 Activate
               </button>

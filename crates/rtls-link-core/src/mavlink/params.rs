@@ -217,6 +217,46 @@ pub const PARAMS: &[ParamEntry] = &[
         name: "z6",
     },
     ParamEntry {
+        id: "UWB_A7_ID",
+        group: "uwb",
+        name: "devId7",
+    },
+    ParamEntry {
+        id: "UWB_A7_X",
+        group: "uwb",
+        name: "x7",
+    },
+    ParamEntry {
+        id: "UWB_A7_Y",
+        group: "uwb",
+        name: "y7",
+    },
+    ParamEntry {
+        id: "UWB_A7_Z",
+        group: "uwb",
+        name: "z7",
+    },
+    ParamEntry {
+        id: "UWB_A8_ID",
+        group: "uwb",
+        name: "devId8",
+    },
+    ParamEntry {
+        id: "UWB_A8_X",
+        group: "uwb",
+        name: "x8",
+    },
+    ParamEntry {
+        id: "UWB_A8_Y",
+        group: "uwb",
+        name: "y8",
+    },
+    ParamEntry {
+        id: "UWB_A8_Z",
+        group: "uwb",
+        name: "z8",
+    },
+    ParamEntry {
         id: "UWB_ADELAY",
         group: "uwb",
         name: "ADelay",
@@ -375,6 +415,11 @@ pub const PARAMS: &[ParamEntry] = &[
         id: "UWB_HEIGHT",
         group: "uwb",
         name: "anchorHeight",
+    },
+    ParamEntry {
+        id: "UWB_PLANE_SEP",
+        group: "uwb",
+        name: "anchorPlaneSeparation",
     },
     ParamEntry {
         id: "UWB_LOCK_MASK",

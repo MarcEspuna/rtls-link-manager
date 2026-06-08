@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Device, DeviceConfig, LocalConfigInfo } from '@shared/types';
 import {
-  activateConfigOnDevices,
   applyConfigToDevices,
   backupDeviceConfigToLocal,
   deleteConfig,
@@ -107,8 +106,8 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
 
   // Activate config on all devices
   const handleActivateOnAll = async () => {
-    if (!selectedConfig) return;
-    if (!confirm(`Activate config "${selectedConfig}" on all ${allDevices.length} devices?`)) return;
+    if (!selectedConfig || !configPreview) return;
+    if (!confirm(`Upload and activate config "${selectedConfig}" on all ${allDevices.length} devices?`)) return;
 
     setLoading(true);
     setResults([]);
@@ -123,10 +122,11 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
     });
 
     try {
-      const backendResults = await activateConfigOnDevices(
+      const backendResults = await applyConfigToDevices(
         allDevices.map((device) => device.ip),
+        configPreview,
         selectedConfig,
-        { concurrency: 5, operationId }
+        { concurrency: 3, operationId }
       );
       setResults(backendResults.map((result) => ({
         ip: result.ip,
@@ -252,7 +252,7 @@ export function LocalConfigPanel({ selectedDevices, allDevices }: LocalConfigPan
         </button>
         <button
           onClick={handleActivateOnAll}
-          disabled={loading || !selectedConfig || allDevices.length === 0}
+          disabled={loading || !selectedConfig || !configPreview || allDevices.length === 0}
         >
           Activate on All ({allDevices.length})
         </button>

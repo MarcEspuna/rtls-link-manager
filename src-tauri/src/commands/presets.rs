@@ -84,6 +84,7 @@ pub async fn backup_device_preset(
                 },
                 rotation: config.uwb.rotation_degrees.unwrap_or(0.0),
                 anchors: config.uwb.anchors.unwrap_or_default(),
+                use_2d_estimator: config.uwb.use_2d_estimator,
             };
             Preset {
                 name,

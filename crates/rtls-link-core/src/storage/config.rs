@@ -234,6 +234,7 @@ mod tests {
                 dynamic_anchor_pos_enabled: None,
                 anchor_layout: None,
                 anchor_height: None,
+                anchor_plane_separation: None,
                 anchor_pos_locked: None,
                 distance_avg_samples: None,
                 use_2d_estimator: None,

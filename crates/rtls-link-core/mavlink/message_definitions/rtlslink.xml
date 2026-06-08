@@ -146,10 +146,10 @@
       <field type="uint8_t" name="mavlink_target_system">Configured ArduPilot target system id.</field>
       <field type="uint8_t" name="log_level">Compiled log level.</field>
       <field type="uint8_t" name="dynamic_anchor_count">Number of valid dynamic anchor entries.</field>
-      <field type="uint8_t[4]" name="dynamic_anchor_id">Dynamic anchor IDs.</field>
-      <field type="int32_t[4]" name="dynamic_anchor_x_mm" units="mm">Dynamic anchor X positions.</field>
-      <field type="int32_t[4]" name="dynamic_anchor_y_mm" units="mm">Dynamic anchor Y positions.</field>
-      <field type="int32_t[4]" name="dynamic_anchor_z_mm" units="mm">Dynamic anchor Z positions.</field>
+      <field type="uint8_t[8]" name="dynamic_anchor_id">Dynamic anchor IDs.</field>
+      <field type="int32_t[8]" name="dynamic_anchor_x_mm" units="mm">Dynamic anchor X positions.</field>
+      <field type="int32_t[8]" name="dynamic_anchor_y_mm" units="mm">Dynamic anchor Y positions.</field>
+      <field type="int32_t[8]" name="dynamic_anchor_z_mm" units="mm">Dynamic anchor Z positions.</field>
       <field type="uint8_t[4]" name="ip">Device IPv4 address.</field>
       <field type="uint8_t[6]" name="mac">WiFi MAC address.</field>
       <field type="char[16]" name="device_type">Device type string.</field>

@@ -23,9 +23,11 @@ const layoutToBackend = (layout: AnchorLayout) => {
 };
 
 export function AntennaCalibrationSection({ devices }: { devices: Device[] }) {
+  const [anchorCount, setAnchorCount] = useState<4 | 8>(4);
   const [layout, setLayout] = useState<AnchorLayout>(AnchorLayout.RECTANGULAR_A1X_A3Y);
   const [x, setX] = useState('5.2');
   const [y, setY] = useState('2.3');
+  const [planeSeparation, setPlaneSeparation] = useState('2.0');
   const [tolerance, setTolerance] = useState('0.15');
   const [maxDeltaTicks, setMaxDeltaTicks] = useState('500');
   const [minSamples, setMinSamples] = useState('30');
@@ -47,13 +49,14 @@ export function AntennaCalibrationSection({ devices }: { devices: Device[] }) {
     }
 
     const anchors: Array<{ anchorId: number; ip: string }> = [];
-    for (const id of [0, 1, 2, 3]) {
+    const requiredIds = Array.from({ length: anchorCount }, (_, id) => id);
+    for (const id of requiredIds) {
       const device = byId.get(id);
       if (!device) return null;
       anchors.push({ anchorId: id, ip: device.ip });
     }
     return anchors;
-  }, [devices]);
+  }, [devices, anchorCount]);
 
   const addLog = (line: string) => setLog((prev) => [...prev.slice(-200), line]);
 
@@ -71,6 +74,11 @@ export function AntennaCalibrationSection({ devices }: { devices: Device[] }) {
     const yM = Number.parseFloat(y);
     if (!Number.isFinite(xM) || !Number.isFinite(yM) || xM <= 0 || yM <= 0) {
       setStatus('Invalid X/Y distances. Enter positive meters.');
+      return;
+    }
+    const planeSeparationM = Number.parseFloat(planeSeparation);
+    if (anchorCount === 8 && (!Number.isFinite(planeSeparationM) || planeSeparationM <= 0)) {
+      setStatus('Invalid plane separation. Enter a positive distance for 8-anchor calibration.');
       return;
     }
 
@@ -91,8 +99,10 @@ export function AntennaCalibrationSection({ devices }: { devices: Device[] }) {
     setRunning(true);
     try {
       const run = await runAntennaCalibration({
+        anchorCount,
         x: xM,
         y: yM,
+        planeSeparation: anchorCount === 8 ? planeSeparationM : undefined,
         layout: layoutToBackend(layout),
         ips: endpoints.map((endpoint) => endpoint.ip),
         discoveryDuration: 3,
@@ -127,9 +137,21 @@ export function AntennaCalibrationSection({ devices }: { devices: Device[] }) {
 
         {!endpoints && (
           <div className={styles.fieldError}>
-            Need anchors 0..3 in <code>anchor_tdoa</code> role online.
+            Need anchors 0..{anchorCount - 1} in <code>anchor_tdoa</code> role online.
           </div>
         )}
+
+        <div className={styles.field}>
+          <label>Anchor Count</label>
+          <select
+            value={anchorCount}
+            onChange={(e) => setAnchorCount(Number(e.target.value) === 8 ? 8 : 4)}
+            disabled={running}
+          >
+            <option value={4}>4 anchors</option>
+            <option value={8}>8 anchors</option>
+          </select>
+        </div>
 
         <div className={styles.field}>
           <label>Layout</label>
@@ -149,6 +171,12 @@ export function AntennaCalibrationSection({ devices }: { devices: Device[] }) {
             <label>Y distance (m)</label>
             <input value={y} onChange={(e) => setY(e.target.value)} disabled={running} />
           </div>
+          {anchorCount === 8 && (
+            <div className={styles.field}>
+              <label>Plane separation (m)</label>
+              <input value={planeSeparation} onChange={(e) => setPlaneSeparation(e.target.value)} disabled={running} />
+            </div>
+          )}
           <div className={styles.field}>
             <label>Tolerance (m)</label>
             <input type="number" step="0.01" value={tolerance} onChange={(e) => setTolerance(e.target.value)} disabled={running} />
@@ -213,7 +241,7 @@ export function AntennaCalibrationSection({ devices }: { devices: Device[] }) {
             RMS: {result.error.rmsM.toFixed(3)} m - Max: {result.error.maxAbsM.toFixed(3)} m
           </div>
           <div className={styles.calibrationDelayGrid}>
-            {result.delays.slice(0, 4).map((d, idx) => (
+            {result.delays.map((d, idx) => (
               <div key={idx} className={styles.calibrationDelayCard}>
                 <div style={{ fontWeight: 700 }}>A{idx}</div>
                 <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace' }}>

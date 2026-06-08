@@ -124,6 +124,10 @@ impl From<RectLayout> for rtls_link_core::calibration::RectLayout {
 
 #[derive(Args, Debug)]
 pub struct CalibrateAnchorsArgs {
+    /// Anchor count to calibrate: 4 for 2D/default layout, 8 for two-plane 3D layout
+    #[arg(long, default_value = "4")]
+    pub anchor_count: u8,
+
     /// Target X-axis distance in meters (between A0 and +X anchor)
     #[arg(long)]
     pub x: f64,
@@ -131,6 +135,10 @@ pub struct CalibrateAnchorsArgs {
     /// Target Y-axis distance in meters (between A0 and +Y anchor)
     #[arg(long)]
     pub y: f64,
+
+    /// Vertical separation in meters between lower and upper planes (required for --anchor-count 8)
+    #[arg(long)]
+    pub plane_separation: Option<f64>,
 
     /// Layout mapping (which anchor IDs define +X and +Y axes)
     #[arg(long, value_enum, default_value = "rectangular-a1x-a3y")]
