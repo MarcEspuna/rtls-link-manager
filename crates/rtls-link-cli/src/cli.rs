@@ -13,8 +13,8 @@ pub struct Cli {
     pub json: bool,
 
     /// Command timeout in milliseconds
-    #[arg(long, global = true, default_value = "5000", env = "RTLS_CLI_TIMEOUT")]
-    pub timeout: u64,
+    #[arg(long, global = true, env = "RTLS_CLI_TIMEOUT")]
+    pub timeout: Option<u64>,
 
     /// Verbose output
     #[arg(short, long, global = true)]
