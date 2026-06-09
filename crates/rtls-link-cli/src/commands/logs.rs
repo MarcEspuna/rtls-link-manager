@@ -7,6 +7,7 @@ use colored::*;
 use regex::Regex;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
+use tokio::time::{timeout as tokio_timeout, Duration};
 
 use crate::cli::LogsArgs;
 use crate::error::CliError;
@@ -14,7 +15,7 @@ use crate::types::{LogLevel, LogMessage};
 use rtls_link_core::protocol::binary::decode_log_message;
 
 /// Run the logs command
-pub async fn run_logs(args: LogsArgs, json: bool) -> Result<(), CliError> {
+pub async fn run_logs(args: LogsArgs, timeout_ms: u64, json: bool) -> Result<(), CliError> {
     let min_level = LogLevel::from_str(&args.level)
         .ok_or_else(|| CliError::InvalidArgument(format!("Invalid log level: {}", args.level)))?;
 
@@ -31,55 +32,72 @@ pub async fn run_logs(args: LogsArgs, json: bool) -> Result<(), CliError> {
     let socket = UdpSocket::from_std(socket.into())?;
 
     println!(
-        "Listening for logs on port {} (level >= {}){}",
+        "Listening for logs on port {} (level >= {}){}{}",
         args.port,
         min_level,
         if args.ip.is_some() {
             format!(" from {}", args.ip.as_ref().unwrap())
         } else {
             String::new()
+        },
+        if timeout_ms > 0 {
+            format!(" for {} ms", timeout_ms)
+        } else {
+            String::new()
         }
     );
-    println!("Press Ctrl+C to stop.\n");
+    println!("Press Ctrl+C to stop early.\n");
 
     let mut buf = vec![0u8; 4096];
+    let receive_loop = async {
+        loop {
+            let (len, addr) = socket.recv_from(&mut buf).await?;
 
-    loop {
-        let (len, addr) = socket.recv_from(&mut buf).await?;
+            let ip = addr.ip().to_string();
 
-        let ip = addr.ip().to_string();
-
-        if let Some(ref filter_ip) = args.ip {
-            if &ip != filter_ip {
-                continue;
-            }
-        }
-
-        if let Ok(log_msg) = parse_log_message(&buf[..len], &ip) {
-            if (log_msg.level as u8) > (min_level as u8) {
-                continue;
-            }
-
-            if let Some(ref pattern) = tag_pattern {
-                if !pattern.is_match(&log_msg.tag) {
+            if let Some(ref filter_ip) = args.ip {
+                if &ip != filter_ip {
                     continue;
                 }
             }
 
-            if args.ndjson || json {
-                let output = serde_json::json!({
-                    "ip": log_msg.ip,
-                    "level": log_msg.level.as_str().to_lowercase(),
-                    "tag": log_msg.tag,
-                    "message": log_msg.message,
-                    "timestamp": log_msg.timestamp
-                });
-                println!("{}", serde_json::to_string(&output).unwrap());
-            } else {
-                print_colored_log(&log_msg);
-            }
+            if let Ok(log_msg) = parse_log_message(&buf[..len], &ip) {
+                if (log_msg.level as u8) > (min_level as u8) {
+                    continue;
+                }
 
-            io::stdout().flush().ok();
+                if let Some(ref pattern) = tag_pattern {
+                    if !pattern.is_match(&log_msg.tag) {
+                        continue;
+                    }
+                }
+
+                if args.ndjson || json {
+                    let output = serde_json::json!({
+                        "ip": log_msg.ip,
+                        "level": log_msg.level.as_str().to_lowercase(),
+                        "tag": log_msg.tag,
+                        "message": log_msg.message,
+                        "timestamp": log_msg.timestamp
+                    });
+                    println!("{}", serde_json::to_string(&output).unwrap());
+                } else {
+                    print_colored_log(&log_msg);
+                }
+
+                io::stdout().flush().ok();
+            }
+        }
+        #[allow(unreachable_code)]
+        Ok::<(), CliError>(())
+    };
+
+    if timeout_ms == 0 {
+        receive_loop.await
+    } else {
+        match tokio_timeout(Duration::from_millis(timeout_ms), receive_loop).await {
+            Ok(result) => result,
+            Err(_) => Ok(()),
         }
     }
 }

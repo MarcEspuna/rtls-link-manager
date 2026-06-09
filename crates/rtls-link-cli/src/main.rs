@@ -18,6 +18,8 @@ use clap::Parser;
 use cli::{Cli, Commands};
 use error::{exit_codes, CliError};
 
+const DEFAULT_TIMEOUT_MS: u64 = 5000;
+
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
@@ -34,22 +36,20 @@ async fn main() {
 }
 
 async fn run(cli: Cli) -> Result<(), CliError> {
+    let timeout = cli.timeout.unwrap_or(DEFAULT_TIMEOUT_MS);
+
     match cli.command {
         Commands::Discover(args) => commands::run_discover(args, cli.json).await,
-        Commands::Status(args) => commands::run_status(args, cli.timeout, cli.json).await,
-        Commands::Config(args) => {
-            commands::run_config(args, cli.timeout, cli.json, cli.strict).await
-        }
-        Commands::Preset(args) => {
-            commands::run_preset(args, cli.timeout, cli.json, cli.strict).await
-        }
+        Commands::Status(args) => commands::run_status(args, timeout, cli.json).await,
+        Commands::Config(args) => commands::run_config(args, timeout, cli.json, cli.strict).await,
+        Commands::Preset(args) => commands::run_preset(args, timeout, cli.json, cli.strict).await,
         Commands::Ota(args) => commands::run_ota(args, cli.json, cli.strict).await,
-        Commands::Logs(args) => commands::run_logs(args, cli.json).await,
+        Commands::Logs(args) => commands::run_logs(args, cli.timeout.unwrap_or(0), cli.json).await,
         Commands::AnchorTelemetry(args) => {
-            commands::run_anchor_telemetry(args, cli.timeout, cli.json, cli.strict).await
+            commands::run_anchor_telemetry(args, timeout, cli.json, cli.strict).await
         }
-        Commands::Cmd(args) => commands::run_cmd(args, cli.timeout, cli.json).await,
-        Commands::Bulk(args) => commands::run_bulk(args, cli.timeout, cli.json, cli.strict).await,
-        Commands::Calibrate(args) => commands::run_calibrate(args, cli.timeout, cli.json).await,
+        Commands::Cmd(args) => commands::run_cmd(args, timeout, cli.json).await,
+        Commands::Bulk(args) => commands::run_bulk(args, timeout, cli.json, cli.strict).await,
+        Commands::Calibrate(args) => commands::run_calibrate(args, timeout, cli.json).await,
     }
 }
