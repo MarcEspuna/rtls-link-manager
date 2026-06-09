@@ -8,6 +8,8 @@
 use crate::types::{AnchorConfig, DeviceConfig, LocationData};
 
 const MAX_CONFIGURABLE_ANCHORS: usize = 8;
+const LEGACY_3D_MIN_ANCHORS: usize = 4;
+const ROBUST_3D_MIN_ANCHORS: usize = 6;
 
 /// Parse a firmware `backup-config` payload into a DeviceConfig.
 ///
@@ -289,19 +291,33 @@ fn validate_static_tag_anchor_requirements(
     validate_tag_anchor_requirements_for_estimator(
         anchors,
         config.uwb.use_2d_estimator.unwrap_or(1),
+        config.uwb.tdoa_estimator_mode,
     )
 }
 
 fn validate_tag_anchor_requirements_for_estimator(
     anchors: &[AnchorConfig],
     use_2d_estimator: u8,
+    tdoa_estimator_mode: Option<u8>,
 ) -> Result<(), String> {
     if use_2d_estimator > 1 {
         return Err("use2DEstimator must be 0 or 1".to_string());
     }
+    if let Some(v) = tdoa_estimator_mode {
+        if v > 2 {
+            return Err("tdoaEstimatorMode must be 0, 1, or 2".to_string());
+        }
+    }
 
     let use_3d_estimator = use_2d_estimator == 0;
-    let min_anchors = if use_3d_estimator { 6 } else { 4 };
+    let legacy_3d_estimator = use_3d_estimator && tdoa_estimator_mode == Some(0);
+    let min_anchors = if !use_3d_estimator {
+        4
+    } else if legacy_3d_estimator {
+        LEGACY_3D_MIN_ANCHORS
+    } else {
+        ROBUST_3D_MIN_ANCHORS
+    };
     if anchors.len() < min_anchors {
         return Err(format!(
             "{} TAG_TDOA static geometry requires at least {} anchors",
@@ -757,7 +773,7 @@ pub fn location_to_params(location: &LocationData) -> Result<Vec<ParamTuple>, St
     if location.anchors.is_empty() {
         return Err("Location preset must include anchor geometry".to_string());
     }
-    validate_tag_anchor_requirements_for_estimator(&location.anchors, use_2d_estimator)?;
+    validate_tag_anchor_requirements_for_estimator(&location.anchors, use_2d_estimator, None)?;
     if use_2d_estimator != 0 {
         params.push((
             "uwb".to_string(),
@@ -1834,6 +1850,49 @@ mod tests {
             config_to_params(&config).unwrap_err(),
             "3D TAG_TDOA static geometry requires at least 6 anchors"
         );
+    }
+
+    #[test]
+    fn config_to_params_allows_four_non_coplanar_static_legacy_3d_anchors() {
+        let mut config = minimal_device_config(
+            Some(4),
+            Some(vec![
+                AnchorConfig {
+                    id: "0".to_string(),
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "1".to_string(),
+                    x: 3.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "2".to_string(),
+                    x: 0.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "3".to_string(),
+                    x: 1.0,
+                    y: 1.0,
+                    z: 2.0,
+                },
+            ]),
+        );
+        config.uwb.use_2d_estimator = Some(0);
+        config.uwb.tdoa_estimator_mode = Some(0);
+
+        let params = config_to_params(&config).unwrap();
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "4"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "tdoaEstimatorMode" && v == "0"));
     }
 
     #[test]
