@@ -221,6 +221,8 @@ mod tests {
                 rf_forward_preserve_src_ids: None,
                 enable_cov_matrix: None,
                 rmse_threshold: None,
+                tdoa_estimator_mode: None,
+                tdoa_estimator_diag: None,
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,

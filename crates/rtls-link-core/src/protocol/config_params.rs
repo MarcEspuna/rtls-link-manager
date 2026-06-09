@@ -321,6 +321,16 @@ fn validate_dynamic_tag_anchor_requirements(config: &DeviceConfig) -> Result<(),
             return Err("use2DEstimator must be 0 or 1".to_string());
         }
     }
+    if let Some(v) = config.uwb.tdoa_estimator_mode {
+        if v > 2 {
+            return Err("tdoaEstimatorMode must be 0, 1, or 2".to_string());
+        }
+    }
+    if let Some(v) = config.uwb.tdoa_estimator_diag {
+        if v > 2 {
+            return Err("tdoaEstimatorDiag must be 0, 1, or 2".to_string());
+        }
+    }
     if config.uwb.mode == 4
         && config.uwb.dynamic_anchor_pos_enabled == Some(1)
         && config.uwb.use_2d_estimator == Some(0)
@@ -575,6 +585,20 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
             v.to_string(),
         ));
     }
+    if let Some(v) = config.uwb.tdoa_estimator_mode {
+        params.push((
+            "uwb".to_string(),
+            "tdoaEstimatorMode".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.tdoa_estimator_diag {
+        params.push((
+            "uwb".to_string(),
+            "tdoaEstimatorDiag".to_string(),
+            v.to_string(),
+        ));
+    }
     if let Some(v) = config.uwb.channel {
         params.push(("uwb".to_string(), "channel".to_string(), v.to_string()));
     }
@@ -798,6 +822,8 @@ mod tests {
                 rf_forward_preserve_src_ids: None,
                 enable_cov_matrix: None,
                 rmse_threshold: None,
+                tdoa_estimator_mode: None,
+                tdoa_estimator_diag: None,
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,
@@ -888,6 +914,8 @@ mod tests {
                 rf_forward_preserve_src_ids: Some(1),
                 enable_cov_matrix: Some(1),
                 rmse_threshold: Some(0.8),
+                tdoa_estimator_mode: Some(2),
+                tdoa_estimator_diag: Some(1),
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,
@@ -1328,6 +1356,8 @@ mod tests {
                 rf_forward_preserve_src_ids: None,
                 enable_cov_matrix: None,
                 rmse_threshold: None,
+                tdoa_estimator_mode: None,
+                tdoa_estimator_diag: None,
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,
@@ -1608,6 +1638,8 @@ mod tests {
                 rf_forward_preserve_src_ids: None,
                 enable_cov_matrix: None,
                 rmse_threshold: None,
+                tdoa_estimator_mode: None,
+                tdoa_estimator_diag: None,
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,
@@ -2010,6 +2042,8 @@ mod tests {
                 rf_forward_preserve_src_ids: None,
                 enable_cov_matrix: None,
                 rmse_threshold: None,
+                tdoa_estimator_mode: None,
+                tdoa_estimator_diag: None,
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,

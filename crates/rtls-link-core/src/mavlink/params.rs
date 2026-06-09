@@ -352,6 +352,16 @@ pub const PARAMS: &[ParamEntry] = &[
         name: "use2DEstimator",
     },
     ParamEntry {
+        id: "UWB_EST_MODE",
+        group: "uwb",
+        name: "tdoaEstimatorMode",
+    },
+    ParamEntry {
+        id: "UWB_EST_DIAG",
+        group: "uwb",
+        name: "tdoaEstimatorDiag",
+    },
+    ParamEntry {
         id: "UWB_CHAN",
         group: "uwb",
         name: "channel",

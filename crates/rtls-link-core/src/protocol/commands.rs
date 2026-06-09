@@ -19,6 +19,7 @@ pub const STRUCTURED_RESPONSE_COMMANDS: &[&str] = &[
     "firmware-info",
     "tdoa-distances",
     "tdoa-anchor-stats",
+    "tdoa-estimator-status",
 ];
 
 /// Check if a command is expected to return a structured response.

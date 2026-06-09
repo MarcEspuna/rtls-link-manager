@@ -641,6 +641,7 @@ fn parse_rtls_command(command: &str) -> Result<(RtlsCommand, Option<String>), St
         "tdoa-anchor-model-status" => RtlsCommand::RTLS_COMMAND_TDOA_ANCHOR_MODEL_STATUS,
         "tdoa-anchor-model-export" => RtlsCommand::RTLS_COMMAND_TDOA_ANCHOR_MODEL_EXPORT,
         "tdoa-estimator-stats-reset" => RtlsCommand::RTLS_COMMAND_TDOA_ESTIMATOR_STATS_RESET,
+        "tdoa-estimator-status" => RtlsCommand::RTLS_COMMAND_TDOA_ESTIMATOR_STATUS,
         "save-config-as" => RtlsCommand::RTLS_COMMAND_SAVE_CONFIG_AS,
         "load-config-named" => RtlsCommand::RTLS_COMMAND_LOAD_CONFIG_NAMED,
         "read-config-named" => RtlsCommand::RTLS_COMMAND_READ_CONFIG_NAMED,
