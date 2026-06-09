@@ -49,6 +49,7 @@
       <entry value="19" name="RTLS_COMMAND_TDOA_ANCHOR_MODEL_STATUS"/>
       <entry value="20" name="RTLS_COMMAND_TDOA_ANCHOR_MODEL_EXPORT"/>
       <entry value="21" name="RTLS_COMMAND_TDOA_ESTIMATOR_STATS_RESET"/>
+      <entry value="22" name="RTLS_COMMAND_TDOA_ESTIMATOR_STATUS"/>
     </enum>
 
     <enum name="RTLS_RESULT">

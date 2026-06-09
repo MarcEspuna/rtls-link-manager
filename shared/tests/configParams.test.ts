@@ -23,6 +23,8 @@ describe('configToParams', () => {
         rfForwardPreserveSrcIds: 1,
         enableCovMatrix: 1,
         rmseThreshold: 0.8,
+        tdoaEstimatorMode: 1,
+        tdoaEstimatorDiag: 1,
         outputBackend: 1,
         rtlsBeaconAgeBiasMs: 2,
         rtlsBeaconTdoaSigmaFloorM: 0.25,
@@ -46,6 +48,8 @@ describe('configToParams', () => {
     expect(params).toContainEqual(['uwb', 'rfForwardPreserveSrcIds', '1']);
     expect(params).toContainEqual(['uwb', 'enableCovMatrix', '1']);
     expect(params).toContainEqual(['uwb', 'rmseThreshold', '0.8']);
+    expect(params).toContainEqual(['uwb', 'tdoaEstimatorMode', '1']);
+    expect(params).toContainEqual(['uwb', 'tdoaEstimatorDiag', '1']);
     expect(params).toContainEqual(['uwb', 'outputBackend', '1']);
     expect(params).toContainEqual(['uwb', 'rtlsBeaconAgeBiasMs', '2']);
     expect(params).toContainEqual(['uwb', 'rtlsBeaconTdoaSigmaFloorM', '0.25']);
@@ -205,10 +209,10 @@ describe('configToParams', () => {
         ],
       },
       app: {},
-    })).toThrow('3D TAG_TDOA static geometry requires at least 4 anchors');
+    })).toThrow('3D TAG_TDOA static geometry requires at least 6 anchors');
   });
 
-  it('allows four non-coplanar static 3D TAG_TDOA anchors', () => {
+  it('allows six non-coplanar static 3D TAG_TDOA anchors', () => {
     const params = configToParams({
       wifi: {},
       uwb: {
@@ -219,12 +223,14 @@ describe('configToParams', () => {
           { id: '1', x: 3, y: 0, z: 0 },
           { id: '2', x: 0, y: 4, z: 0 },
           { id: '3', x: 1, y: 1, z: 2 },
+          { id: '4', x: 3, y: 4, z: 2 },
+          { id: '5', x: 0, y: 4, z: 2 },
         ],
       },
       app: {},
     });
 
-    expect(params).toContainEqual(['uwb', 'anchorCount', '4']);
+    expect(params).toContainEqual(['uwb', 'anchorCount', '6']);
   });
 
   it('rejects coplanar static 3D TAG_TDOA params before writing geometry', () => {
@@ -239,6 +245,7 @@ describe('configToParams', () => {
           { id: '2', x: 3, y: 4, z: 0 },
           { id: '3', x: 0, y: 4, z: 0 },
           { id: '4', x: 1.5, y: 2, z: 0 },
+          { id: '5', x: 2, y: 1, z: 0 },
         ],
       },
       app: {},

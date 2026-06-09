@@ -20,6 +20,10 @@ describe('Commands', () => {
   it('builds anchor stats command', () => {
     expect(Commands.tdoaAnchorStats()).toBe('tdoa-anchor-stats');
   });
+
+  it('builds estimator status command', () => {
+    expect(Commands.tdoaEstimatorStatus()).toBe('tdoa-estimator-status');
+  });
 });
 
 describe('isStructuredResponseCommand', () => {
@@ -27,6 +31,7 @@ describe('isStructuredResponseCommand', () => {
     expect(isStructuredResponseCommand('backup-config')).toBe(true);
     expect(isStructuredResponseCommand('toggle-led2')).toBe(true);
     expect(isStructuredResponseCommand('tdoa-anchor-stats')).toBe(true);
+    expect(isStructuredResponseCommand('tdoa-estimator-status')).toBe(true);
     expect(isStructuredResponseCommand('readall all')).toBe(false);
   });
 });

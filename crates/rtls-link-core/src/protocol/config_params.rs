@@ -8,6 +8,8 @@
 use crate::types::{AnchorConfig, DeviceConfig, LocationData};
 
 const MAX_CONFIGURABLE_ANCHORS: usize = 8;
+const LEGACY_3D_MIN_ANCHORS: usize = 4;
+const ROBUST_3D_MIN_ANCHORS: usize = 6;
 
 /// Parse a firmware `backup-config` payload into a DeviceConfig.
 ///
@@ -289,22 +291,38 @@ fn validate_static_tag_anchor_requirements(
     validate_tag_anchor_requirements_for_estimator(
         anchors,
         config.uwb.use_2d_estimator.unwrap_or(1),
+        config.uwb.tdoa_estimator_mode,
     )
 }
 
 fn validate_tag_anchor_requirements_for_estimator(
     anchors: &[AnchorConfig],
     use_2d_estimator: u8,
+    tdoa_estimator_mode: Option<u8>,
 ) -> Result<(), String> {
     if use_2d_estimator > 1 {
         return Err("use2DEstimator must be 0 or 1".to_string());
     }
+    if let Some(v) = tdoa_estimator_mode {
+        if v > 2 {
+            return Err("tdoaEstimatorMode must be 0, 1, or 2".to_string());
+        }
+    }
 
     let use_3d_estimator = use_2d_estimator == 0;
-    if anchors.len() < 4 {
+    let legacy_3d_estimator = use_3d_estimator && tdoa_estimator_mode == Some(0);
+    let min_anchors = if !use_3d_estimator {
+        4
+    } else if legacy_3d_estimator {
+        LEGACY_3D_MIN_ANCHORS
+    } else {
+        ROBUST_3D_MIN_ANCHORS
+    };
+    if anchors.len() < min_anchors {
         return Err(format!(
-            "{} TAG_TDOA static geometry requires at least 4 anchors",
+            "{} TAG_TDOA static geometry requires at least {} anchors",
             if use_3d_estimator { "3D" } else { "2D" },
+            min_anchors,
         ));
     }
 
@@ -319,6 +337,16 @@ fn validate_dynamic_tag_anchor_requirements(config: &DeviceConfig) -> Result<(),
     if let Some(v) = config.uwb.use_2d_estimator {
         if v > 1 {
             return Err("use2DEstimator must be 0 or 1".to_string());
+        }
+    }
+    if let Some(v) = config.uwb.tdoa_estimator_mode {
+        if v > 2 {
+            return Err("tdoaEstimatorMode must be 0, 1, or 2".to_string());
+        }
+    }
+    if let Some(v) = config.uwb.tdoa_estimator_diag {
+        if v > 2 {
+            return Err("tdoaEstimatorDiag must be 0, 1, or 2".to_string());
         }
     }
     if config.uwb.mode == 4
@@ -575,6 +603,20 @@ pub fn config_to_params(config: &DeviceConfig) -> Result<Vec<ParamTuple>, String
             v.to_string(),
         ));
     }
+    if let Some(v) = config.uwb.tdoa_estimator_mode {
+        params.push((
+            "uwb".to_string(),
+            "tdoaEstimatorMode".to_string(),
+            v.to_string(),
+        ));
+    }
+    if let Some(v) = config.uwb.tdoa_estimator_diag {
+        params.push((
+            "uwb".to_string(),
+            "tdoaEstimatorDiag".to_string(),
+            v.to_string(),
+        ));
+    }
     if let Some(v) = config.uwb.channel {
         params.push(("uwb".to_string(), "channel".to_string(), v.to_string()));
     }
@@ -731,7 +773,7 @@ pub fn location_to_params(location: &LocationData) -> Result<Vec<ParamTuple>, St
     if location.anchors.is_empty() {
         return Err("Location preset must include anchor geometry".to_string());
     }
-    validate_tag_anchor_requirements_for_estimator(&location.anchors, use_2d_estimator)?;
+    validate_tag_anchor_requirements_for_estimator(&location.anchors, use_2d_estimator, None)?;
     if use_2d_estimator != 0 {
         params.push((
             "uwb".to_string(),
@@ -798,6 +840,8 @@ mod tests {
                 rf_forward_preserve_src_ids: None,
                 enable_cov_matrix: None,
                 rmse_threshold: None,
+                tdoa_estimator_mode: None,
+                tdoa_estimator_diag: None,
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,
@@ -888,6 +932,8 @@ mod tests {
                 rf_forward_preserve_src_ids: Some(1),
                 enable_cov_matrix: Some(1),
                 rmse_threshold: Some(0.8),
+                tdoa_estimator_mode: Some(2),
+                tdoa_estimator_diag: Some(1),
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,
@@ -1328,6 +1374,8 @@ mod tests {
                 rf_forward_preserve_src_ids: None,
                 enable_cov_matrix: None,
                 rmse_threshold: None,
+                tdoa_estimator_mode: None,
+                tdoa_estimator_diag: None,
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,
@@ -1508,6 +1556,18 @@ mod tests {
                     y: 4.0,
                     z: 0.0,
                 },
+                AnchorConfig {
+                    id: "4".to_string(),
+                    x: 1.5,
+                    y: 2.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "5".to_string(),
+                    x: 2.0,
+                    y: 1.0,
+                    z: 0.0,
+                },
             ],
             use_2d_estimator: Some(0),
         };
@@ -1550,6 +1610,18 @@ mod tests {
                     id: "3".to_string(),
                     x: 1.0,
                     y: 1.0,
+                    z: 2.0,
+                },
+                AnchorConfig {
+                    id: "4".to_string(),
+                    x: 3.0,
+                    y: 4.0,
+                    z: 2.0,
+                },
+                AnchorConfig {
+                    id: "5".to_string(),
+                    x: 0.0,
+                    y: 4.0,
                     z: 2.0,
                 },
             ],
@@ -1608,6 +1680,8 @@ mod tests {
                 rf_forward_preserve_src_ids: None,
                 enable_cov_matrix: None,
                 rmse_threshold: None,
+                tdoa_estimator_mode: None,
+                tdoa_estimator_diag: None,
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,
@@ -1774,12 +1848,12 @@ mod tests {
 
         assert_eq!(
             config_to_params(&config).unwrap_err(),
-            "3D TAG_TDOA static geometry requires at least 4 anchors"
+            "3D TAG_TDOA static geometry requires at least 6 anchors"
         );
     }
 
     #[test]
-    fn config_to_params_allows_four_non_coplanar_static_3d_anchors() {
+    fn config_to_params_allows_four_non_coplanar_static_legacy_3d_anchors() {
         let mut config = minimal_device_config(
             Some(4),
             Some(vec![
@@ -1810,11 +1884,66 @@ mod tests {
             ]),
         );
         config.uwb.use_2d_estimator = Some(0);
+        config.uwb.tdoa_estimator_mode = Some(0);
 
         let params = config_to_params(&config).unwrap();
         assert!(params
             .iter()
             .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "4"));
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "tdoaEstimatorMode" && v == "0"));
+    }
+
+    #[test]
+    fn config_to_params_allows_six_non_coplanar_static_3d_anchors() {
+        let mut config = minimal_device_config(
+            Some(6),
+            Some(vec![
+                AnchorConfig {
+                    id: "0".to_string(),
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "1".to_string(),
+                    x: 3.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "2".to_string(),
+                    x: 0.0,
+                    y: 4.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "3".to_string(),
+                    x: 1.0,
+                    y: 1.0,
+                    z: 2.0,
+                },
+                AnchorConfig {
+                    id: "4".to_string(),
+                    x: 3.0,
+                    y: 4.0,
+                    z: 2.0,
+                },
+                AnchorConfig {
+                    id: "5".to_string(),
+                    x: 0.0,
+                    y: 4.0,
+                    z: 2.0,
+                },
+            ]),
+        );
+        config.uwb.use_2d_estimator = Some(0);
+
+        let params = config_to_params(&config).unwrap();
+        assert!(params
+            .iter()
+            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "6"));
         let anchor_count_pos = params
             .iter()
             .position(|(g, n, _)| g == "uwb" && n == "anchorCount")
@@ -1874,7 +2003,7 @@ mod tests {
     #[test]
     fn config_to_params_rejects_static_3d_coplanar_anchors_before_writing() {
         let mut config = minimal_device_config(
-            Some(5),
+            Some(6),
             Some(vec![
                 AnchorConfig {
                     id: "0".to_string(),
@@ -1904,6 +2033,12 @@ mod tests {
                     id: "4".to_string(),
                     x: 1.5,
                     y: 2.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "5".to_string(),
+                    x: 2.0,
+                    y: 1.0,
                     z: 0.0,
                 },
             ]),
@@ -2010,6 +2145,8 @@ mod tests {
                 rf_forward_preserve_src_ids: None,
                 enable_cov_matrix: None,
                 rmse_threshold: None,
+                tdoa_estimator_mode: None,
+                tdoa_estimator_diag: None,
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,

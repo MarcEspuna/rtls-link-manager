@@ -268,6 +268,12 @@ pub struct UwbConfig {
     /// RMSE threshold for position validity in meters
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rmse_threshold: Option<f64>,
+    /// 3D TDoA estimator mode: 0=legacy, 1=robust, 2=compare
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_estimator_mode: Option<u8>,
+    /// TDoA estimator diagnostics level: 0=off, 1=summary, 2=selected rows
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tdoa_estimator_diag: Option<u8>,
     /// UWB channel (1-7), default 2
     #[serde(skip_serializing_if = "Option::is_none")]
     pub channel: Option<u8>,
@@ -673,6 +679,8 @@ mod tests {
                 rf_forward_preserve_src_ids: Some(1),
                 enable_cov_matrix: Some(1),
                 rmse_threshold: Some(0.8),
+                tdoa_estimator_mode: Some(2),
+                tdoa_estimator_diag: Some(1),
                 channel: None,
                 dw_mode: None,
                 tx_power_level: None,

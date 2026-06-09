@@ -21,6 +21,7 @@ pub enum FrameType {
     LogMessage = 17,
     TdoaEstimatorStatus = 32,
     TdoaAnchorStats = 33,
+    TdoaPositionEstimatorStatus = 34,
 }
 
 #[derive(Debug, Clone)]
@@ -126,6 +127,9 @@ pub fn decode_command_frame(data: &[u8], device_ip: &str) -> Result<Value, CoreE
         x if x == FrameType::LedState as u8 => decode_led_state(frame)?,
         x if x == FrameType::TdoaEstimatorStatus as u8 => decode_tdoa_estimator_status(frame)?,
         x if x == FrameType::TdoaAnchorStats as u8 => decode_tdoa_anchor_stats(frame)?,
+        x if x == FrameType::TdoaPositionEstimatorStatus as u8 => {
+            decode_tdoa_position_estimator_status(frame)?
+        }
         _ => {
             return Err(CoreError::Device(DeviceError::InvalidResponse {
                 ip: device_ip.to_string(),
@@ -299,6 +303,128 @@ fn decode_tdoa_anchor_stats(frame: BinaryFrame<'_>) -> Result<Value, CoreError> 
         "packetIds": packet_ids,
         "distances": distances,
         "slots": slots,
+    }))
+}
+
+fn mode_name(mode: u8) -> &'static str {
+    match mode {
+        0 => "legacy_3d",
+        1 => "robust_3d",
+        2 => "compare",
+        255 => "two_d",
+        _ => "unknown",
+    }
+}
+
+fn decode_tdoa_position_estimator_status(frame: BinaryFrame<'_>) -> Result<Value, CoreError> {
+    if frame.status != 0 {
+        return decode_ack(frame);
+    }
+
+    let mut r = Reader::new(frame.payload);
+    let mode = r.u8().map_err(CoreError::Other)?;
+    let diag_level = r.u8().map_err(CoreError::Other)?;
+    let flags = r.u8().map_err(CoreError::Other)?;
+    let input_rows = r.u8().map_err(CoreError::Other)?;
+    let selected_rows = r.u8().map_err(CoreError::Other)?;
+    let unique_anchors = r.u8().map_err(CoreError::Other)?;
+    let iterations = r.u8().map_err(CoreError::Other)?;
+    let _reserved = r.u8().map_err(CoreError::Other)?;
+    let samples_sent = r.u32().map_err(CoreError::Other)?;
+    let samples_rejected = r.u32().map_err(CoreError::Other)?;
+    let reject_rmse = r.u32().map_err(CoreError::Other)?;
+    let reject_nan = r.u32().map_err(CoreError::Other)?;
+    let reject_insufficient = r.u32().map_err(CoreError::Other)?;
+    let stale_removed = r.u32().map_err(CoreError::Other)?;
+    let producer_dropped = r.u32().map_err(CoreError::Other)?;
+    let solve_count = r.u32().map_err(CoreError::Other)?;
+    let solve_min_us = r.u32().map_err(CoreError::Other)?;
+    let solve_avg_us = r.u32().map_err(CoreError::Other)?;
+    let solve_max_us = r.u32().map_err(CoreError::Other)?;
+    let solve_us = r.u32().map_err(CoreError::Other)?;
+    let legacy_solve_us = r.u32().map_err(CoreError::Other)?;
+    let robust_solve_us = r.u32().map_err(CoreError::Other)?;
+    let rmse_mm = r.u32().map_err(CoreError::Other)?;
+    let residual_scale_mm = r.u32().map_err(CoreError::Other)?;
+    let x_mm = r.i32().map_err(CoreError::Other)?;
+    let y_mm = r.i32().map_err(CoreError::Other)?;
+    let z_mm = r.i32().map_err(CoreError::Other)?;
+    let compare_runs = r.u32().map_err(CoreError::Other)?;
+    let compare_fallback_legacy = r.u32().map_err(CoreError::Other)?;
+    let compare_robust_invalid = r.u32().map_err(CoreError::Other)?;
+    let legacy_rmse_mm = r.u32().map_err(CoreError::Other)?;
+    let robust_rmse_mm = r.u32().map_err(CoreError::Other)?;
+    let compare_delta_mm = r.u32().map_err(CoreError::Other)?;
+    let diag_count = r.u8().map_err(CoreError::Other)? as usize;
+
+    let mut rows = Vec::with_capacity(diag_count);
+    for _ in 0..diag_count {
+        let anchor_a = r.u8().map_err(CoreError::Other)?;
+        let anchor_b = r.u8().map_err(CoreError::Other)?;
+        let residual_mm = r.i32().map_err(CoreError::Other)?;
+        let base_weight_q8 = r.u8().map_err(CoreError::Other)?;
+        let final_weight_q8 = r.u8().map_err(CoreError::Other)?;
+        rows.push(json!({
+            "pair": format!("{}{}", anchor_a, anchor_b),
+            "anchorA": anchor_a,
+            "anchorB": anchor_b,
+            "residualM": residual_mm as f64 / 1000.0,
+            "baseWeight": base_weight_q8 as f64 / 255.0,
+            "finalWeight": final_weight_q8 as f64 / 255.0,
+        }));
+    }
+
+    Ok(json!({
+        "mode": mode_name(mode),
+        "modeId": mode,
+        "diagLevel": diag_level,
+        "flags": flags,
+        "accepted": (flags & (1 << 0)) != 0,
+        "robustPass": (flags & (1 << 1)) != 0,
+        "pairSelection": (flags & (1 << 2)) != 0,
+        "compareMode": (flags & (1 << 3)) != 0,
+        "fallbackLegacy": (flags & (1 << 4)) != 0,
+        "covarianceSent": (flags & (1 << 5)) != 0,
+        "covarianceInvalid": (flags & (1 << 6)) != 0,
+        "robustInvalid": (flags & (1 << 7)) != 0,
+        "inputRows": input_rows,
+        "selectedRows": selected_rows,
+        "uniqueAnchors": unique_anchors,
+        "iterations": iterations,
+        "counts": {
+            "sent": samples_sent,
+            "rejected": samples_rejected,
+            "rejectRmse": reject_rmse,
+            "rejectNan": reject_nan,
+            "rejectInsufficient": reject_insufficient,
+            "staleRemoved": stale_removed,
+            "producerDropped": producer_dropped,
+            "compareRuns": compare_runs,
+            "compareFallbackLegacy": compare_fallback_legacy,
+            "compareRobustInvalid": compare_robust_invalid,
+        },
+        "timing": {
+            "solveCount": solve_count,
+            "minUs": solve_min_us,
+            "avgUs": solve_avg_us,
+            "maxUs": solve_max_us,
+            "lastUs": solve_us,
+            "legacyUs": legacy_solve_us,
+            "robustUs": robust_solve_us,
+        },
+        "position": {
+            "x": x_mm as f64 / 1000.0,
+            "y": y_mm as f64 / 1000.0,
+            "z": z_mm as f64 / 1000.0,
+        },
+        "rmseM": rmse_mm as f64 / 1000.0,
+        "residualScaleM": residual_scale_mm as f64 / 1000.0,
+        "compare": {
+            "legacyRmseM": legacy_rmse_mm as f64 / 1000.0,
+            "robustRmseM": robust_rmse_mm as f64 / 1000.0,
+            "positionDeltaM": compare_delta_mm as f64 / 1000.0,
+        },
+        "rows": rows,
     }))
 }
 
@@ -541,6 +667,10 @@ mod tests {
         out.extend_from_slice(&value.to_le_bytes());
     }
 
+    fn push_i32(out: &mut Vec<u8>, value: i32) {
+        out.extend_from_slice(&value.to_le_bytes());
+    }
+
     fn push_string(out: &mut Vec<u8>, value: &str) {
         push_u16(out, value.len() as u16);
         out.extend_from_slice(value.as_bytes());
@@ -710,5 +840,72 @@ mod tests {
         assert_eq!(value["pairs"][0]["pair"], "12");
         assert_eq!(value["pairs"][0]["locked"], 111);
         assert_eq!(value["pairs"][0]["residualMax"], 7);
+    }
+
+    #[test]
+    fn decodes_tdoa_position_estimator_status_frame() {
+        let mut payload = vec![2, 2, 0b1111_1111, 15, 12, 8, 4, 0];
+        push_u32(&mut payload, 10);
+        push_u32(&mut payload, 2);
+        push_u32(&mut payload, 1);
+        push_u32(&mut payload, 0);
+        push_u32(&mut payload, 1);
+        push_u32(&mut payload, 3);
+        push_u32(&mut payload, 4);
+        push_u32(&mut payload, 9);
+        push_u32(&mut payload, 120);
+        push_u32(&mut payload, 180);
+        push_u32(&mut payload, 320);
+        push_u32(&mut payload, 440);
+        push_u32(&mut payload, 170);
+        push_u32(&mut payload, 260);
+        push_u32(&mut payload, 91);
+        push_u32(&mut payload, 52);
+        push_i32(&mut payload, 1234);
+        push_i32(&mut payload, -567);
+        push_i32(&mut payload, 2100);
+        push_u32(&mut payload, 5);
+        push_u32(&mut payload, 2);
+        push_u32(&mut payload, 3);
+        push_u32(&mut payload, 130);
+        push_u32(&mut payload, 91);
+        push_u32(&mut payload, 42);
+        payload.push(1);
+        payload.push(2);
+        payload.push(7);
+        push_i32(&mut payload, -83);
+        payload.push(255);
+        payload.push(128);
+
+        let value = decode_command_frame(
+            &frame(FrameType::TdoaPositionEstimatorStatus, payload),
+            "192.168.1.50",
+        )
+        .expect("position estimator frame");
+
+        assert_eq!(value["mode"], "compare");
+        assert_eq!(value["accepted"], true);
+        assert_eq!(value["robustPass"], true);
+        assert_eq!(value["pairSelection"], true);
+        assert_eq!(value["compareMode"], true);
+        assert_eq!(value["fallbackLegacy"], true);
+        assert_eq!(value["covarianceSent"], true);
+        assert_eq!(value["covarianceInvalid"], true);
+        assert_eq!(value["robustInvalid"], true);
+        assert_eq!(value["inputRows"], 15);
+        assert_eq!(value["selectedRows"], 12);
+        assert_eq!(value["counts"]["producerDropped"], 4);
+        assert_eq!(value["counts"]["compareFallbackLegacy"], 2);
+        assert_eq!(value["counts"]["compareRobustInvalid"], 3);
+        assert_eq!(value["timing"]["lastUs"], 440);
+        assert_eq!(value["timing"]["legacyUs"], 170);
+        assert_eq!(value["timing"]["robustUs"], 260);
+        assert_eq!(value["position"]["x"], 1.234);
+        assert_eq!(value["position"]["y"], -0.567);
+        assert_eq!(value["rmseM"], 0.091);
+        assert_eq!(value["compare"]["positionDeltaM"], 0.042);
+        assert_eq!(value["rows"][0]["pair"], "27");
+        assert_eq!(value["rows"][0]["residualM"], -0.083);
+        assert_eq!(value["rows"][0]["baseWeight"], 1.0);
     }
 }

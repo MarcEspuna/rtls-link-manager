@@ -113,6 +113,8 @@ export function configToParams(config: DeviceConfig): Array<[string, string, str
     if (config.uwb.rfForwardPreserveSrcIds !== undefined) params.push(['uwb', 'rfForwardPreserveSrcIds', String(config.uwb.rfForwardPreserveSrcIds)]);
     if (config.uwb.enableCovMatrix !== undefined) params.push(['uwb', 'enableCovMatrix', String(config.uwb.enableCovMatrix)]);
     if (config.uwb.rmseThreshold !== undefined) params.push(['uwb', 'rmseThreshold', String(config.uwb.rmseThreshold)]);
+    if (config.uwb.tdoaEstimatorMode !== undefined) params.push(['uwb', 'tdoaEstimatorMode', String(config.uwb.tdoaEstimatorMode)]);
+    if (config.uwb.tdoaEstimatorDiag !== undefined) params.push(['uwb', 'tdoaEstimatorDiag', String(config.uwb.tdoaEstimatorDiag)]);
     // UWB Radio settings (TDoA mode only, expert mode)
     if (config.uwb.channel !== undefined) params.push(['uwb', 'channel', String(config.uwb.channel)]);
     if (config.uwb.dwMode !== undefined) params.push(['uwb', 'dwMode', String(config.uwb.dwMode)]);

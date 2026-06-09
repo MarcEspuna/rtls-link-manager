@@ -34,6 +34,7 @@ export const Commands = {
   // Diagnostics / calibration
   tdoaDistances: () => 'tdoa-distances',
   tdoaAnchorStats: () => 'tdoa-anchor-stats',
+  tdoaEstimatorStatus: () => 'tdoa-estimator-status',
 } as const;
 
 // Commands that return structured responses.
@@ -51,6 +52,7 @@ export const STRUCTURED_RESPONSE_COMMANDS = [
   'firmware-info',
   'tdoa-distances',
   'tdoa-anchor-stats',
+  'tdoa-estimator-status',
 ];
 
 export function isStructuredResponseCommand(cmd: string): boolean {
