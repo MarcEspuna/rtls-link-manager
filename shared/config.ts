@@ -183,6 +183,20 @@ export function validateConfig(config: Partial<DeviceConfig>): ConfigValidationR
       errors.push('TDoA matcher policy must be 0 or 1');
     }
 
+    if (config.uwb.tdoaEstimatorMode !== undefined &&
+      config.uwb.tdoaEstimatorMode !== 0 &&
+      config.uwb.tdoaEstimatorMode !== 1 &&
+      config.uwb.tdoaEstimatorMode !== 2) {
+      errors.push('TDoA estimator mode must be 0, 1, or 2');
+    }
+
+    if (config.uwb.tdoaEstimatorDiag !== undefined &&
+      config.uwb.tdoaEstimatorDiag !== 0 &&
+      config.uwb.tdoaEstimatorDiag !== 1 &&
+      config.uwb.tdoaEstimatorDiag !== 2) {
+      errors.push('TDoA estimator diagnostics must be 0, 1, or 2');
+    }
+
     if (config.uwb.rmseThreshold !== undefined) {
       const v = Number(config.uwb.rmseThreshold);
       if (Number.isNaN(v) || !Number.isFinite(v) || v <= 0) {

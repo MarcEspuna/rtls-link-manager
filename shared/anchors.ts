@@ -134,8 +134,9 @@ export function validateStaticTagAnchorList(anchors: AnchorConfig[], use2DEstima
   }
 
   const use3DEstimator = use2DEstimator === 0;
-  if (anchors.length < 4) {
-    return `${use3DEstimator ? '3D' : '2D'} TAG_TDOA static geometry requires at least 4 anchors`;
+  const minAnchors = use3DEstimator ? 6 : 4;
+  if (anchors.length < minAnchors) {
+    return `${use3DEstimator ? '3D' : '2D'} TAG_TDOA static geometry requires at least ${minAnchors} anchors`;
   }
   if (use3DEstimator && !anchorsAreNonCoplanar3D(anchors)) {
     return '3D TAG_TDOA static geometry requires non-coplanar anchors';

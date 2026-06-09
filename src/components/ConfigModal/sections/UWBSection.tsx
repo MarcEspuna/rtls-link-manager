@@ -375,6 +375,36 @@ export function UWBSection({ config, onChange, onApply, onApplyBatch, isExpertMo
                 <option value={1}>Random</option>
               </select>
             </div>
+            <div className={styles.field}>
+              <label>Estimator Mode</label>
+              <select
+                value={config.uwb.tdoaEstimatorMode ?? 1}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  onChange('uwb', 'tdoaEstimatorMode', val);
+                  onApply('uwb', 'tdoaEstimatorMode', val);
+                }}
+              >
+                <option value={1}>Robust</option>
+                <option value={0}>Legacy</option>
+                <option value={2}>Compare</option>
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label>Estimator Diagnostics</label>
+              <select
+                value={config.uwb.tdoaEstimatorDiag ?? 0}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  onChange('uwb', 'tdoaEstimatorDiag', val);
+                  onApply('uwb', 'tdoaEstimatorDiag', val);
+                }}
+              >
+                <option value={0}>Off</option>
+                <option value={1}>Summary</option>
+                <option value={2}>Selected Rows</option>
+              </select>
+            </div>
           </div>
         </div>
       )}

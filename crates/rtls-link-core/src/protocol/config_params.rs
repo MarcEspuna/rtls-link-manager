@@ -301,10 +301,12 @@ fn validate_tag_anchor_requirements_for_estimator(
     }
 
     let use_3d_estimator = use_2d_estimator == 0;
-    if anchors.len() < 4 {
+    let min_anchors = if use_3d_estimator { 6 } else { 4 };
+    if anchors.len() < min_anchors {
         return Err(format!(
-            "{} TAG_TDOA static geometry requires at least 4 anchors",
+            "{} TAG_TDOA static geometry requires at least {} anchors",
             if use_3d_estimator { "3D" } else { "2D" },
+            min_anchors,
         ));
     }
 
@@ -1538,6 +1540,18 @@ mod tests {
                     y: 4.0,
                     z: 0.0,
                 },
+                AnchorConfig {
+                    id: "4".to_string(),
+                    x: 1.5,
+                    y: 2.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "5".to_string(),
+                    x: 2.0,
+                    y: 1.0,
+                    z: 0.0,
+                },
             ],
             use_2d_estimator: Some(0),
         };
@@ -1580,6 +1594,18 @@ mod tests {
                     id: "3".to_string(),
                     x: 1.0,
                     y: 1.0,
+                    z: 2.0,
+                },
+                AnchorConfig {
+                    id: "4".to_string(),
+                    x: 3.0,
+                    y: 4.0,
+                    z: 2.0,
+                },
+                AnchorConfig {
+                    id: "5".to_string(),
+                    x: 0.0,
+                    y: 4.0,
                     z: 2.0,
                 },
             ],
@@ -1806,14 +1832,14 @@ mod tests {
 
         assert_eq!(
             config_to_params(&config).unwrap_err(),
-            "3D TAG_TDOA static geometry requires at least 4 anchors"
+            "3D TAG_TDOA static geometry requires at least 6 anchors"
         );
     }
 
     #[test]
-    fn config_to_params_allows_four_non_coplanar_static_3d_anchors() {
+    fn config_to_params_allows_six_non_coplanar_static_3d_anchors() {
         let mut config = minimal_device_config(
-            Some(4),
+            Some(6),
             Some(vec![
                 AnchorConfig {
                     id: "0".to_string(),
@@ -1839,6 +1865,18 @@ mod tests {
                     y: 1.0,
                     z: 2.0,
                 },
+                AnchorConfig {
+                    id: "4".to_string(),
+                    x: 3.0,
+                    y: 4.0,
+                    z: 2.0,
+                },
+                AnchorConfig {
+                    id: "5".to_string(),
+                    x: 0.0,
+                    y: 4.0,
+                    z: 2.0,
+                },
             ]),
         );
         config.uwb.use_2d_estimator = Some(0);
@@ -1846,7 +1884,7 @@ mod tests {
         let params = config_to_params(&config).unwrap();
         assert!(params
             .iter()
-            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "4"));
+            .any(|(g, n, v)| g == "uwb" && n == "anchorCount" && v == "6"));
         let anchor_count_pos = params
             .iter()
             .position(|(g, n, _)| g == "uwb" && n == "anchorCount")
@@ -1906,7 +1944,7 @@ mod tests {
     #[test]
     fn config_to_params_rejects_static_3d_coplanar_anchors_before_writing() {
         let mut config = minimal_device_config(
-            Some(5),
+            Some(6),
             Some(vec![
                 AnchorConfig {
                     id: "0".to_string(),
@@ -1936,6 +1974,12 @@ mod tests {
                     id: "4".to_string(),
                     x: 1.5,
                     y: 2.0,
+                    z: 0.0,
+                },
+                AnchorConfig {
+                    id: "5".to_string(),
+                    x: 2.0,
+                    y: 1.0,
                     z: 0.0,
                 },
             ]),

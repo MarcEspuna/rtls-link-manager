@@ -78,6 +78,7 @@ describe('validateConfig', () => {
           { id: '2', x: 3, y: 4, z: 0 },
           { id: '3', x: 0, y: 4, z: 0 },
           { id: '4', x: 1.5, y: 2, z: 0 },
+          { id: '5', x: 2, y: 1, z: 0 },
         ],
       } as any
     });
@@ -101,7 +102,7 @@ describe('validateConfig', () => {
     expect(result.errors).toContain('2D TAG_TDOA static geometry requires at least 4 anchors');
   });
 
-  it('rejects static 3D TAG_TDOA geometry with fewer than 4 anchors', () => {
+  it('rejects static 3D TAG_TDOA geometry with fewer than 6 anchors', () => {
     const result = validateConfig({
       uwb: {
         mode: 4,
@@ -114,10 +115,10 @@ describe('validateConfig', () => {
       } as any
     });
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('3D TAG_TDOA static geometry requires at least 4 anchors');
+    expect(result.errors).toContain('3D TAG_TDOA static geometry requires at least 6 anchors');
   });
 
-  it('accepts four non-coplanar static anchors for 3D TAG_TDOA configs', () => {
+  it('accepts six non-coplanar static anchors for 3D TAG_TDOA configs', () => {
     const result = validateConfig({
       uwb: {
         mode: 4,
@@ -127,6 +128,8 @@ describe('validateConfig', () => {
           { id: '1', x: 3, y: 0, z: 0 },
           { id: '2', x: 0, y: 4, z: 0 },
           { id: '3', x: 1, y: 1, z: 2 },
+          { id: '4', x: 3, y: 4, z: 2 },
+          { id: '5', x: 0, y: 4, z: 2 },
         ],
       } as any
     });
@@ -310,6 +313,18 @@ describe('validateConfig', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('TDoA matcher policy must be 0 or 1');
+  });
+
+  it('validates TDoA estimator controls', () => {
+    const result = validateConfig({
+      uwb: {
+        tdoaEstimatorMode: 3,
+        tdoaEstimatorDiag: 3,
+      } as any
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('TDoA estimator mode must be 0, 1, or 2');
+    expect(result.errors).toContain('TDoA estimator diagnostics must be 0, 1, or 2');
   });
 
   it('validates TDoA anchor telemetry settings', () => {
